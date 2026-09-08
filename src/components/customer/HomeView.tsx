@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ArrowRight, Zap, RotateCcw, ShieldCheck, Truck, Undo2, Headset, Clock3 } from "lucide-react";
-import { useData } from "@/lib/hooks";
+import { useData, useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { searchProducts, summarize } from "@/lib/catalog";
 import { repeatItemsForCustomer } from "@/lib/engines";
 import { SearchBox } from "./CustomerShell";
 import ProductCard from "./ProductCard";
 import AssetImage from "@/components/shared/AssetImage";
-import { won } from "@/lib/format";
+import { shipCutdown, todayLabel, won } from "@/lib/format";
 import { useToast } from "@/components/shared/Toast";
 
 const CAT_ICON: Record<string, string> = { food: "🍚", living: "🧻", kitchen: "🧽", home: "🛋️", digital: "🔌", pet: "🐾", baby: "🍼", health: "💊" };
@@ -41,6 +41,8 @@ export default function HomeView() {
     return searchProducts(data, { sort: "popular" }).filter((s) => cats.has(s.product.categorySlug) && !repeat.some((r) => r.product.id === s.product.id)).slice(0, 4);
   }, [data, repeat]);
   const me = data.customers.find((c) => c.id === customerId);
+  const now = useNow(30000);
+  const cut = useMemo(() => (now ? { ...shipCutdown(now), now } : null), [now]);
 
   return (
     <div className="pb-6">
@@ -53,16 +55,28 @@ export default function HomeView() {
             <p className="mt-3 text-white/75 text-[17px] max-w-xl">식품·생활·주방·리빙·디지털·반려·유아·건강. 재고와 배송예정일을 구매 전에 확인하고, 자주 쓰는 상품은 한 번에 다시 담습니다.</p>
             <div className="mt-6 max-w-2xl text-ink"><SearchBox size="lg" /></div>
             <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/80">
-              <li className="inline-flex items-center gap-1.5"><Zap size={15} className="text-teal fill-teal" />15:00 전 주문 시 내일 도착</li>
+              <li className="inline-flex items-center gap-1.5"><Zap size={15} className="text-teal fill-teal" />{cut ? (cut.beforeCutoff ? `오늘 15:00까지 ${cut.remain} 남음 · ${cut.arriveLabel} 도착` : `지금 주문 시 ${cut.arriveLabel} 도착`) : "15:00 전 주문 시 내일 도착"}</li>
               <li className="inline-flex items-center gap-1.5"><Truck size={15} className="text-teal" />3만원 이상 무료배송</li>
               <li className="inline-flex items-center gap-1.5"><RotateCcw size={15} className="text-teal" />다시 구매 한 번에 담기</li>
             </ul>
           </div>
           <div className="relative">
-            <AssetImage assetKey="hero-01" category="living" variant="hero" ratio="asp-[4/3] aspect-[4/3]" className="rounded-3xl bg-white/10 border border-white/10" />
+            <AssetImage assetKey="hero-01" category="living" variant="hero" ratio="aspect-[4/3.6] sm:aspect-[4/3]" className="rounded-3xl bg-white/10 border border-white/10" />
+            {/* 사진 자산이 들어오기 전에도 비어 보이지 않도록: 실시간 배송 현황 오버레이 */}
+            <div className="absolute left-4 top-4 right-4">
+              <div className="rounded-2xl bg-white/95 text-ink px-4 py-3 shadow-card">
+                <div className="text-[11px] font-semibold text-muted">{cut ? todayLabel(cut.now, false) : "오늘"} 빠른배송</div>
+                {cut?.beforeCutoff ? (
+                  <div className="mt-0.5 flex items-baseline gap-1.5"><span className="text-2xl sm:text-3xl font-black tabular-nums text-navy">{cut.remain}</span><span className="text-sm font-semibold text-muted">남음</span></div>
+                ) : (
+                  <div className="mt-0.5 text-xl font-black text-navy">오늘 마감</div>
+                )}
+                <div className="text-xs text-muted mt-0.5">지금 주문 시 <b className="text-teal">{cut?.arriveLabel ?? "-"}</b> 도착 예정</div>
+              </div>
+            </div>
             <div className="absolute left-4 bottom-4 right-4 grid grid-cols-3 gap-2">
-              {[["8개 카테고리", "생활 필수품 중심"], ["배송예정 표시", "구매 전 확인"], ["재구매 추천", "구매주기 기반"]].map(([a, b]) => (
-                <div key={a} className="rounded-xl bg-white/95 text-ink px-3 py-2"><div className="font-bold text-sm">{a}</div><div className="text-[11px] text-muted">{b}</div></div>
+              {[["카테고리 8", "생활 필수품 중심"], ["배송예정", "구매 전 확인"], ["재구매 추천", "구매주기 기반"]].map(([a, b]) => (
+                <div key={a} className="rounded-xl bg-white/95 text-ink px-2.5 py-2"><div className="font-bold text-[13px] sm:text-sm whitespace-nowrap">{a}</div><div className="text-[10px] sm:text-[11px] text-muted leading-tight mt-0.5">{b}</div></div>
               ))}
             </div>
           </div>

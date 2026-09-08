@@ -37,6 +37,35 @@ export const relTime = (s: string, now = new Date()) => {
 
 export const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
+/** 빠른배송 출고마감(15:00) 기준 카운트다운 */
+export function shipCutdown(now: Date, cutoffHour = 15) {
+  const cutoff = new Date(now);
+  cutoff.setHours(cutoffHour, 0, 0, 0);
+  const beforeCutoff = now.getTime() < cutoff.getTime();
+  if (!beforeCutoff) cutoff.setDate(cutoff.getDate() + 1);
+  const ms = cutoff.getTime() - now.getTime();
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const arrive = new Date(now.getTime() + (beforeCutoff ? 1 : 2) * 86400000);
+  return {
+    beforeCutoff,
+    hours: h,
+    minutes: m,
+    /** "3시간 12분" */
+    remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`,
+    /** "9/9(수)" */
+    arriveLabel: `${arrive.getMonth() + 1}/${arrive.getDate()}(${DOW[arrive.getDay()]})`,
+    arrive,
+    urgent: beforeCutoff && ms < 3 * 3600000,
+  };
+}
+
+export function todayLabel(now: Date, withTime = true) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const date = `${now.getMonth() + 1}월 ${now.getDate()}일 (${DOW[now.getDay()]})`;
+  return withTime ? `${date} ${p(now.getHours())}:${p(now.getMinutes())}` : date;
+}
+
 export function deliveryPromise(type: "fast" | "standard" | "reserve", available: number, inboundEta?: string, now = new Date()) {
   const p = (n: number) => String(n).padStart(2, "0");
   const addD = (n: number) => new Date(now.getTime() + n * 86400000);

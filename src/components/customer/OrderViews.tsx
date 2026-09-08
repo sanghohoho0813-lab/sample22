@@ -24,6 +24,17 @@ const STEPS: { key: string; label: string; stages: OrderStage[] }[] = [
   { key: "done", label: "배송완료", stages: ["delivered"] },
 ];
 
+/** 주문 상태에 맞는 날짜 문구 — 진행중이면 도착예정, 완료면 실제 완료일 */
+export function deliveryNote(order: Order) {
+  if (order.stage === "cancelled") return `${fmtDate(order.updatedAt, "md")} 취소`;
+  if (order.stage === "return") return `${fmtDate(order.updatedAt, "md")} 반품·교환 접수`;
+  if (order.stage === "delivered") {
+    const at = order.history.find((h) => h.stage === "delivered")?.at ?? order.updatedAt;
+    return `${fmtDate(at, "md")} 배송완료`;
+  }
+  return `${fmtDate(order.promisedAt, "md")} 도착 예정`;
+}
+
 export function OrderProgress({ order }: { order: Order }) {
   if (order.stage === "cancelled") return <div className="badge bg-mist text-muted">취소된 주문</div>;
   if (order.stage === "return") return <div className="badge bg-danger/10 text-danger">반품·교환 진행중</div>;
@@ -129,7 +140,7 @@ export function MyPageView() {
                 </div>
                 <div className="mt-3 flex gap-3 items-center">
                   <div className="flex -space-x-2">{o.items.slice(0, 3).map((it) => { const p = productById.get(it.productId)!; return <AssetImage key={it.skuId} assetKey={`product/${p.id}`} category={p.categorySlug} label={p.name} className="w-14 h-14 rounded-lg ring-2 ring-white" ratio="" />; })}</div>
-                  <div className="min-w-0 flex-1"><div className="font-semibold text-sm line-clamp-1">{o.items[0].name}{o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}</div><div className="text-xs text-muted">{won(o.total)} · {["delivered", "cancelled", "return"].includes(o.stage) ? "" : `${fmtDate(o.promisedAt, "md")} 도착 예정`}</div></div>
+                  <div className="min-w-0 flex-1"><div className="font-semibold text-sm line-clamp-1">{o.items[0].name}{o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}</div><div className="text-xs text-muted">{won(o.total)} · {deliveryNote(o)}</div></div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Link href={`/my/orders/${o.id}`} className="btn-outline btn-sm">배송조회</Link>
@@ -182,7 +193,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
       <div className="mt-2 flex items-end justify-between gap-2 flex-wrap"><h1 className="text-2xl font-bold">주문상세</h1><div className="text-sm text-muted">{order.id} · {fmtDate(order.createdAt, "datetime")}</div></div>
 
       <div className="card mt-4 p-5">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2"><div className="text-lg font-bold">{CUSTOMER_STAGE_LABEL[order.stage]}</div><div className="text-sm text-muted inline-flex items-center gap-1"><Truck size={14} />{["delivered", "cancelled", "return"].includes(order.stage) ? "" : `${fmtDate(order.promisedAt, "md")} 도착 예정`}</div></div>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2"><div className="text-lg font-bold">{CUSTOMER_STAGE_LABEL[order.stage]}</div><div className="text-sm text-muted inline-flex items-center gap-1"><Truck size={14} />{deliveryNote(order)}</div></div>
         <OrderProgress order={order} />
         {order.customerNotified && <div className="mt-4 rounded-xl bg-orange/10 text-[#B84F1A] px-3 py-2 text-sm flex items-start gap-2"><Bell size={15} className="mt-0.5" />물류 사정으로 배송이 하루 지연될 수 있어 미리 안내드립니다. 불편을 드려 죄송합니다.</div>}
         <ol className="mt-5 border-l-2 border-line pl-4 space-y-3">

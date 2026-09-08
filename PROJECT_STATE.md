@@ -52,6 +52,14 @@
 
 - QA_REPORT.md 참조. 자동화 스크립트: Playwright (scratchpad qa.mjs — 저장소 외부)
 
+## 2026-09-08 추가 (모바일 시연 피드백 반영)
+
+- [x] **모바일 AX 진입 경로**: 헤더 `DEMO` 배지를 Demo 컨트롤 버튼으로 전환 → Bottom Sheet에서 Business AX / Presentation Mode / 기획의도 이동. 데스크톱 상단 메뉴 우측과 모바일 Footer에도 동일 진입점 추가 (기존에는 `hidden md:block` Footer에만 있어 모바일에서 접근 불가)
+- [x] **실시간 날짜·시각 (Customer)**: 전 페이지 상단에 Delivery Strip — 오늘 날짜·시각(30초 갱신) + 빠른배송 15:00 출고마감 카운트다운 + 도착예정일. 마감 3시간 이내는 오렌지 강조, 마감 후에는 익일 도착 안내로 전환
+- [x] **Hero 실시간 카드**: 사진 자산 도착 전에도 비어 보이지 않도록 Hero에 "오늘 마감까지 N시간 M분 · 도착예정" 카드 오버레이
+- [x] **모바일 Footer 신설**: 주문·배송조회 / 다시 구매 / 빠른배송 / 취소·반품 바로가기 + 관리자 Demo 버튼 + 회사 고지 (Bottom Nav와 비중첩 검증)
+- [x] **주문 날짜 문구 보정**: 배송완료·취소·반품 건에서 " · " 뒤가 비던 문제 → `deliveryNote()`로 완료일/취소일 표시
+
 ## USER ACTION QUEUE
 
 1. **사진 자산**: `public/assets/README.md` 규칙대로 hero-01 / photo-01 / photo-02 / flow-01 / product/<id> / category/<slug> jpg 추가 (Google Drive 원본 활용 예정). 추가 즉시 placeholder → 실사진 자동 전환.

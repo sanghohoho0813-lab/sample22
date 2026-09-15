@@ -4,8 +4,8 @@
 
 ## 고객 가치 큰 것 (다음 세션 후보)
 
-1. **Radar → 원클릭 Action 생성**: 재고·발주 표에서 "발주 검토 Action 만들기" 버튼 → Action Center에 즉시 카드 생성. (현재는 시드 Action + SKU Drawer 경유)
-2. **AX Owner 필드 + Baseline 입력 화면**: 설정 > 데이터·연결에 "AX Owner 지정 · 측정지점별 Baseline 값 입력" 폼. Pilot 전환의 첫 화면이 됨.
+~~1. Radar → 원클릭 Action 생성~~ ✅ R2 완료
+~~2. AX Owner 필드 + Baseline 입력 화면~~ ✅ R2 완료 (AX Evidence > 실증 준비)
 3. **사진 자산 적용 후 Visual Density 재점검**: Customer 60~80%, AX 30~50% 규칙 확인. Hero Crop Desktop/Mobile 분리.
 4. **Front Reference 재해석**: 12종 Reference 도착 시 Hero composition · Product Card · Nav language 조정 (Signature 4 유지).
 
@@ -13,7 +13,7 @@
 
 5. Fulfillment 보드 드래그로 단계 변경 (현재 Drawer 버튼)
 6. 발주서 PDF/CSV Export (공급사 전달용)
-7. Evidence Pack Markdown Export (12주 실증 보고서 초안)
+~~7. Evidence Pack Markdown Export~~ ✅ R2 완료
 8. 고객 알림 센터 실시간 배지 (현재 My Page 탭)
 
 ## 데이터·AI
@@ -21,6 +21,13 @@
 9. Executive Briefing LLM 연결 (API 키 시) — 1개 기능만
 10. Demand 엔진에 요일·시즌 계수 (90일 데이터로 주간 패턴 반영)
 11. 공급사 가중치 실측 보정 UI (설정에서 가중치 슬라이더)
+
+## R2 Red Team P2 (기록만)
+
+- Baseline 입력값 검증(음수·비율 0~100 범위) 및 단위 힌트
+- 체크리스트 수동 항목(교육·데이터 정리)에 증빙 메모/파일 첨부
+- 생성된 Action의 추천수량을 최소주문수량 배수로 반올림 옵션
+- Evidence Pack PDF 변환 (현재 Markdown)
 
 ## 확장 (NEXT — 실증 후)
 

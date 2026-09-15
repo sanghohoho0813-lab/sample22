@@ -30,7 +30,16 @@ export default function InventoryView() {
   const { supplierById, categoryBySlug } = useLookups();
   const role = useStore((s) => s.ui.role);
   const receive = useStore((s) => s.receiveInbound);
+  const createActionFromSku = useStore((s) => s.createActionFromSku);
   const toast = useToast();
+  const canCreate = role === "owner" || role === "buyer";
+  const makeAction = (skuId: string) => {
+    const id = createActionFromSku(skuId);
+    if (!id) { toast({ title: "Action을 만들 수 없습니다", body: "이미 진행 중인 Action이 있거나 발주 검토가 필요한 상태가 아닙니다.", tone: "info" }); return; }
+    const a = useStore.getState().data.actions.find((x) => x.id === id) ?? null;
+    setAction(a);
+    toast({ title: "Action을 생성했습니다", body: "Radar 계산 근거가 그대로 담겼습니다. 검토 후 승인하세요.", tone: "success" });
+  };
   const sp = useSearchParams();
   const [group, setGroup] = useState<Group>((sp.get("status") as Group) || "risk");
   const [q, setQ] = useState("");
@@ -73,9 +82,9 @@ export default function InventoryView() {
         {list.length ? (
           <div className="table-wrap mt-3">
             <table className="table">
-              <thead><tr><th>상품 · <Term term="SKU" desc={TERMS.sku}>SKU</Term></th><th>상태</th><th className="text-right">가용재고</th><th className="text-right">일판매</th><th className="text-right"><Term term="재고일수" desc={TERMS.daysOfStock}>예상 소진</Term></th><th>수요 14일</th><th className="text-right">검색·장바구니</th><th className="text-right">입고예정</th><th className="text-right"><Term term="리드타임" desc={TERMS.leadTime}>리드타임</Term></th><th className="text-right">추천수량</th><th className="text-right">우선순위</th></tr></thead>
+              <thead><tr><th>상품 · <Term term="SKU" desc={TERMS.sku}>SKU</Term></th><th>상태</th><th className="text-right">가용재고</th><th className="text-right">일판매</th><th className="text-right"><Term term="재고일수" desc={TERMS.daysOfStock}>예상 소진</Term></th><th>수요 14일</th><th className="text-right">검색·장바구니</th><th className="text-right">입고예정</th><th className="text-right"><Term term="리드타임" desc={TERMS.leadTime}>리드타임</Term></th><th className="text-right">추천수량</th><th className="text-right">우선순위</th><th></th></tr></thead>
               <tbody>
-                {list.map((i) => <Row key={i.sku.id} i={i} onOpen={() => setSkuId(i.sku.id)} supplierName={supplierById.get(i.sku.primarySupplierId)?.name} catName={categoryBySlug.get(i.product.categorySlug)?.name} />)}
+                {list.map((i) => <Row key={i.sku.id} i={i} onOpen={() => setSkuId(i.sku.id)} onCreate={canCreate ? () => makeAction(i.sku.id) : undefined} supplierName={supplierById.get(i.sku.primarySupplierId)?.name} catName={categoryBySlug.get(i.product.categorySlug)?.name} />)}
               </tbody>
             </table>
           </div>
@@ -89,7 +98,7 @@ export default function InventoryView() {
             <tr key={po.id} className="row-clickable" onClick={() => setSkuId(po.skuId)}><td className="font-semibold whitespace-nowrap">{po.id}</td><td>{ins?.product.name} <span className="text-muted">· {ins?.sku.name}</span></td><td className="whitespace-nowrap">{supplierById.get(po.supplierId)?.name}</td><td className="text-right tabular-nums">{num(po.qty)}</td>{showCost && <td className="text-right tabular-nums">{won(po.qty * po.unitCost)}</td>}<td className="whitespace-nowrap">{po.expectedAt}</td><td><StatusBadge status={po.status} /></td><td className="text-muted whitespace-nowrap">{po.actor}</td><td>{po.status !== "received" && po.status !== "cancelled" && (role === "owner" || role === "buyer" || role === "ops") && <button className="btn-outline btn-sm whitespace-nowrap" onClick={(e) => { e.stopPropagation(); receive(po.id); toast({ title: `${po.id} 입고 처리`, body: "가용재고 증가 · 고객 상품 재고상태 갱신", tone: "success" }); }}>입고 처리</button>}</td></tr>
           ); })}
         </tbody></table></div>
-        <p className="text-xs text-muted mt-2">자동발주(L4)는 구현하지 않습니다. 모든 발주는 사람이 검토·승인하는 L3 이하로 동작합니다.</p>
+        <p className="text-xs text-muted mt-2">Radar에서 "Action" 버튼을 누르면 계산 근거가 담긴 발주 검토 Action이 생성되고, 승인 시 발주서가 만들어집니다. 자동발주(L4)는 구현하지 않습니다. 모든 발주는 사람이 검토·승인하는 L3 이하로 동작합니다.</p>
       </Panel>
 
       <SkuDrawer skuId={skuId} onClose={() => setSkuId(null)} onOpenAction={(a) => { setSkuId(null); setAction(a); }} />
@@ -98,8 +107,9 @@ export default function InventoryView() {
   );
 }
 
-function Row({ i, onOpen, supplierName, catName }: { i: SkuInsight; onOpen: () => void; supplierName?: string; catName?: string }) {
+function Row({ i, onOpen, onCreate, supplierName, catName }: { i: SkuInsight; onOpen: () => void; onCreate?: () => void; supplierName?: string; catName?: string }) {
   const trend = i.demandTrend;
+  const creatable = !i.hasOpenAction && ((i.recommendedQty > 0 && ["urgent", "stockout", "low", "rising"].includes(i.status)) || ["slow", "overstock"].includes(i.status));
   return (
     <tr className={`row-clickable ${i.priority >= 70 ? "bg-danger/[0.04]" : ""}`} onClick={onOpen}>
       <td><div className="font-semibold whitespace-nowrap">{i.product.name}</div><div className="text-xs text-muted">{i.sku.name} · {catName} · {supplierName}{i.hasOpenAction && <span className="ml-1 text-accent font-semibold">· Action</span>}</div></td>
@@ -113,6 +123,7 @@ function Row({ i, onOpen, supplierName, catName }: { i: SkuInsight; onOpen: () =
       <td className="text-right tabular-nums">{i.leadTimeDays}일</td>
       <td className="text-right tabular-nums font-semibold">{i.recommendedQty ? num(i.recommendedQty) : <span className="text-muted">-</span>}</td>
       <td className="text-right"><div className="inline-flex items-center gap-1.5"><span className="font-bold tabular-nums w-7 text-right">{i.priority}</span><span className="w-12 h-1.5 rounded-full bg-mist overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${i.priority}%`, background: i.priority >= 70 ? "#D93A3A" : i.priority >= 40 ? "#F47A3C" : "var(--t-primary)" }} /></span></div></td>
+      <td>{onCreate && creatable ? <button className="btn-outline btn-sm whitespace-nowrap !min-h-[32px] text-xs" onClick={(e) => { e.stopPropagation(); onCreate(); }}>{["slow", "overstock"].includes(i.status) ? "보류 검토" : "발주 검토"} Action</button> : i.hasOpenAction ? <span className="text-xs text-muted whitespace-nowrap">진행중</span> : null}</td>
     </tr>
   );
 }

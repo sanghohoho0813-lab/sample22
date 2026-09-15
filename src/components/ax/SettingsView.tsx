@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, Palette, Type, Users, Database, Sparkles, FlaskConical, RotateCcw, Smartphone, FileBadge2 } from "lucide-react";
@@ -79,7 +80,7 @@ export default function SettingsView() {
           <div className="table-wrap"><table className="table"><thead><tr><th>항목</th><th>상태</th><th>설명</th></tr></thead><tbody>
             {[["Shared Demo Repository", "LIVE", "브라우저 localStorage 기반 · 고객·AX 동일 데이터"], ["Data Freshness", "LIVE", `Demo 생성 ${generatedAt.slice(0, 16).replace("T", " ")} · 실시간 시각 표시`], ["Event Tracking (19 events)", "READY", "Adapter 구조 · GA4/PostHog/Supabase로 교체 가능"], ["Supabase (DB · Auth · RLS)", "READY", "Entity 스키마 정의됨 · 연결 시 Adapter 교체"], ["CSV Import (상품·재고·주문)", "READY", "Data Intake Ready · 템플릿 정의"], ["실제 결제 (PG)", "READY", "DEMO Checkout → PG 연동 지점 분리"], ["택배사 API", "READY", "Shipment · DeliveryEvent Entity 준비"], ["외부 쇼핑채널", "READY", "채널별 주문 Adapter"], ["정기배송", "NEXT", "Repeat Basket 이후 확장"], ["B2B 대량구매 · 공급사 Portal · 다창고", "NEXT", "실증 후"]].map(([k, s, d]) => <tr key={k}><td className="font-semibold">{k}</td><td><StatusBadge status={s} /></td><td className="text-muted text-sm">{d}</td></tr>)}
           </tbody></table></div>
-          <div className="mt-3 text-sm"><b>Delivery Stage:</b> <Badge tone="warn">{stage}</Badge> <span className="text-muted">— 시연 데이터. Pilot은 실제 데이터 일부 + 현장 실증, Production은 실제 업무·고객 사용.</span></div>
+          <div className="mt-3 text-sm"><b>Delivery Stage:</b> <Badge tone={stage === "DEMO" ? "warn" : "secondary"}>{stage}</Badge> <span className="text-muted">— 시연 데이터. Pilot은 실제 데이터 일부 + 현장 실증, Production은 실제 업무·고객 사용.</span> <Link href="/ax/evidence?tab=pilot" className="text-primary font-semibold ml-1">실증 준비(AX Owner · Baseline) →</Link></div>
         </Panel>
       )}
 

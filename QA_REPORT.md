@@ -1,13 +1,13 @@
 # QA_REPORT.md — NEXMART First Build
 
-> 실행일 2026-09-08 · 환경 Next.js 15.5 / React 19 / Node 22 · 자동화 Playwright(Chromium) + 수동 스크린샷 검토
+> 실행일 2026-09-08 (First Build) · 2026-09-15 (고도화 R2 재검증) · 환경 Next.js 15.5 / React 19 / Node 22 · 자동화 Playwright(Chromium) + 수동 스크린샷 검토
 
 ## Score
 
 | 구분 | 점수 | 근거 |
 |---|---|---|
 | **Strategy Score A** | **93 / 100** | Problem/Constraint 15 · Process 9 · Data 13 · AI Fit 10 · Proof/KPI 12 (Baseline 미측정 −3) · Customer/Platform Fit 10 · Scale/Unit Economics 7 (CAC/LTV 측정항목만 정의) · Moat 5 · Adoption 4 (AX Owner 전용 UI 없음) · Financeability 5 → 90+ 통과, Strategic P0 0 |
-| **Product Score B** | **91 / 100** | Product Shell 14/15 · Business AX 19/20 · Customer 18/20 (사진 자산 미적용 −2) · Cross-Surface 15/15 · Visual/Interaction 13/15 · Theme 9/10 · Story/Growth 5/5 (D-6 기준) — Business 91 / Customer 90 |
+| **Product Score B** | **92 / 100** (R2, 91→92) | Product Shell 14/15 · Business AX 20/20 (Insight→Action 생성으로 KPI→Detail→Insight→Action 전 구간 완성) · Customer 18/20 (사진 자산 미적용 −2) · Cross-Surface 15/15 · Visual/Interaction 13/15 · Theme 9/10 · Story/Growth 5/5 |
 | **Strategic P0** | **0** | 13항목 전수 확인 (아래) |
 | **Product P0 / P1** | **0 / 0** (수정 완료) | Red Team 발견 P0 3 · P1 2 → 모두 수정 후 재검증 |
 | **One-Shot 75 Gate** | **PASS** | 회사 맞춤성·첫인상·핵심 Journey·모바일·데이터/AI/Action 논리·Story·Growth·QA 모두 존재, Placeholder Route 0 |
@@ -86,6 +86,21 @@ Hover/Pressed/Selected/Focus(ring) · Loading(skeleton) · Empty(검색/장바�
 | P2 | 대표 | AX Owner 지정 전용 필드 UI 없음 (Evidence BASELINE 텍스트만) | RECOMMENDATIONS |
 | P2 | 고객 | 상품 사진 placeholder (자산 미제공) | USER ACTION QUEUE |
 | P2 | 투자자 | CAC/LTV/Payback은 측정항목만, 화면 없음 (의도적 — 숫자 발명 금지) | Pilot 후 |
+
+## 고도화 R2 (2026-09-15) — 신규 흐름 자동화 결과
+
+| Step | 결과 |
+|---|---|
+| Radar 품절위험 행 → "발주 검토 Action" → Drawer(근거 3·공급사 대안 2·추천수량 30) → 승인 → 발주요청 · Action 17→18 · 해당 SKU 상태 입고예정 | ✅ |
+| Control Tower 지연위험 → "Action 생성" → 우선처리 Action → 승인 → 실행중 | ✅ |
+| 실증 준비: 전환 버튼 초기 비활성 → Owner(김구매) + Baseline 3(Cost/Revenue/Scale) 입력 → 활성 → PILOT 전환 → 헤더 Stage 배지 PILOT · BASELINE Evidence 생성 | ✅ |
+| Evidence Pack Markdown 다운로드 (6.4KB · Baseline 표 · 입력값 반영 · Simulation 표기) | ✅ |
+| 이전 localStorage 형태(pilot 없음) 재로드 | ✅ (merge 기본값) |
+| Demo Reset → DEMO 복귀 | ✅ |
+| 360/390/768 overflow (pilot·inventory·fulfillment) | 0 (초기 pilot 탭 +595px → `min-w-0` 수정 후 0) |
+| 전체 Journey 회귀 (주문→AX→승인→출고→고객→Repeat→Reset) | ✅ 오류 0 |
+
+Red Team R2: P1 1건(pilot 탭 grid overflow) 수정. P2 — Baseline 입력값 검증(음수·범위) 없음, 체크리스트 수동 항목 근거 첨부 없음 → RECOMMENDATIONS.
 
 ## Known Issues
 

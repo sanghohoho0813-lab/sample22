@@ -1,12 +1,17 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import PilotPanel from "./PilotPanel";
+import { useStore } from "@/lib/store";
+import { buildEvidencePack, downloadText } from "@/lib/evidencePack";
+import { useToast } from "@/components/shared/Toast";
 import Link from "next/link";
-import { FileCheck2, Search } from "lucide-react";
+import { FileCheck2, Search, Download, FlaskConical } from "lucide-react";
 import { useData, useLookups } from "@/lib/hooks";
 import { fmtDate } from "@/lib/format";
 import type { EvidenceType } from "@/lib/types";
 import Badge from "@/components/shared/Badge";
-import { EmptyState } from "@/components/shared/Bits";
+import { EmptyState, Tabs } from "@/components/shared/Bits";
 import { KpiCard, Panel } from "./Widgets";
 import { ActionDrawer } from "./Drawers";
 import type { AXAction } from "@/lib/types";
@@ -21,6 +26,12 @@ export default function EvidenceView() {
   const [q, setQ] = useState("");
   const [period, setPeriod] = useState<"7" | "30" | "90">("30");
   const [action, setAction] = useState<AXAction | null>(null);
+  const sp = useSearchParams();
+  const [view, setView] = useState<"log" | "pilot">(sp.get("tab") === "pilot" ? "pilot" : "log");
+  useEffect(() => { if (sp.get("tab") === "pilot") setView("pilot"); }, [sp]);
+  const ui = useStore((s) => s.ui);
+  const toast = useToast();
+  const baselineCount = Object.values(ui.pilot.baselines).filter((b) => b.value !== undefined).length;
   const list = useMemo(() => data.evidence.filter((e) => (type === "all" || e.type === type) && (Date.now() - new Date(e.createdAt).getTime()) / 86400000 <= Number(period) && (!q || `${e.title} ${e.detail} ${e.actor}`.includes(q))).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)), [data.evidence, type, q, period]);
   const counts = TYPES.map((t) => ({ t, n: data.evidence.filter((e) => e.type === t).length }));
   const results = data.evidence.filter((e) => e.type === "RESULT").length;
@@ -31,8 +42,12 @@ export default function EvidenceView() {
         <KpiCard label="Evidence 총계" value={data.evidence.length} tone="primary" sub="Baseline·Action·Result·…" />
         <KpiCard label="RESULT 기록" value={results} tone="good" sub="Action → 결과 연결" />
         <KpiCard label="RISK · EXCEPTION" value={data.evidence.filter((e) => ["RISK", "EXCEPTION"].includes(e.type)).length} tone="warn" />
-        <KpiCard label="실증 상태" value="준비" sub="Baseline 측정 전 · 12주 실증 계획" tone="neutral" />
+        <KpiCard label="실증 상태" value={ui.stage === "DEMO" ? (baselineCount ? "준비 중" : "준비") : ui.stage} sub={ui.stage === "DEMO" ? `Owner ${ui.pilot.owner ? "지정" : "미지정"} · Baseline ${baselineCount}건` : `Owner ${ui.pilot.owner} · Baseline ${baselineCount}건`} tone={ui.stage === "DEMO" ? "neutral" : "primary"} onClick={() => setView("pilot")} />
       </div>
+
+      <Tabs value={view} onChange={setView} tabs={[{ key: "log", label: "Evidence Log", count: data.evidence.length }, { key: "pilot", label: "실증 준비 · Pilot Readiness" }]} />
+      {view === "pilot" && <PilotPanel />}
+      {view === "log" && (
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
         <Panel title={<span className="inline-flex items-center gap-2"><FileCheck2 size={18} className="text-accent" />AX Evidence Log</span>} sub="단순 로그가 아닌 실증 시스템 — Before → Trigger → 추천 → 승인 → Action → 결과 → KPI Delta → 출처 → 담당 → 시각">
@@ -64,11 +79,11 @@ export default function EvidenceView() {
         </Panel>
 
         <div className="space-y-4">
-          <Panel title="Evidence Pack (12주 실증 후)" sub="지금은 구조만 준비 — 숫자는 실측 후 채웁니다">
+          <Panel title="Evidence Pack (12주 실증 후)" sub="지금은 구조만 준비 — 숫자는 실측 후 채웁니다" right={<button className="btn-outline btn-sm" onClick={() => { downloadText(`NEXMART_Evidence_Pack_${new Date().toISOString().slice(0, 10)}.md`, buildEvidencePack(data, ui)); toast({ title: "Evidence Pack 초안을 내려받았습니다", tone: "success" }); }}><Download size={14} />초안</button>}>
             <ol className="text-sm space-y-1.5">
               {["Before / Baseline", "Trigger / Problem", "Recommendation / Decision", "Human Approval", "Action", "Result", "KPI Delta", "Data Source / Provenance", "User / Time Log", "Screenshot / Report"].map((s, i) => <li key={s} className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-mist text-[11px] font-bold flex items-center justify-center">{i + 1}</span>{s}</li>)}
             </ol>
-            <div className="mt-3 rounded-xl bg-mist p-3 text-xs text-muted">BASELINE STATUS: <b className="text-ink">UNKNOWN / REQUIRED</b><br />TARGET: DO NOT INVENT<br />CURRENT NUMBERS: DEMO SIMULATION ONLY</div>
+            <div className="mt-3 rounded-xl bg-mist p-3 text-xs text-muted">BASELINE STATUS: <b className="text-ink">{baselineCount ? `${baselineCount} / 11 입력 (나머지 UNKNOWN / REQUIRED)` : "UNKNOWN / REQUIRED"}</b><br />TARGET: DO NOT INVENT<br />CURRENT NUMBERS: DEMO SIMULATION ONLY</div>
           </Panel>
           <Panel title="12주 실증 계획">
             <ul className="text-sm space-y-2">
@@ -77,10 +92,11 @@ export default function EvidenceView() {
               <li><b>7~10주</b> · Repeat Basket, 프로모션 마진 비교, 배송위험 사전처리, Action 결과 축적</li>
               <li><b>11~12주</b> · Before/After, Cost·Revenue·Scale KPI, Adoption, Evidence Pack, 고도화/재설계 결정</li>
             </ul>
-            <Link href="/ax/why#16" className="mt-3 inline-flex text-sm text-primary font-semibold">기획의도 16. 실증과 확장 →</Link>
+            <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><button onClick={() => setView("pilot")} className="inline-flex items-center gap-1 text-primary"><FlaskConical size={14} />실증 준비 화면 →</button><Link href="/ax/why#16" className="text-primary">기획의도 16 →</Link></div>
           </Panel>
         </div>
       </div>
+      )}
       <ActionDrawer action={action} onClose={() => setAction(null)} />
     </div>
   );

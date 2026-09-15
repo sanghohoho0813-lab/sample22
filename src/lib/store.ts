@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { generateDemoData } from "./seed";
+import { assessOrderRisks, buildSkuInsights, compareSuppliers } from "./engines";
 import type { AXAction, ActionStage, CartItem, DemoData, EvidenceLog, EvidenceType, Order, OrderStage, RoleKey } from "./types";
 import { DEFAULT_THEME } from "./themes";
 
@@ -39,7 +40,40 @@ export interface UiState {
   stage: "DEMO" | "PILOT" | "PRODUCTION";
   compact: boolean;
   aiConnected: boolean;
+  pilot: PilotState;
 }
+
+export interface BaselineEntry { value?: number; measuredAt?: string; note?: string }
+export interface PilotState {
+  owner?: string;
+  ownerRole?: RoleKey;
+  startedAt?: string;
+  baselines: Record<string, BaselineEntry>;
+  checklist: Record<string, boolean>;
+}
+
+/** Baseline 측정지점 — 숫자는 회사가 실측해 입력한다 (DO NOT INVENT) */
+export const BASELINE_KPIS: { key: string; group: "COST" | "REVENUE" | "SCALE"; label: string; unit: string; point: string }[] = [
+  { key: "weekly_analysis_hours", group: "COST", label: "주간 재고·발주 분석 소요시간", unit: "시간/주", point: "구매담당이 판매·재고·공급사 자료를 대조해 발주안을 만드는 데 쓰는 주간 시간" },
+  { key: "supplier_compare_min", group: "COST", label: "공급사 비교 소요시간", unit: "분/건", point: "발주 1건당 단가·납기·최소수량을 확인하는 시간 (전화·카톡 포함)" },
+  { key: "urgent_po_ratio", group: "COST", label: "긴급발주 비중", unit: "%", point: "월 발주 건수 중 리드타임 미만 긴급발주 비율" },
+  { key: "order_status_min", group: "COST", label: "주문상태 확인·전달시간", unit: "분/건", point: "고객 문의 1건당 물류 확인 후 회신까지 시간" },
+  { key: "conversion_rate", group: "REVENUE", label: "구매 전환율", unit: "%", point: "상품상세 방문고객 대비 주문완료 고객" },
+  { key: "stockout_rate", group: "REVENUE", label: "품절률", unit: "%", point: "활성 SKU 중 가용재고 0인 SKU 비율 (주간 평균)" },
+  { key: "repeat_rate", group: "REVENUE", label: "재구매율", unit: "%", point: "전체 구매고객 중 2회 이상 구매 고객" },
+  { key: "promo_margin", group: "REVENUE", label: "프로모션 실질마진율", unit: "%", point: "(매출 − 원가 − 할인 − 배송비) ÷ 매출, 캠페인별" },
+  { key: "sku_per_buyer", group: "SCALE", label: "구매담당 1인당 관리 SKU", unit: "개", point: "활성 SKU ÷ 구매담당 인원" },
+  { key: "orders_per_ops", group: "SCALE", label: "운영직원 1인당 처리 주문", unit: "건/일", point: "일 출고 주문 ÷ 물류·운영 인원" },
+  { key: "self_service_ratio", group: "SCALE", label: "Portal Self-Service 조회 비율", unit: "%", point: "배송 문의 중 My Page에서 자체 확인한 비율" },
+];
+
+export const PILOT_CHECKLIST: { key: string; label: string; auto?: boolean }[] = [
+  { key: "owner", label: "AX Owner 1명 지정 (KPI·데이터 품질·교육·Issue 책임)", auto: true },
+  { key: "baseline", label: "Cost · Revenue · Scale 각 1개 이상 Baseline 입력", auto: true },
+  { key: "data_intake", label: "상품·SKU·공급사·재고 실데이터 정리 (CSV Import READY)" },
+  { key: "training", label: "대표·구매·운영·CS 역할별 사용 교육 1회" },
+  { key: "event", label: "핵심 Event 19종 수집 구조 확인 (Adapter READY)" },
+];
 
 export interface StoreState {
   data: DemoData;
@@ -71,6 +105,11 @@ export interface StoreState {
   notifyCustomer: (orderId: string, body: string) => void;
   receiveInbound: (poId: string) => void;
   addEvidence: (e: Omit<EvidenceLog, "id" | "createdAt" | "updatedAt" | "source">) => string;
+  createActionFromSku: (skuId: string) => string | null;
+  createPriorityAction: (orderIds: string[]) => string | null;
+  setPilot: (patch: Partial<PilotState>) => void;
+  setBaseline: (key: string, entry: BaselineEntry) => void;
+  setStage: (stage: UiState["stage"]) => void;
   resetDemo: () => void;
 }
 
@@ -87,6 +126,7 @@ const initialUi = (): UiState => ({
   stage: "DEMO",
   compact: false,
   aiConnected: false,
+  pilot: { baselines: {}, checklist: {} },
 });
 
 export const useStore = create<StoreState>()(
@@ -315,12 +355,99 @@ export const useStore = create<StoreState>()(
         set((s) => ({ data: { ...s.data, evidence: [{ ...e, id, createdAt: t, updatedAt: t, source: "demo" }, ...s.data.evidence] } }));
         return id;
       },
+      createActionFromSku: (skuId) => {
+        const s = get();
+        if (s.data.actions.some((a) => a.related.skuId === skuId && !["done", "dismissed"].includes(a.stage))) return null;
+        const ins = buildSkuInsights(s.data).find((i) => i.sku.id === skuId);
+        if (!ins) return null;
+        const t = nowIso();
+        const id = uid("act");
+        const actor = ROLE_PERSON[s.ui.role];
+        const isLow = ["urgent", "stockout", "low", "rising"].includes(ins.status) && ins.recommendedQty > 0;
+        const isSlow = ["slow", "overstock"].includes(ins.status);
+        if (!isLow && !isSlow) return null;
+        const urgent = ["urgent", "stockout"].includes(ins.status);
+        const options = compareSuppliers(s.data, skuId, urgent ? "urgent" : isSlow ? "overstock" : "normal");
+        const best = options.find((o) => o.recommended);
+        const days = ins.daysOfStock === Infinity ? "-" : ins.daysOfStock.toFixed(1);
+        const action: AXAction = isLow
+          ? {
+              id, createdAt: t, updatedAt: t, source: "demo", type: "urgent_po",
+              title: `${ins.product.name} ${ins.sku.name} ${urgent ? "긴급발주" : "발주"} 검토`,
+              summary: `가용재고 ${ins.available}개, 예상 소진 ${days}일. 공급 리드타임 ${ins.leadTimeDays}일 기준 ${ins.recommendedQty}개 발주 검토가 필요합니다.`,
+              trigger: urgent ? `예상 소진일(${days}일) < 공급 리드타임(${ins.leadTimeDays}일)` : `안전재고 미달 또는 수요 증가`,
+              reasons: ins.reasons.slice(0, 4),
+              expectedImpact: `품절 방지 · 약 ${ins.leadTimeDays + 7}일치 재고 확보`,
+              caution: best && best.costDiffPct > 0 ? `추천 공급사 단가가 최저가 대비 +${best.costDiffPct}%입니다.` : undefined,
+              urgency: urgent ? "critical" : ins.status === "low" ? "high" : "mid",
+              owner: "buyer", assignee: "김구매", recommendedAt: t, dueAt: new Date(Date.now() + (urgent ? 6 : 48) * 3600000).toISOString(), stage: "recommended",
+              related: { productId: ins.product.id, skuId, supplierId: ins.sku.primarySupplierId, altSupplierId: best?.supplier.id },
+              proposal: { qty: ins.recommendedQty, supplierId: best?.supplier.id ?? ins.sku.primarySupplierId, note: `Radar 계산 · ${actor} 생성` },
+              evidenceIds: [],
+            }
+          : {
+              id, createdAt: t, updatedAt: t, source: "demo", type: "stop_po",
+              title: `${ins.product.name} ${ins.sku.name} 저회전 발주 보류 검토`,
+              summary: `재고일수 ${days}일, 재고금액 ${Math.round(ins.stockValue).toLocaleString()}원. 추가 발주를 보류하고 프로모션·묶음 구성을 검토합니다.`,
+              trigger: `재고일수 > ${ins.status === "slow" ? 180 : 75}일`,
+              reasons: ins.reasons.slice(0, 4),
+              expectedImpact: `재고자금 약 ${Math.round(ins.stockValue / 10000).toLocaleString()}만원 보류`,
+              urgency: "low", owner: "buyer", assignee: "김구매", recommendedAt: t, dueAt: new Date(Date.now() + 120 * 3600000).toISOString(), stage: "recommended",
+              related: { productId: ins.product.id, skuId },
+              proposal: { note: `Radar 계산 · ${actor} 생성` },
+              evidenceIds: [],
+            };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RISK", title: `${action.title} — Radar에서 Action 생성`, detail: `${actor}가 Stock & Purchase Radar 계산 결과로 Action을 생성. 근거: ${ins.reasons[0]}`, actor, actionId: id, skuId, dataSource: "Demand Signal + Inventory", mode: "Demo Evidence" };
+        action.evidenceIds = [ev.id];
+        set({ data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] } });
+        return id;
+      },
+      createPriorityAction: (orderIds) => {
+        const s = get();
+        const covered = new Set(s.data.actions.filter((a) => a.type === "priority_order" && !["done", "dismissed"].includes(a.stage)).flatMap((a) => a.related.orderIds ?? []));
+        const ids = orderIds.filter((o) => !covered.has(o));
+        if (!ids.length) return null;
+        const risks = assessOrderRisks(s.data).filter((r) => ids.includes(r.order.id));
+        const t = nowIso();
+        const id = uid("act");
+        const actor = ROLE_PERSON[s.ui.role];
+        const zones = Array.from(new Set(risks.map((r) => s.data.warehouses.find((w) => w.id === r.order.warehouseId)?.name.split(" ")[0]))).join("·");
+        const causes = Array.from(new Set(risks.flatMap((r) => r.causes))).slice(0, 4);
+        const action: AXAction = {
+          id, createdAt: t, updatedAt: t, source: "demo", type: "priority_order",
+          title: `${zones} 지연위험 주문 ${ids.length}건 우선처리`,
+          summary: `배송약속·출고마감·구역 적체 기준으로 지연위험이 감지된 주문 ${ids.length}건을 마감 전 우선 피킹합니다.`,
+          trigger: "Fulfillment Risk 점수 ≥ 60",
+          reasons: causes.length ? causes : ["지연위험 점수 상위 주문"],
+          expectedImpact: "정시출고율 하락 방지, 배송지연 VOC 예방",
+          urgency: "critical", owner: "ops", assignee: "박운영", recommendedAt: t, dueAt: risks[0]?.order.cutoffAt ?? t, stage: "recommended",
+          related: { orderIds: ids },
+          proposal: { note: `Control Tower 계산 · ${actor} 생성` },
+          evidenceIds: [],
+        };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "EXCEPTION", title: `${action.title} — Control Tower에서 Action 생성`, detail: `${actor}가 지연위험 ${ids.length}건에 대해 우선처리 Action 생성. ${causes[0] ?? ""}`, actor, actionId: id, dataSource: "Fulfillment Risk", mode: "Demo Evidence" };
+        action.evidenceIds = [ev.id];
+        set({ data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] } });
+        return id;
+      },
+      setPilot: (patch) => set((s) => ({ ui: { ...s.ui, pilot: { ...s.ui.pilot, ...patch } } })),
+      setBaseline: (key, entry) => set((s) => ({ ui: { ...s.ui, pilot: { ...s.ui.pilot, baselines: { ...s.ui.pilot.baselines, [key]: { ...s.ui.pilot.baselines[key], ...entry } } } } })),
+      setStage: (stage) => {
+        const s = get();
+        const t = nowIso();
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "BASELINE", title: `Delivery Stage → ${stage}`, detail: stage === "PILOT" ? `AX Owner ${s.ui.pilot.owner ?? "-"} · Baseline ${Object.values(s.ui.pilot.baselines).filter((b) => b.value !== undefined).length}개 입력. 12주 실증 시작. 화면 데이터는 실데이터 연결(READY) 전까지 Demo Simulation.` : `Stage 변경 (${ROLE_PERSON[s.ui.role]})`, actor: ROLE_PERSON[s.ui.role], dataSource: "Pilot Readiness", mode: "실증 준비" };
+        set({ ui: { ...s.ui, stage, pilot: { ...s.ui.pilot, startedAt: stage === "PILOT" ? t : s.ui.pilot.startedAt } }, data: { ...s.data, evidence: [ev, ...s.data.evidence] } });
+      },
       resetDemo: () => set((s) => ({ data: generateDemoData(), ui: { ...initialUi(), theme: s.ui.theme, fontScale: s.ui.fontScale, tutorialDone: s.ui.tutorialDone, demoResetAt: nowIso() } })),
     }),
     {
       name: "nexmart-demo-v1",
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ data: s.data, ui: s.ui }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<StoreState>;
+        return { ...current, ...p, ui: { ...initialUi(), ...(p.ui ?? {}), pilot: { baselines: {}, checklist: {}, ...(p.ui?.pilot ?? {}) } } };
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
       },

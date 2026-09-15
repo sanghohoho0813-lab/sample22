@@ -22,7 +22,7 @@
 | **SHARED DATA ASSET** | 단일 Demo Repository(Zustand + localStorage). Customer/AX 동일 Store. Entity 34종 |
 | **CUSTOMER EVENT → AX MAP** | 검색/조회/담기 → DemandSignal(SKU별 7d 카운터) · 주문 → Order + Inventory.reserved + dailySales + Evidence · 재구매 → RepeatPrediction 갱신 · 반품 → ReturnRequest |
 | **AI METHOD MATRIX** | 5 Engine (§6) — 4개 LIVE(규칙·통계), 1개 READY(LLM) · 자동발주 L4 미구현 |
-| **PROOF PLAN** | Baseline UNKNOWN/REQUIRED · 12주 실증 계획 · Evidence Log 10 Type · Evidence Pack 구조 준비 |
+| **PROOF PLAN** | Baseline 측정지점 11개 입력 화면(AX Evidence > 실증 준비) · AX Owner · Pilot 전환 게이트 · 12주 실증 계획 · Evidence Log 10 Type · Evidence Pack Markdown 생성 |
 | **PORTAL / PLATFORM READINESS** | **MID** — 고객 커머스와 내부 운영 연결이 우선. Industry Platform·대형 Marketplace 과장 금지 |
 | **FUTURE EXPANSION 3~6** | 정기배송 · B2B 대량구매 · 공급사 Portal · 다창고 · 고급 수요예측 · (파트너 입점) — 모두 NEXT 표시 |
 | **MOAT CANDIDATE** | Proprietary Data(SKU 수요신호·공급사 실납기·고객 구매주기) · Workflow(KPI→Action→Evidence) · Decision Logic(4 엔진 가중치) |
@@ -85,7 +85,7 @@ Explainability: 모든 Action = 추천 → 사용데이터 → 근거 2~4 → �
 
 | Loop | 경로 | 검증 |
 |---|---|---|
-| 1 수요증가→발주 | DemandSignal → Radar 품절위험 → act-001 → 공급사 비교 → 승인 → PO 생성·입고예정 → 상품 상세 배송예정 → 입고 처리 → Evidence | ✅ QA 통과 |
+| 1 수요증가→발주 | DemandSignal → Radar 품절위험 → **Action 생성(임의 SKU)** 또는 act-001 → 공급사 비교 → 승인 → PO 생성·입고예정 → 상품 상세 배송예정 → 입고 처리 → Evidence | ✅ QA 통과 (R2: 시드 없이도 작동) |
 | 2 주문→출고·배송 | Customer DEMO 주문 → Order·reserved·dailySales → 신규주문 Queue → 단계 변경 → 재고 차감 → 고객 알림·My Page 상태 → Evidence | ✅ QA 통과 |
 | 3 공급사 지연→대체판단 | PO-2609-018 지연 → RISK Evidence → act-002 대체공급 → 승인 → 대체 PO → 입고예정 반영 | ✅ (Action 승인 경로 동일) |
 | 4 구매주기→재구매 | 구매이력 → RepeatPrediction → 홈/Repeat Basket 노출 → 한 번에 다시 주문 → 주기 갱신 → CUSTOMER Evidence | ✅ QA 통과 |

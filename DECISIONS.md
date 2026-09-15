@@ -59,3 +59,17 @@
 
 ## D-12 Hydration 전략: 셸은 SSR 기본값 → hydrated 후 persisted 값 적용
 - **WHY**: Zustand persist가 클라이언트 첫 렌더에서 localStorage 값을 동기 적용해 SSR HTML과 텍스트가 달라짐(React #418). 데이터 화면은 ClientGate로 스켈레톤 후 렌더, 셸(역할·Theme·Freshness)은 hydrated 플래그로 지연 적용.
+
+## D-13 Pilot 전환은 "라벨 + Evidence" 변경이며 데이터는 Demo 유지
+- **WHY**: 실데이터 연결(Supabase·CSV) 없이 Stage만 PILOT으로 바꾸면 Demo 수치가 실증 성과처럼 보일 위험. 전환 확인창과 Evidence Pack에 "Simulation" 명시로 차단. Baseline만 회사 입력값.
+- **WHY NOT** 실데이터 연결 전 전환 금지: 컨설턴트가 고객사에서 Owner·Baseline을 잡는 첫 미팅이 곧 Pilot 시작이며, 그 시점에 실데이터가 준비돼 있는 경우는 드묾. 준비 단계를 시스템 안에서 진행하게 하는 편이 Adoption에 유리.
+- **REVISIT WHEN**: CSV Import 도입 시 "실데이터 연결됨" 게이트를 전환 조건에 추가.
+
+## D-14 Action 생성은 규칙 결과를 그대로 담고, 중복(진행 중 Action 존재)은 차단
+- **WHY**: Radar가 이미 계산한 근거·추천수량·공급사 대안을 사람이 다시 타이핑하는 것은 반복업무. 같은 SKU에 Action이 둘이면 발주가 중복될 위험.
+- **WHY NOT** 자동 생성(감지 즉시 Action 발행): Action 폭주로 우선순위가 흐려짐. 사람이 "만들기"를 누르는 지점이 검토의 시작.
+- **REVISIT WHEN**: Pilot에서 Action 누락이 반복되면 일 1회 자동 생성 배치 검토(L2).
+
+## D-15 Baseline 측정지점 11개는 고정 목록, 값은 회사가 입력
+- **WHY**: Unified v3.0 "Baseline 없는 개선율 금지". 측정지점은 컨설턴트가 표준화하고, 숫자는 고객사가 실측. 화면의 Demo KPI를 Baseline으로 자동 채우지 않음.
+- **REVISIT WHEN**: 업종별 템플릿(유통 외) 확장 시 목록을 설정 가능하게.

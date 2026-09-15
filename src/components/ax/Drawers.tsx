@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Factory, FileCheck2, Package, PauseCircle, Truck, User, XCircle, Bell, Play, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Factory, FileCheck2, Package, PauseCircle, Truck, User, XCircle, Bell, Play, Sparkles, Rocket } from "lucide-react";
 import type { AXAction, Order, OrderStage } from "@/lib/types";
 import { useData, useInsights, useLookups, useOrderRisks } from "@/lib/hooks";
 import { ACTION_STAGE_LABEL, CUSTOMER_STAGE_LABEL, ORDER_STAGE_LABEL, ROLE_LABEL, useStore } from "@/lib/store";
@@ -184,6 +184,8 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
   const insights = useInsights();
   const { productById, supplierById, warehouseById, categoryBySlug } = useLookups();
   const role = useStore((s) => s.ui.role);
+  const createActionFromSku = useStore((s) => s.createActionFromSku);
+  const toast = useToast();
   const [tab, setTab] = useState<"insight" | "supplier" | "orders" | "evidence">("insight");
   const ins = skuId ? insights.find((i) => i.sku.id === skuId) : undefined;
   const options = useMemo(() => (skuId ? compareSuppliers(data, skuId, ins && ["urgent", "stockout"].includes(ins.status) ? "urgent" : ins && ["slow", "overstock"].includes(ins.status) ? "overstock" : "normal") : []), [data, skuId, ins]);
@@ -224,6 +226,12 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
               <Stat label="추천 검토수량" value={ins.recommendedQty ? `${num(ins.recommendedQty)}개` : "-"} sub={ins.recommendedQty ? `최소주문 ${ins.sku.moq}` : "발주 불필요"} />
             </div>
             {showCost && <div className="grid grid-cols-3 gap-2 text-sm"><Stat label="판매가" value={won(ins.sku.salePrice)} /><Stat label="원가" value={won(ins.sku.cost)} /><Stat label={<Term term="마진율" desc={TERMS.grossMargin}>마진율</Term>} value={pct(ins.marginRate, 0)} sub={`재고금액 ${won(ins.stockValue)}`} /></div>}
+            {!ins.hasOpenAction && (role === "owner" || role === "buyer") && ((ins.recommendedQty > 0 && ["urgent", "stockout", "low", "rising"].includes(ins.status)) || ["slow", "overstock"].includes(ins.status)) && (
+              <button className="btn-primary w-full" onClick={() => { const id = createActionFromSku(ins.sku.id); if (!id) { toast({ title: "이미 진행 중인 Action이 있습니다", tone: "info" }); return; } const a = useStore.getState().data.actions.find((x) => x.id === id); toast({ title: "Action을 생성했습니다", body: "근거·추천수량·공급사 대안이 담겼습니다.", tone: "success" }); if (a) onOpenAction?.(a); }}>
+                <Rocket size={16} />{["slow", "overstock"].includes(ins.status) ? "발주 보류 검토 Action 만들기" : `발주 검토 Action 만들기 (${ins.recommendedQty}개)`}
+              </button>
+            )}
+            {ins.hasOpenAction && <div className="text-xs text-muted">이 SKU에 진행 중인 Action이 있습니다 — Action·Evidence 탭에서 확인</div>}
             <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="Demand & Purchase Recommendation" now="판매속도·재고·검색·장바구니·리드타임 규칙 계산" method="RULE + STATISTICAL · L3" next="LLM이 시즌·프로모션 맥락을 반영한 설명 제공" />AI Ready</div>
           </>
         )}

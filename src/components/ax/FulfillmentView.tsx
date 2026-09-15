@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Truck, AlertTriangle, Bell, Search } from "lucide-react";
+import { Truck, AlertTriangle, Bell, Search, Rocket } from "lucide-react";
 import { useData, useLookups, useOrderRisks } from "@/lib/hooks";
 import { ORDER_STAGE_LABEL, useStore } from "@/lib/store";
 import { fulfillmentKpis } from "@/lib/kpi";
@@ -12,7 +12,8 @@ import Badge from "@/components/shared/Badge";
 import { Meter } from "@/components/shared/Charts";
 import { EmptyState, Tabs, Term, TERMS, AiReady } from "@/components/shared/Bits";
 import { KpiCard, Panel } from "./Widgets";
-import { OrderDrawer } from "./Drawers";
+import { OrderDrawer, ActionDrawer } from "./Drawers";
+import type { AXAction } from "@/lib/types";
 import { useToast } from "@/components/shared/Toast";
 
 const COLS: { key: string; label: string; stages: OrderStage[] }[] = [
@@ -29,7 +30,9 @@ export default function FulfillmentView() {
   const risks = useOrderRisks();
   const { customerById, warehouseById } = useLookups();
   const advance = useStore((s) => s.advanceOrder);
+  const createPriorityAction = useStore((s) => s.createPriorityAction);
   const role = useStore((s) => s.ui.role);
+  const [action, setAction] = useState<AXAction | null>(null);
   const toast = useToast();
   const sp = useSearchParams();
   const [tab, setTab] = useState<"board" | "risk" | "list">((sp.get("tab") as never) || "board");
@@ -43,6 +46,14 @@ export default function FulfillmentView() {
   const highRisk = risks.filter((r) => r.level !== "low");
   const canOps = role === "owner" || role === "ops";
   const pickingWaitRisk = risks.filter((r) => r.level === "high" && ["new", "confirmed", "picking_wait"].includes(r.order.stage));
+  const coveredByAction = useMemo(() => new Set(data.actions.filter((a) => a.type === "priority_order" && !["done", "dismissed"].includes(a.stage)).flatMap((a) => a.related.orderIds ?? [])), [data.actions]);
+  const uncovered = pickingWaitRisk.filter((r) => !coveredByAction.has(r.order.id));
+  const makePriorityAction = () => {
+    const id = createPriorityAction(uncovered.map((r) => r.order.id));
+    if (!id) { toast({ title: "생성할 대상이 없습니다", body: "위험 주문이 이미 진행 중인 Action에 포함되어 있습니다.", tone: "info" }); return; }
+    setAction(useStore.getState().data.actions.find((x) => x.id === id) ?? null);
+    toast({ title: "우선처리 Action을 생성했습니다", body: "승인하면 해당 주문이 피킹 단계로 전환됩니다.", tone: "success" });
+  };
 
   return (
     <div className="space-y-4">
@@ -88,7 +99,10 @@ export default function FulfillmentView() {
             {pickingWaitRisk.length > 0 && canOps && (
               <div className="rounded-xl border border-danger/30 bg-danger/5 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap text-sm">
                 <div className="inline-flex items-center gap-2"><AlertTriangle size={16} className="text-danger" /><b>피킹 전 단계 고위험 주문 {pickingWaitRisk.length}건</b> — 마감 전 우선 피킹이 필요합니다.</div>
-                <button className="btn-primary btn-sm" onClick={() => { pickingWaitRisk.forEach((r) => advance(r.order.id, "picking", "박운영")); toast({ title: `${pickingWaitRisk.length}건 우선 피킹 시작`, body: "고객 My Page '상품준비' 반영", tone: "success" }); }}>전체 우선처리</button>
+                <div className="flex gap-2 flex-wrap">
+                  {uncovered.length > 0 && <button className="btn-outline btn-sm" onClick={makePriorityAction}><Rocket size={14} />Action 생성 ({uncovered.length}건)</button>}
+                  <button className="btn-primary btn-sm" onClick={() => { pickingWaitRisk.forEach((r) => advance(r.order.id, "picking", "박운영")); toast({ title: `${pickingWaitRisk.length}건 우선 피킹 시작`, body: "고객 My Page '상품준비' 반영", tone: "success" }); }}>전체 우선처리</button>
+                </div>
               </div>
             )}
             {highRisk.length ? (
@@ -112,6 +126,7 @@ export default function FulfillmentView() {
       </Panel>
 
       <OrderDrawer orderId={orderId} onClose={() => setOrderId(null)} />
+      <ActionDrawer action={action} onClose={() => setAction(null)} onOpenOrder={(id) => { setAction(null); setOrderId(id); }} />
     </div>
   );
 }

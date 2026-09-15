@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — NEXMART 현재 공사 진행상황
 
-> 갱신: 2026-09-08 · First Build 완료 (PASS 0 → 1 → 2 → QA → Red Team 1회)
+> 갱신: 2026-09-15 · First Build + 고도화 R2 (Insight→Action 생성 · Pilot Readiness · Evidence Pack)
 
 ## STRATEGIC GATES
 
@@ -12,8 +12,8 @@
 | MONEY KPI / BASELINE | KPI 3종 정의 ✅ · Baseline UNKNOWN/REQUIRED (실측 전, 숫자 미발명) |
 | DATA FOUNDATION | SSOT = Shared Demo Repository ✅ · Adapter 전환점 분리 ✅ |
 | AI / LOGIC STATUS | 4 엔진 LIVE(규칙·통계) · 1 READY(LLM) · L4 없음 ✅ |
-| PROOF STATUS | Evidence Log 작동 · Evidence Pack 구조 · 12주 계획 — **실증 준비** 단계 |
-| ADOPTION READINESS | 역할별 이익 정의(대표/구매/운영/CS) · AX Owner 필드는 Evidence BASELINE에 표기 (전용 필드 UI는 미구현) |
+| PROOF STATUS | Evidence Log 작동 · **Evidence Pack Markdown 생성 가능** · Baseline 입력 화면 · 12주 계획 — 실증 준비 단계 (실측값은 회사 입력 대기) |
+| ADOPTION READINESS | 역할별 이익 정의 · **AX Owner 지정 UI** · Pilot 전환 체크리스트 5항목 (Owner·Baseline 자동판정) ✅ |
 | RISK / GOVERNANCE | Demo/Live 구분 배지 · READY/NEXT 분리 · 근거 없는 추천 0 ✅ |
 | PLATFORM READINESS | MID (과장 없음) ✅ |
 | EVIDENCE STATUS | 초기 12건 + 실행 시 자동 누적 ✅ |
@@ -38,6 +38,7 @@
 ## AI / LOGIC
 
 - [x] buildSkuInsights · compareSuppliers · assessOrderRisks · repeatItemsForCustomer · buildBriefing · buildSegments
+- [x] **Insight → Action 생성**: Radar 행/SKU Drawer에서 발주·보류 검토 Action 생성(근거·추천수량·공급사 대안 자동 포함), Control Tower 지연위험에서 우선처리 Action 생성 — 시드 Action 없이도 Closed Loop 완성
 - [ ] LLM API 연결 (READY — `ui.aiConnected` 플래그 예약)
 
 ## ACTION / EVIDENCE
@@ -60,9 +61,18 @@
 - [x] **모바일 Footer 신설**: 주문·배송조회 / 다시 구매 / 빠른배송 / 취소·반품 바로가기 + 관리자 Demo 버튼 + 회사 고지 (Bottom Nav와 비중첩 검증)
 - [x] **주문 날짜 문구 보정**: 배송완료·취소·반품 건에서 " · " 뒤가 비던 문제 → `deliveryNote()`로 완료일/취소일 표시
 
+## 2026-09-15 고도화 R2 (§23 "다음 단계" 해석 순서로 진단 → 갭 3개만 구현)
+
+- [x] **Insight → Action 생성** (Closed Loop 갭): `createActionFromSku` / `createPriorityAction` — Radar 표 마지막 열 "발주 검토 Action" 버튼, SKU Drawer 버튼, Fulfillment 지연위험 탭 "Action 생성". 진행 중 Action이 있으면 중복 생성 차단. 생성 시 RISK/EXCEPTION Evidence 자동 기록
+- [x] **실증 준비 · Pilot Readiness** (PROOF·ADOPTION 게이트): AX Evidence > "실증 준비" 탭 — AX Owner 지정(역할 선택 또는 직접 입력) · Baseline 측정지점 11개(Cost 4 · Revenue 4 · Scale 3) 값·측정일 입력 · 전환 체크리스트 5 · **PILOT 단계 전환**(Owner + 그룹별 Baseline 1개 이상일 때만 활성, BASELINE Evidence 기록) · DEMO 되돌리기. 대표 권한만 편집
+- [x] **Evidence Pack 생성**: `lib/evidencePack.ts` — Baseline 표 · Action→결과 표 · KPI Delta · Timeline · Adoption · Provenance를 Markdown으로 내려받기/복사. Demo 수치는 "Simulation" 명시
+- [x] 저장소 호환: `persist.merge`로 이전 localStorage 형태(pilot 없음)도 안전 로드
+- [x] QA: 신규 흐름 자동화(Action 생성→승인→입고예정 반영 / 우선처리 Action→실행중 / Owner+Baseline 3→PILOT→헤더 배지 / Pack 다운로드 내용 검증 / 구형 상태 재로드 / Reset→DEMO) + 전체 회귀 오류 0 · overflow 0
+- [ ] 사진 자산: Drive 폴더 "샘플 22. 유통 플랫폼"이 비어 있음 — 파일 업로드 후 다음 라운드
+
 ## USER ACTION QUEUE
 
-1. **사진 자산**: `public/assets/README.md` 규칙대로 hero-01 / photo-01 / photo-02 / flow-01 / product/<id> / category/<slug> jpg 추가 (Google Drive 원본 활용 예정). 추가 즉시 placeholder → 실사진 자동 전환.
+1. **사진 자산** (Drive 폴더 현재 비어 있음): `public/assets/README.md` 규칙대로 hero-01 / photo-01 / photo-02 / flow-01 / product/<id> / category/<slug> jpg 추가 (Google Drive 원본 활용 예정). 추가 즉시 placeholder → 실사진 자동 전환.
 2. **Front Design Reference** 12종 제공 시 PROJECT_SPEC §9 Visual Reference Map을 PROVIDED로 갱신하고 Mood/Hierarchy 재해석.
 3. **Supabase 프로젝트** (선택): `.env.example` 참고 — 연결 시 store → adapter 교체.
 4. **AI API 키** (선택): Executive Briefing 자연어 설명 1개부터 연결.
@@ -77,7 +87,7 @@
 
 ## NEXT PRIORITY
 
-1. 사진 자산 적용 → Visual Density 60~80% (Customer) / 30~50% (AX) 확인
-2. Front Reference 도착 후 Hero/Card/Nav 언어 재해석 (Project Signature 유지)
-3. Red Team P2 → RECOMMENDATIONS.md 항목 중 고객 가치 큰 것부터 (선택)
-4. Pilot 전환 시: Baseline 측정 UI (AX Owner 필드 · 측정지점 입력) → Supabase Adapter
+1. 사진 자산 적용 (Drive 업로드 대기) → Visual Density 60~80% (Customer) / 30~50% (AX)
+2. **실제 유통사 대표 1명에게 Presentation Mode 시연** → "돈 낼 만한가" 피드백 (기능 추가보다 우선)
+3. 피드백 있을 때만: CSV Import 마법사(상품·재고·주문) → Supabase Adapter — Pilot 진입의 실데이터 경로
+4. Front Reference 도착 후 Hero/Card/Nav 재해석

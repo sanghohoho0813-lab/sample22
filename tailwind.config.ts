@@ -29,6 +29,18 @@ const config: Config = {
         sans: ["Pretendard Variable", "Pretendard", "-apple-system", "BlinkMacSystemFont", "system-ui", "Roboto", "Apple SD Gothic Neo", "Noto Sans KR", "sans-serif"],
       },
       screens: { xs: "430px" },
+      fontSize: {
+        // MD 기준: 고객 본문 17~19 · AX 대표/관리자 가독성 우선 · 작은 글자 남발 금지
+        xs: ["0.8125rem", { lineHeight: "1.15rem" }],   // 13px
+        sm: ["0.9375rem", { lineHeight: "1.4rem" }],    // 15px
+        base: ["1.0625rem", { lineHeight: "1.65rem" }], // 17px
+        lg: ["1.1875rem", { lineHeight: "1.75rem" }],   // 19px
+        xl: ["1.375rem", { lineHeight: "1.9rem" }],     // 22px
+        "2xl": ["1.625rem", { lineHeight: "2.1rem" }],  // 26px
+        "3xl": ["2rem", { lineHeight: "2.5rem" }],      // 32px
+        "4xl": ["2.5rem", { lineHeight: "3rem" }],      // 40px
+        "5xl": ["3.25rem", { lineHeight: "1.1" }],      // 52px
+      },
     },
   },
   plugins: [],

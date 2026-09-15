@@ -57,7 +57,7 @@ export default function FulfillmentView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 stagger">
         <KpiCard label="신규주문" value={num(fk.newOrders)} tone="primary" />
         <KpiCard label="오늘 출고대상" value={num(fk.todayShip)} />
         <KpiCard label="마감임박" value={num(fk.cutoffSoon)} tone="warn" sub="15:00 마감 4h 이내" />
@@ -70,7 +70,7 @@ export default function FulfillmentView() {
 
       <Panel title={<span className="inline-flex items-center gap-2"><Truck size={18} className="text-accent" />Fulfillment Control Tower</span>} sub={<span><Term term="Fulfillment" desc={TERMS.fulfillment}>Fulfillment</Term>: 주문 이후 상품을 피킹·포장·출고·배송하는 전체 처리과정 — 지연위험과 우선처리 대상을 한눈에</span>} right={<AiReady title="Fulfillment Risk" now="마감·배송약속·구역 적체·재고예외 규칙 점수 (L2 추천)" method="RULE + STATISTICAL" next="시간대별 처리량 예측으로 마감 초과 확률 계산" />}>
         <div className="grid sm:grid-cols-5 gap-2 mb-4">
-          {data.warehouses.map((w) => <button key={w.id} onClick={() => setWh(wh === w.id ? "all" : w.id)} className={`rounded-xl border p-3 text-left ${wh === w.id ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}><div className="text-xs text-muted">{w.name}</div><div className={`font-bold ${w.congestion > 0.7 ? "text-danger" : ""}`}>적체 {Math.round(w.congestion * 100)}%</div><Meter value={w.congestion} color={w.congestion > 0.7 ? "#D93A3A" : w.congestion > 0.5 ? "#F47A3C" : "var(--t-primary)"} className="mt-1.5" /><div className="text-[11px] text-muted mt-1">대기 {data.orders.filter((o) => o.warehouseId === w.id && ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"].includes(o.stage)).length}건</div></button>)}
+          {data.warehouses.map((w) => <button key={w.id} onClick={() => setWh(wh === w.id ? "all" : w.id)} className={`rounded-xl border p-3 text-left ${wh === w.id ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}><div className="text-xs text-muted">{w.name}</div><div className={`font-bold ${w.congestion > 0.7 ? "text-danger" : ""}`}>적체 {Math.round(w.congestion * 100)}%</div><Meter value={w.congestion} color={w.congestion > 0.7 ? "#D93A3A" : w.congestion > 0.5 ? "#F47A3C" : "var(--t-primary)"} className="mt-1.5" /><div className="text-[13px] text-muted mt-1">대기 {data.orders.filter((o) => o.warehouseId === w.id && ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"].includes(o.stage)).length}건</div></button>)}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Tabs value={tab} onChange={setTab} tabs={[{ key: "board", label: "상태 보드" }, { key: "risk", label: "지연위험", count: highRisk.length }, { key: "list", label: "전체 목록", count: orders.length }]} className="flex-1" />
@@ -134,9 +134,9 @@ export default function FulfillmentView() {
 function OrderMini({ o, risk, name, onOpen }: { o: Order; risk?: "high" | "mid" | "low"; name?: string; onOpen: () => void }) {
   return (
     <button onClick={onOpen} className={`w-full text-left bg-white rounded-lg border px-2.5 py-2 hover:shadow-card transition-shadow ${risk === "high" ? "border-danger/50" : risk === "mid" ? "border-orange/50" : "border-line"}`}>
-      <div className="flex items-center justify-between gap-1"><span className="text-xs font-bold truncate">{o.id}</span>{risk && risk !== "low" && <span className={`w-2 h-2 rounded-full shrink-0 ${risk === "high" ? "bg-danger" : "bg-orange"}`} />}</div>
+      <div className="flex items-center justify-between gap-1"><span className="text-[12px] font-bold truncate tabular-nums">{o.id}</span>{risk && risk !== "low" && <span className={`w-2 h-2 rounded-full shrink-0 ${risk === "high" ? "bg-danger" : "bg-orange"}`} />}</div>
       <div className="text-xs truncate mt-0.5">{o.items[0].name}{o.items.length > 1 ? ` 외 ${o.items.length - 1}` : ""}</div>
-      <div className="text-[11px] text-muted mt-0.5 flex justify-between"><span>{name}</span><span>{fmtDate(o.promisedAt, "md")} 약속</span></div>
+      <div className="text-[13px] text-muted mt-0.5 flex justify-between"><span>{name}</span><span>{fmtDate(o.promisedAt, "md")} 약속</span></div>
     </button>
   );
 }

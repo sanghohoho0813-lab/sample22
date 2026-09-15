@@ -23,15 +23,15 @@ export function ActionCard({ a, onOpen, compact = false }: { a: AXAction; onOpen
   const open = !["done", "dismissed"].includes(a.stage);
   const due = new Date(a.dueAt).getTime() - Date.now();
   return (
-    <button onClick={() => onOpen(a)} className={`w-full text-left card p-4 hover:shadow-raised transition-shadow ${!open ? "opacity-80" : ""}`}>
+    <button onClick={() => onOpen(a)} className={`w-full text-left card p-4 lift ${!open ? "opacity-80" : ""}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span>
         <Badge tone="soft">{actionTypeLabel(a.type)}</Badge>
         <StatusBadge status={a.stage} />
-        {a.scenario && <span className="text-[11px] text-muted">시나리오 {a.scenario}</span>}
+        {a.scenario && <span className="text-[13px] text-muted">시나리오 {a.scenario}</span>}
         <span className="ml-auto text-xs text-muted inline-flex items-center gap-1"><Clock3 size={12} />{open ? (due < 0 ? `마감 ${relTime(a.dueAt)}` : `마감 ${relTime(a.dueAt)}`) : `완료 ${relTime(a.updatedAt)}`}</span>
       </div>
-      <div className="mt-2 font-bold text-[16px] leading-snug">{a.title}</div>
+      <div className="mt-2 font-bold text-[18px] leading-snug">{a.title}</div>
       {!compact && <p className="mt-1 text-sm text-ink/80 line-clamp-2">{a.summary}</p>}
       <div className="mt-2 flex items-center gap-3 text-xs text-muted flex-wrap">
         {p && <span className="inline-flex items-center gap-1"><Package size={12} />{p.name}</span>}
@@ -100,7 +100,7 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
         </div>
       }>
       <div className="space-y-5">
-        <div className="rounded-xl bg-mist p-4 text-[15px] leading-relaxed">{a.summary}</div>
+        <div className="rounded-xl bg-mist p-4 text-[17px] leading-relaxed">{a.summary}</div>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Trigger">{a.trigger}</Field>
@@ -216,7 +216,7 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
                 <div className="mt-1"><Sparkline values={d.dailySales} width={380} height={64} /></div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {[["검색", d.search7d, d.searchPrev7d], ["조회", d.view7d, d.viewPrev7d], ["장바구니", d.cart7d, d.cartPrev7d], ["주문", d.order7d, d.orderPrev7d]].map(([l, c, pv]) => { const r = (pv as number) > 0 ? ((c as number) - (pv as number)) / (pv as number) : 0; return <div key={l as string} className="rounded-lg bg-mist px-2.5 py-2"><div className="text-[11px] text-muted">{l} 7일</div><div className="font-bold tabular-nums">{num(c as number)}</div><div className={`text-[11px] font-semibold ${r >= 0 ? "text-teal" : "text-danger"}`}>{r >= 0 ? "+" : ""}{Math.round(r * 100)}%</div></div>; })}
+                {[["검색", d.search7d, d.searchPrev7d], ["조회", d.view7d, d.viewPrev7d], ["장바구니", d.cart7d, d.cartPrev7d], ["주문", d.order7d, d.orderPrev7d]].map(([l, c, pv]) => { const r = (pv as number) > 0 ? ((c as number) - (pv as number)) / (pv as number) : 0; return <div key={l as string} className="rounded-lg bg-mist px-2.5 py-2"><div className="text-[13px] text-muted">{l} 7일</div><div className="font-bold tabular-nums">{num(c as number)}</div><div className={`text-[13px] font-semibold ${r >= 0 ? "text-teal" : "text-danger"}`}>{r >= 0 ? "+" : ""}{Math.round(r * 100)}%</div></div>; })}
               </div>
             </div>
             <Reasons items={ins.reasons} title="판단 근거 (Demand Signal)" />
@@ -239,7 +239,7 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
           <>
             <div className="text-xs font-semibold text-muted uppercase mb-2">공급사 비교 ({options.length}) — {ins.status === "urgent" || ins.status === "stockout" ? "긴급: 납기 가중" : ins.status === "slow" || ins.status === "overstock" ? "과잉: 최소수량·단가 가중" : "기본 가중"}</div>
             <div className="table-wrap"><table className="table"><thead><tr><th>공급사</th><th>단가</th><th>납기</th><th>최소수량</th><th>정시납품</th><th>충족률</th><th>불량</th><th>예상입고</th><th>점수</th></tr></thead><tbody>
-              {options.map((o) => <tr key={o.supplier.id} className={o.recommended ? "row-selected" : ""}><td className="font-semibold whitespace-nowrap">{o.supplier.name}{o.recommended && <Badge tone="primary" className="ml-1">추천</Badge>}</td><td className="tabular-nums">{showCost ? won(o.sp.unitCost) : "—"}<div className="text-[11px] text-muted">{o.costDiffPct ? `+${o.costDiffPct}%` : "최저"}</div></td><td>{o.sp.leadTimeDays}일</td><td>{o.sp.moq}</td><td>{Math.round(o.supplier.onTimeRate * 100)}%</td><td>{Math.round(o.supplier.fillRate * 100)}%</td><td>{(o.supplier.defectRate * 100).toFixed(1)}%</td><td className="whitespace-nowrap">{o.expectedArrival}</td><td className="font-bold">{o.score}</td></tr>)}
+              {options.map((o) => <tr key={o.supplier.id} className={o.recommended ? "row-selected" : ""}><td className="font-semibold whitespace-nowrap">{o.supplier.name}{o.recommended && <Badge tone="primary" className="ml-1">추천</Badge>}</td><td className="tabular-nums">{showCost ? won(o.sp.unitCost) : "—"}<div className="text-[13px] text-muted">{o.costDiffPct ? `+${o.costDiffPct}%` : "최저"}</div></td><td>{o.sp.leadTimeDays}일</td><td>{o.sp.moq}</td><td>{Math.round(o.supplier.onTimeRate * 100)}%</td><td>{Math.round(o.supplier.fillRate * 100)}%</td><td>{(o.supplier.defectRate * 100).toFixed(1)}%</td><td className="whitespace-nowrap">{o.expectedArrival}</td><td className="font-bold">{o.score}</td></tr>)}
             </tbody></table></div>
             <p className="text-xs text-muted mt-2">가장 싼 공급사를 무조건 추천하지 않습니다. 긴급 품절위험에서는 납기가, 과잉재고 위험에서는 최소주문수량이 더 중요합니다.</p>
             <div className="text-xs font-semibold text-muted uppercase mt-4 mb-2">발주 이력</div>

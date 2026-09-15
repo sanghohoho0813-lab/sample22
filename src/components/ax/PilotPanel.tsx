@@ -86,7 +86,7 @@ export default function PilotPanel() {
                 <li key={c.key}>
                   <button disabled={c.auto || !canEdit} onClick={() => setPilot({ checklist: { ...pilot.checklist, [c.key]: !pilot.checklist[c.key] } })} className={`w-full text-left flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm ${c.auto ? "" : "hover:bg-mist"} disabled:cursor-default`}>
                     {c.done ? <CheckCircle2 size={18} className="text-primary shrink-0 mt-0.5" /> : <Circle size={18} className="text-line shrink-0 mt-0.5" />}
-                    <span className={c.done ? "" : "text-muted"}>{c.label}{c.auto && <span className="ml-1 text-[10px] text-muted">(자동)</span>}</span>
+                    <span className={c.done ? "" : "text-muted"}>{c.label}{c.auto && <span className="ml-1 text-[12px] text-muted">(자동)</span>}</span>
                   </button>
                 </li>
               ))}
@@ -114,7 +114,7 @@ export default function PilotPanel() {
       </div>
 
       <Overlay open={confirm} onClose={() => setConfirm(false)} title="PILOT 단계로 전환" size="sm" footer={<div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setConfirm(false)}>취소</button><button className="btn-primary flex-1" onClick={() => { setStage("PILOT"); setConfirm(false); toast({ title: "PILOT 단계로 전환했습니다", body: "BASELINE Evidence가 기록되었습니다.", tone: "success" }); }}>전환</button></div>}>
-        <div className="space-y-2 text-[15px]">
+        <div className="space-y-2 text-[17px]">
           <p>AX Owner <b>{pilot.owner}</b> · Baseline <b>{total}개</b> 입력 상태로 12주 실증을 시작합니다.</p>
           <p className="text-sm text-muted">Stage 라벨과 Evidence만 바뀝니다. 화면의 상품·주문·재고 수치는 실데이터 연결(Supabase · CSV Import, READY) 전까지 여전히 Demo Simulation이며, 실증 성과처럼 표시되지 않습니다.</p>
         </div>

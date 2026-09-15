@@ -50,7 +50,7 @@ export function OrderProgress({ order }: { order: Order }) {
               <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-primary text-white" : "bg-line text-muted"}`}>{done ? <CheckCircle2 size={16} /> : <span className="text-xs">{i + 1}</span>}</div>
               <div className={`h-1 flex-1 rounded-full ${i === STEPS.length - 1 ? "opacity-0" : i < idx ? "bg-primary" : "bg-line"}`} />
             </div>
-            <span className={`text-[11px] sm:text-xs ${i === idx ? "font-bold text-primary" : done ? "text-ink" : "text-muted"}`}>{s.label}</span>
+            <span className={`text-[13px] sm:text-xs ${i === idx ? "font-bold text-primary" : done ? "text-ink" : "text-muted"}`}>{s.label}</span>
           </li>
         );
       })}
@@ -297,7 +297,7 @@ export function RepeatBasketView() {
                       <div><span className="text-muted">재고·배송</span><div className="font-semibold"><DeliveryBadge promise={deliveryPromise(r.product.deliveryType, r.available)} compact /></div></div>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                      <div className="inline-flex items-center border border-line rounded-lg"><button className="w-9 h-9 flex items-center justify-center hover:bg-mist" aria-label="수량 감소" onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.max(1, r.q - 1) }))}>−</button><span className="w-9 text-center text-sm font-bold">{r.q}</span><button className="w-9 h-9 flex items-center justify-center hover:bg-mist" aria-label="수량 증가" onClick={() => setQty((q) => ({ ...q, [r.product.id]: r.q + 1 }))}>+</button><span className="text-[11px] text-muted pr-2">추천 {r.suggestedQty}</span></div>
+                      <div className="inline-flex items-center border border-line rounded-lg"><button className="w-9 h-9 flex items-center justify-center hover:bg-mist" aria-label="수량 감소" onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.max(1, r.q - 1) }))}>−</button><span className="w-9 text-center text-sm font-bold">{r.q}</span><button className="w-9 h-9 flex items-center justify-center hover:bg-mist" aria-label="수량 증가" onClick={() => setQty((q) => ({ ...q, [r.product.id]: r.q + 1 }))}>+</button><span className="text-[13px] text-muted pr-2">추천 {r.suggestedQty}</span></div>
                       <div className="flex items-center gap-2"><span className="font-bold tabular-nums">{won(r.useSku.salePrice * r.q)}</span><button className="btn-outline btn-sm" onClick={() => { addToCart(r.useSku.id, r.q); toast({ title: "다시 담았습니다", tone: "success" }); }}>다시 담기</button></div>
                     </div>
                   </div>

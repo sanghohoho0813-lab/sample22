@@ -9,8 +9,8 @@ export function Sparkline({ values, width = 96, height = 28, stroke = "var(--t-p
   const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" className="overflow-visible">
-      {fill && <path d={`${d} L${width},${height} L0,${height} Z`} fill={stroke} opacity={0.12} />}
-      <path d={d} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {fill && <path d={`${d} L${width},${height} L0,${height} Z`} fill={stroke} opacity={0.12} className="fade-in" />}
+      <path d={d} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" className="draw-line" style={{ ["--len" as string]: width * 2 }} />
     </svg>
   );
 }
@@ -28,7 +28,7 @@ export function BarChart({ data, height = 200, format = (v: number) => v.toLocal
           <div key={i} className="flex items-center gap-3 text-sm">
             <div className="w-24 shrink-0 truncate text-muted">{d.label}</div>
             <div className="flex-1 h-6 rounded-md bg-mist overflow-hidden relative">
-              <div className="h-full rounded-md transition-all duration-300" style={{ width: `${(d.value / max) * 100}%`, background: color }} />
+              <div className="h-full rounded-md transition-all duration-300 grow-x" style={{ width: `${(d.value / max) * 100}%`, background: color, animationDelay: `${i * 40}ms` }} />
             </div>
             <div className="w-24 text-right tabular-nums font-semibold">{format(d.value)}</div>
           </div>
@@ -53,8 +53,8 @@ export function BarChart({ data, height = 200, format = (v: number) => v.toLocal
           return (
             <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onTouchStart={() => setHover(i)}>
               <rect x={padL + slot * i} y={padT} width={slot} height={H - padT - padB} fill="transparent" />
-              <rect x={label2 ? x - bw - 1 : x - bw / 2} y={H - padB - h1} width={bw} height={h1} rx={4} fill={color} opacity={on ? 1 : 0.85} />
-              {label2 && <rect x={x + 1} y={H - padB - h2} width={bw} height={h2} rx={4} fill={color2} opacity={on ? 1 : 0.85} />}
+              <rect x={label2 ? x - bw - 1 : x - bw / 2} y={H - padB - h1} width={bw} height={h1} rx={4} fill={color} opacity={on ? 1 : 0.85} className="grow-bar" style={{ transformOrigin: `${x}px ${H - padB}px`, animationDelay: `${i * 25}ms` }} />
+              {label2 && <rect x={x + 1} y={H - padB - h2} width={bw} height={h2} rx={4} fill={color2} opacity={on ? 1 : 0.85} className="grow-bar" style={{ transformOrigin: `${x}px ${H - padB}px`, animationDelay: `${i * 25 + 60}ms` }} />}
               {i % showEvery === 0 && <text x={x} y={H - 6} textAnchor="middle" fontSize={11} fill="#66727F">{d.label}</text>}
             </g>
           );
@@ -90,9 +90,9 @@ export function LineChart({ data, height = 200, format = (v: number) => v.toLoca
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-labelledby={id} onMouseLeave={() => setHover(null)}>
         <title id={id}>{label1}{label2 ? ` / ${label2}` : ""} 추이</title>
         {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1={padL} x2={W - padR} y1={y(max * f)} y2={y(max * f)} stroke="#E6EBEF" strokeDasharray="3 4" />)}
-        <path d={`${path("value")} L${x(n - 1)},${H - padB} L${x(0)},${H - padB} Z`} fill={color} opacity={0.08} />
-        <path d={path("value")} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" />
-        {label2 && <path d={path("value2")} fill="none" stroke={color2} strokeWidth={2.5} strokeDasharray="5 4" strokeLinejoin="round" />}
+        <path d={`${path("value")} L${x(n - 1)},${H - padB} L${x(0)},${H - padB} Z`} fill={color} opacity={0.08} className="fade-in" />
+        <path d={path("value")} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" className="draw-line" style={{ ["--len" as string]: 1400 }} />
+        {label2 && <path d={path("value2")} fill="none" stroke={color2} strokeWidth={2.5} strokeLinejoin="round" className="draw-line" style={{ ["--len" as string]: 1400, animationDelay: "150ms", opacity: 0.85 }} />}
         {data.map((d, i) => (
           <g key={i}>
             <rect x={x(i) - (W / n) / 2} y={padT} width={W / n} height={H - padT - padB} fill="transparent" onMouseEnter={() => setHover(i)} onTouchStart={() => setHover(i)} />
@@ -138,7 +138,7 @@ export function Donut({ parts, size = 120, thickness = 16 }: { parts: { label: s
 export function Meter({ value, max = 1, color = "var(--t-primary)", className = "" }: { value: number; max?: number; color?: string; className?: string }) {
   return (
     <div className={`h-2 rounded-full bg-mist overflow-hidden ${className}`}>
-      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${Math.min(100, (value / max) * 100)}%`, background: color }} />
+      <div className="h-full rounded-full transition-all duration-300 grow-x" style={{ width: `${Math.min(100, (value / max) * 100)}%`, background: color }} />
     </div>
   );
 }

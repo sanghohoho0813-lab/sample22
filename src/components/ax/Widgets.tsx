@@ -1,19 +1,40 @@
 "use client";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowUpRight, ArrowDownRight, ChevronRight } from "lucide-react";
 import { Sparkline } from "@/components/shared/Charts";
+
+/** 숫자가 포함된 문자열이면 첫 숫자를 0→값으로 카운트업 (접두·접미 유지). 감속 곡선, 600ms. */
+export function CountUp({ text, duration = 650 }: { text: string; duration?: number }) {
+  const m = text.match(/^([^\d-]*)(-?[\d,]+(?:\.\d+)?)(.*)$/);
+  const target = m ? Number(m[2].replace(/,/g, "")) : NaN;
+  const decimals = m && m[2].includes(".") ? m[2].split(".")[1].length : 0;
+  const [v, setV] = useState(Number.isFinite(target) ? 0 : target);
+  const started = useRef(false);
+  useEffect(() => {
+    if (!Number.isFinite(target)) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setV(target); return; }
+    started.current = true;
+    let raf = 0; const t0 = performance.now();
+    const tick = (t: number) => { const k = Math.min(1, (t - t0) / duration); const e = 1 - Math.pow(1 - k, 3); setV(target * e); if (k < 1) raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  if (!m || !Number.isFinite(target)) return <>{text}</>;
+  const shown = (decimals ? v.toFixed(decimals) : Math.round(v).toString()).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return <>{m[1]}{shown}{m[3]}</>;
+}
 
 export function KpiCard({ label, value, sub, delta, href, tone = "neutral", spark, icon, onClick, big = false }: { label: ReactNode; value: ReactNode; sub?: ReactNode; delta?: number; href?: string; tone?: "neutral" | "danger" | "warn" | "good" | "primary"; spark?: number[]; icon?: ReactNode; onClick?: () => void; big?: boolean }) {
   const toneBar = { neutral: "bg-line", danger: "bg-danger", warn: "bg-orange", good: "bg-teal", primary: "bg-primary" }[tone];
   const inner = (
-    <div className={`card p-4 h-full flex flex-col relative overflow-hidden transition-shadow ${href || onClick ? "hover:shadow-raised cursor-pointer" : ""}`}>
-      <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r ${toneBar}`} />
+    <div className={`card p-4 h-full flex flex-col relative overflow-hidden ${href || onClick ? "lift cursor-pointer" : ""}`}>
+      <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r grow-bar ${toneBar}`} />
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm text-muted font-semibold flex items-center gap-1.5">{icon}{label}</div>
         {(href || onClick) && <ChevronRight size={16} className="text-muted" />}
       </div>
-      <div className={`mt-1.5 font-black tabular-nums tracking-tight ${big ? "text-3xl sm:text-4xl" : "text-2xl sm:text-[28px]"}`}>{value}</div>
+      <div className={`mt-1.5 font-black tabular-nums tracking-tight ${big ? "text-3xl sm:text-4xl" : "text-2xl sm:text-[30px]"}`}>{typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}</div>
       <div className="mt-1 flex items-center gap-2 text-xs text-muted min-h-[18px]">
         {delta !== undefined && <span className={`inline-flex items-center gap-0.5 font-semibold ${delta >= 0 ? "text-teal" : "text-danger"}`}>{delta >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(delta * 100).toFixed(1)}%</span>}
         {sub && <span className="truncate">{sub}</span>}
@@ -41,18 +62,18 @@ export function Panel({ title, sub, right, children, className = "", id, tour }:
 }
 
 export function Stat({ label, value, sub, className = "" }: { label: ReactNode; value: ReactNode; sub?: ReactNode; className?: string }) {
-  return <div className={`rounded-xl bg-mist px-3 py-2.5 ${className}`}><div className="text-xs text-muted">{label}</div><div className="font-bold tabular-nums text-[17px] leading-tight mt-0.5">{value}</div>{sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}</div>;
+  return <div className={`rounded-xl bg-mist px-3 py-2.5 ${className}`}><div className="text-xs text-muted">{label}</div><div className="font-bold tabular-nums text-[19px] leading-tight mt-0.5">{value}</div>{sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}</div>;
 }
 
 export function Reasons({ items, title = "판단근거" }: { items: string[]; title?: string }) {
   return (
     <div>
       <div className="text-xs font-semibold text-muted uppercase tracking-wide">{title}</div>
-      <ul className="mt-1.5 space-y-1">{items.map((r, i) => <li key={i} className="flex items-start gap-2 text-[14px]"><span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-primary shrink-0" />{r}</li>)}</ul>
+      <ul className="mt-1.5 space-y-1">{items.map((r, i) => <li key={i} className="flex items-start gap-2 text-[16px]"><span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-primary shrink-0" />{r}</li>)}</ul>
     </div>
   );
 }
 
 export function Field({ label, children, className = "" }: { label: ReactNode; children: ReactNode; className?: string }) {
-  return <div className={className}><div className="text-xs text-muted">{label}</div><div className="font-semibold text-[15px] mt-0.5">{children}</div></div>;
+  return <div className={className}><div className="text-xs text-muted">{label}</div><div className="font-semibold text-[17px] mt-0.5">{children}</div></div>;
 }

@@ -8,12 +8,12 @@ import { Term, TERMS } from "@/components/shared/Bits";
 function Sec({ no, title, children, id }: { no: string; title: string; children: React.ReactNode; id?: string }) {
   return (
     <section id={id ?? no} className="scroll-mt-24">
-      <div className="flex items-baseline gap-3 mb-3"><span className="text-3xl font-black text-primary/40 tabular-nums">{no}</span><h2 className="text-2xl sm:text-[28px] font-bold tracking-tight">{title}</h2></div>
+      <div className="flex items-baseline gap-3 mb-3"><span className="text-3xl font-black text-primary/40 tabular-nums">{no}</span><h2 className="text-2xl sm:text-[30px] font-bold tracking-tight">{title}</h2></div>
       {children}
     </section>
   );
 }
-const Big = ({ children }: { children: React.ReactNode }) => <p className="text-[19px] sm:text-[22px] leading-relaxed font-semibold text-balance">{children}</p>;
+const Big = ({ children }: { children: React.ReactNode }) => <p className="text-[21px] sm:text-[24px] leading-relaxed font-semibold text-balance">{children}</p>;
 const Card = ({ title, children, tone = "" }: { title: React.ReactNode; children: React.ReactNode; tone?: string }) => <div className={`card p-4 ${tone}`}><div className="font-bold mb-1">{title}</div><div className="text-sm text-ink/80 leading-relaxed">{children}</div></div>;
 
 const TOC = ["NEXMART의 현재", "종합유통 운영이 어려운 이유", "고객이 상품을 찾고 주문하는 흐름", "내부 주문·재고·발주 흐름", "데이터가 끊기는 지점", "돈이 새는 곳: 품절과 과잉재고", "시간이 새는 곳: 공급사·주문 확인", "매출이 새는 곳: 재구매 누락", "NEXMART에서 AX란 무엇인가", "Customer Platform이 바꾸는 것", "Business AX가 바꾸는 것", "Stock & Purchase Radar", "Fulfillment Control Tower", "AI와 사람이 나누어 맡는 판단", "12개월 후 쌓이는 데이터 자산", "실증과 단계별 확장"];
@@ -35,7 +35,7 @@ export default function WhyAxView() {
           <div className="relative">
             <div className="text-highlight font-semibold text-sm">기획의도 · Why AX</div>
             <h1 className="mt-2 text-3xl sm:text-4xl font-black leading-tight text-balance">고객의 검색·장바구니·주문이<br />상품별 수요 데이터가 되고,<br />그 데이터가 발주·출고·배송을 바꾼다</h1>
-            <p className="mt-4 text-white/80 max-w-2xl text-[16px] leading-relaxed">NEXMART는 쇼핑몰도, 재고 ERP도 아닙니다. 고객 행동 → 내부 판단 → 결과 → 고객 경험으로 돌아오는 <b className="text-white">닫힌 데이터 순환</b>을 실제로 작동시키는 종합유통 AX+플랫폼입니다.</p>
+            <p className="mt-4 text-white/80 max-w-2xl text-[18px] leading-relaxed">NEXMART는 쇼핑몰도, 재고 ERP도 아닙니다. 고객 행동 → 내부 판단 → 결과 → 고객 경험으로 돌아오는 <b className="text-white">닫힌 데이터 순환</b>을 실제로 작동시키는 종합유통 AX+플랫폼입니다.</p>
             <div className="mt-5 flex flex-wrap gap-2"><Link href="/ax/presentation" className="btn bg-white text-shell hover:bg-white/90">Presentation Mode로 보기</Link><Link href="/" className="btn bg-white/15 text-white hover:bg-white/25"><Store size={16} />Customer Platform</Link></div>
           </div>
         </header>
@@ -43,7 +43,7 @@ export default function WhyAxView() {
         <Sec no="01" title="NEXMART의 현재">
           <div className="grid sm:grid-cols-[1fr_1.2fr] gap-4 items-center">
             <AssetImage assetKey="photo-01" category="living" variant="photo" ratio="aspect-[4/3]" className="rounded-2xl" />
-            <div className="space-y-3 text-[16px] leading-relaxed">
+            <div className="space-y-3 text-[18px] leading-relaxed">
               <p>NEXMART는 국내 공급사로부터 생활·식품·주방·리빙·반려·유아·디지털·건강 상품을 <b>직매입</b>해 자체 물류에서 재고를 보유하고, 자사 Customer Platform에서 판매하는 <b>중소 종합유통사</b>입니다.</p>
               <div className="grid grid-cols-3 gap-2 text-center">{[["8", "카테고리"], [String(data.products.length), "상품"], [String(data.skus.length), "SKU"], [String(data.suppliers.length), "공급사"], ["5", "물류구역"], ["~1.4천", "월 주문 (Demo)"]].map(([v, l]) => <div key={l} className="rounded-xl bg-mist py-2.5"><div className="text-xl font-black">{v}</div><div className="text-xs text-muted">{l}</div></div>)}</div>
               <p className="text-sm text-muted">수익은 매입·판매 마진, 묶음상품, 프로모션에서 나옵니다. 대형 마켓플레이스·광고입찰·글로벌 커머스는 현재 사업이 아닙니다. (가상의 시연 기업)</p>
@@ -62,12 +62,12 @@ export default function WhyAxView() {
 
         <Sec no="03" title="고객이 상품을 찾고 주문하는 흐름">
           <div className="card p-4 overflow-x-auto"><div className="flex items-center gap-2 min-w-[720px] text-sm">{[["검색·카테고리", Search], ["상품 상세", Store], ["배송예정 확인", Clock3], ["장바구니", ShoppingCart], ["주문", Truck], ["배송조회", Truck], ["다시 구매", RotateCcw]].map(([l, I], i, arr) => { const Icon = I as typeof Search; return <div key={l as string} className="flex items-center gap-2"><div className="rounded-xl bg-soft px-3 py-2 font-semibold inline-flex items-center gap-1.5"><Icon size={15} className="text-primary" />{l as string}</div>{i < arr.length - 1 && <ArrowRight size={14} className="text-muted" />}</div>; })}</div></div>
-          <p className="mt-3 text-[16px] leading-relaxed">고객이 각 단계에서 남기는 행동은 모두 <b>수요신호</b>입니다. 검색만 하고 떠난 것, 장바구니에 담고 주문하지 않은 것, 3주마다 같은 물티슈를 사는 것 — 지금까지는 이 신호들이 어디에도 쓰이지 않았습니다.</p>
+          <p className="mt-3 text-[18px] leading-relaxed">고객이 각 단계에서 남기는 행동은 모두 <b>수요신호</b>입니다. 검색만 하고 떠난 것, 장바구니에 담고 주문하지 않은 것, 3주마다 같은 물티슈를 사는 것 — 지금까지는 이 신호들이 어디에도 쓰이지 않았습니다.</p>
         </Sec>
 
         <Sec no="04" title="내부 주문·재고·발주 흐름">
           <div className="card p-4 overflow-x-auto"><div className="flex items-center gap-2 min-w-[760px] text-sm">{["공급사 발주", "입고", "재고", "주문접수", "피킹", "포장", "출고", "배송", "반품·VOC"].map((l, i, arr) => <div key={l} className="flex items-center gap-2"><div className="rounded-xl bg-mist px-3 py-2 font-semibold">{l}</div>{i < arr.length - 1 && <ArrowRight size={14} className="text-muted" />}</div>)}</div></div>
-          <p className="mt-3 text-[16px] leading-relaxed">내부에서는 발주·입고·재고·주문·출고·배송이 각각 다른 파일과 화면에서 관리되었습니다. 구매담당자는 판매량 엑셀을, 운영담당자는 주문 리스트를, 대표는 매출 보고서를 따로 봅니다.</p>
+          <p className="mt-3 text-[18px] leading-relaxed">내부에서는 발주·입고·재고·주문·출고·배송이 각각 다른 파일과 화면에서 관리되었습니다. 구매담당자는 판매량 엑셀을, 운영담당자는 주문 리스트를, 대표는 매출 보고서를 따로 봅니다.</p>
         </Sec>
 
         <Sec no="05" title="데이터가 끊기는 지점">
@@ -98,7 +98,7 @@ export default function WhyAxView() {
 
         <Sec no="08" title="매출이 새는 곳: 재구매 누락">
           <Big>생활용품은 반복구매 상품입니다. 재구매를 놓치는 것은 신규고객을 놓치는 것보다 비쌉니다.</Big>
-          <div className="mt-4 card p-4 text-[15px] leading-relaxed"><b>고객 김서연</b>은 물티슈를 21일, 세제를 35일, 배변패드를 18일마다 삽니다. 주기가 왔을 때 아무 제안이 없으면 다른 곳에서 삽니다. 지금 이런 고객이 <b>42명</b> 주기 도래 상태입니다 (Demo). Repeat Basket 노출 시 지난달 전환율 31%였습니다 — 이 숫자도 실측으로 다시 확인합니다.</div>
+          <div className="mt-4 card p-4 text-[17px] leading-relaxed"><b>고객 김서연</b>은 물티슈를 21일, 세제를 35일, 배변패드를 18일마다 삽니다. 주기가 왔을 때 아무 제안이 없으면 다른 곳에서 삽니다. 지금 이런 고객이 <b>42명</b> 주기 도래 상태입니다 (Demo). Repeat Basket 노출 시 지난달 전환율 31%였습니다 — 이 숫자도 실측으로 다시 확인합니다.</div>
         </Sec>
 
         <Sec no="09" title="NEXMART에서 AX란 무엇인가">
@@ -126,7 +126,7 @@ export default function WhyAxView() {
 
         <Sec no="12" title="Stock & Purchase Radar">
           <div className="grid sm:grid-cols-[1fr_1fr] gap-4">
-            <div className="text-[16px] leading-relaxed space-y-2">
+            <div className="text-[18px] leading-relaxed space-y-2">
               <p>판매량만 보지 않습니다. <b>검색·조회·장바구니·주문·현재고·예약재고·입고예정·공급기간</b>을 함께 계산해 SKU마다 예상 소진일, 품절위험, 발주 우선순위, 추천 검토수량을 냅니다.</p>
               <p className="text-sm text-muted"><Term term="재고일수" desc={TERMS.daysOfStock}>재고일수</Term> = 가용재고 ÷ 평균 일판매량. <Term term="리드타임" desc={TERMS.leadTime}>리드타임</Term>보다 짧으면 긴급발주 후보입니다.</p>
             </div>
@@ -147,7 +147,7 @@ export default function WhyAxView() {
               <div className="rounded-lg bg-mist p-2.5 text-xs">Action: A구역 피커 2명 임시 배치 → 12건 우선 피킹 → 출고 → 고객 My Page '출고완료' 반영. 마감을 넘길 4건은 CS가 사전 안내.</div>
               <Link href="/ax/fulfillment?tab=risk" className="text-primary font-semibold inline-flex items-center gap-1">Control Tower 열기 <ArrowRight size={14} /></Link>
             </div>
-            <div className="text-[16px] leading-relaxed space-y-2">
+            <div className="text-[18px] leading-relaxed space-y-2">
               <p><Term term="Fulfillment" desc={TERMS.fulfillment}>Fulfillment</Term>는 주문 이후 상품을 피킹·포장·출고·배송하는 전체 과정입니다. 주문마다 마감시각·배송약속·구역 적체·재고예외로 <b>지연위험 점수</b>를 계산해 무엇을 먼저 처리할지 보여줍니다.</p>
               <p className="text-sm text-muted">여기서 상태를 바꾸면 고객 화면이 함께 바뀝니다. "내 주문 어디쯤이에요?" 전화가 줄어드는 지점입니다.</p>
             </div>

@@ -20,15 +20,23 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
   const step = STEPS[i];
 
   useLayoutEffect(() => {
-    const find = () => {
-      const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
-      if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); setRect(el.getBoundingClientRect()); } else setRect(null);
+    // 스크롤은 단계가 바뀔 때 한 번만. 스크롤/리사이즈 리스너는 좌표만 갱신하고 절대 다시 스크롤하지 않는다 (피드백 루프 방지).
+    let raf = 0;
+    const measure = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+        setRect(el ? el.getBoundingClientRect() : null);
+      });
     };
-    find();
-    const t = setTimeout(find, 350);
-    window.addEventListener("resize", find);
-    window.addEventListener("scroll", find, true);
-    return () => { clearTimeout(t); window.removeEventListener("resize", find); window.removeEventListener("scroll", find, true); };
+    const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    measure();
+    const t1 = setTimeout(measure, 400);
+    const t2 = setTimeout(measure, 800);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, { capture: true, passive: true });
+    return () => { clearTimeout(t1); clearTimeout(t2); cancelAnimationFrame(raf); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
   }, [step.target]);
 
   const finish = () => { setTutorialDone(true); onClose(); };
@@ -54,7 +62,7 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
       <div className="absolute card-raised p-5 w-[360px] max-w-[calc(100vw-24px)] fade-up" style={cardStyle}>
         <div className="text-xs font-semibold text-muted">{i + 1} / {STEPS.length}</div>
         <div className="text-lg font-bold mt-0.5">{step.title}</div>
-        <p className="text-[15px] text-ink/85 mt-1.5 leading-relaxed">{step.body}</p>
+        <p className="text-[17px] text-ink/85 mt-1.5 leading-relaxed">{step.body}</p>
         <div className="mt-4 flex items-center gap-2">
           <button className="btn-ghost btn-sm" onClick={finish}>건너뛰기</button>
           <div className="ml-auto flex gap-2">

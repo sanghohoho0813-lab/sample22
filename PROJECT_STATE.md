@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — NEXMART 현재 공사 진행상황
 
-> 갱신: 2026-09-15 · First Build + 고도화 R2 (Insight→Action 생성 · Pilot Readiness · Evidence Pack)
+> 갱신: 2026-09-15 · First Build + R2 + **R3 (안정성·가독성·모션 전면 업데이트)**
 
 ## STRATEGIC GATES
 
@@ -69,6 +69,19 @@
 - [x] 저장소 호환: `persist.merge`로 이전 localStorage 형태(pilot 없음)도 안전 로드
 - [x] QA: 신규 흐름 자동화(Action 생성→승인→입고예정 반영 / 우선처리 Action→실행중 / Owner+Baseline 3→PILOT→헤더 배지 / Pack 다운로드 내용 검증 / 구형 상태 재로드 / Reset→DEMO) + 전체 회귀 오류 0 · overflow 0
 - [ ] 사진 자산: Drive 폴더 "샘플 22. 유통 플랫폼"이 비어 있음 — 파일 업로드 후 다음 라운드
+
+## 2026-09-15 R3 — 안정성 · 사이드바 그룹핑 · 글자 크기 · 모션 (사용자 피드백)
+
+**"메뉴 이것저것 누르다 다운" 원인 조사**
+- 헤드리스 재현(튜토리얼 열린 채 28회 연속 내비, Presentation iframe 열고 역할 전환): 프리즈 미재현, heap 14MB. 코드 상 취약점 3곳을 확인해 모두 방어:
+  1. **Tutorial 스크롤 피드백 루프** — 스크롤 이벤트마다 `scrollIntoView(smooth)`를 다시 호출해 스크롤이 스크롤을 부르는 구조 + 이벤트마다 setState → 스크롤 가능한 환경(모바일 등)에서 렌더 폭주 가능. 스크롤은 단계 전환 시 1회, 리스너는 rAF로 좌표만 갱신
+  2. **탭/iframe 간 localStorage 재수화 왕복** — 다른 창 storage 이벤트 → rehydrate → 재기록 → 상대 창 이벤트 … 같은 값이면 무시 + 150ms 디바운스, localStorage 예외(용량·Private 모드)는 메모리 폴백
+  3. **에러 경계 부재** — 예외 시 흰 화면. `app/error.tsx`·`global-error.tsx` 추가: 다시 시도 / Demo 데이터 초기화 후 홈 / AX 이동
+  4. 부수: DevicePreview 이펙트가 매 렌더 재등록되던 문제(onClose ref), 모바일 Presentation은 iframe 대신 단계 화면으로 직접 이동(앱 안의 앱 메모리 제거), 사진 슬롯 404 폭주 제거(`scripts/gen-assets.mjs` 매니페스트 — 있는 파일만 요청)
+- [x] **사이드바 그룹핑**: 경영·판단(대시보드·Action Center·매출마진, 블루) / 상품·재고·공급(앰버) / 주문·고객·운영(틸) / 실증·스토리(바이올렛) / 시스템(슬레이트). 그룹 = 같은 색 계열, 항목 = 톤만 다름. 활성 항목 좌측 컬러 바
+- [x] **글자 크기 전면 상향** (Executive Readability First): Tailwind 스케일 재정의 xs 13 · sm 15 · base 17 · lg 19 · xl 22 · 2xl 26 · 3xl 32, 하드코딩 px 22개 파일 +2px, 본문 17px, 사이드바 16px·288px, 아이콘 36px. "크게" 옵션은 root font-size에 적용되어 전체 UI가 함께 커짐. 한국어 어절 단위 줄바꿈(keep-all)
+- [x] **모션 시스템** (MD 규칙: 140~180ms ease-out 기본, Bounce·Pulse·Neon·큰 Scale 금지): 페이지 진입 rise-in, KPI·카드·Brief 순차 등장(stagger), KPI 숫자 카운트업(650ms 감속), Drawer 우측 슬라이드·Sheet 상향 슬라이드, 차트 라인 draw-in·막대 grow·Meter grow, 카드 hover 리프트, 상품 이미지 소폭 zoom, 사이드바 hover 이동·아이콘 scale, `prefers-reduced-motion` 존중
+- [x] QA: 21 라우트 × 8 폭 overflow 0(초기 4페이지 overflow → grid `min-w-0` 전역 규칙·overflow-wrap로 해결) · 오류 0 · 전체 Journey 회귀 통과 · 프리즈 재현 스크립트 응답 2ms
 
 ## USER ACTION QUEUE
 

@@ -34,12 +34,12 @@ export default function DashboardView() {
     <div className="space-y-4 sm:space-y-5">
       {/* Today Brief */}
       <Panel tour="brief" title={<span className="inline-flex items-center gap-2"><Sparkles size={18} className="text-accent" />Today Brief — {ROLE_LABEL[role]}님, 오늘 확인할 순서</span>} sub="어디에서 돈이 새고, 무엇을 먼저 발주하고, 어떤 주문을 먼저 처리할지" right={<AiReady title="Executive Briefing" now="KPI·Action을 규칙으로 정렬한 우선순위 (L1 Assist)" method="Structured Rule" next="LLM이 여러 지표와 Action을 한 문단 자연어로 설명" />}>
-        <ol className="grid md:grid-cols-2 gap-2">
+        <ol className="grid md:grid-cols-2 gap-2 stagger">
           {briefing.map((b) => (
             <li key={b.rank}>
               <Link href={b.href} className="flex items-start gap-3 rounded-xl border border-line px-3.5 py-3 hover:bg-mist transition-colors h-full">
                 <span className={`w-7 h-7 rounded-lg text-white text-sm font-bold flex items-center justify-center shrink-0 ${b.tone === "danger" ? "bg-danger" : b.tone === "warn" ? "bg-orange" : b.tone === "good" ? "bg-teal" : "bg-secondary"}`}>{b.rank}</span>
-                <div className="min-w-0 flex-1"><div className="font-semibold text-[15px] leading-snug">{b.title}</div><div className="text-sm text-muted mt-0.5">{b.why}</div></div>
+                <div className="min-w-0 flex-1"><div className="font-semibold text-[17px] leading-snug">{b.title}</div><div className="text-sm text-muted mt-0.5">{b.why}</div></div>
                 <ArrowRight size={16} className="text-muted shrink-0 mt-1" />
               </Link>
             </li>
@@ -50,7 +50,7 @@ export default function DashboardView() {
       {/* KPI hierarchy 1: 매출·마진 */}
       <div data-tour="kpi">
         <div className="flex items-center gap-2 mb-2 text-sm font-bold text-muted"><TrendingUp size={15} />1. 매출·마진 <span className="font-normal">(최근 30일)</span></div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
           {showMoney ? (
             <>
               <KpiCard label="순매출" value={wonShort(k.revenue30)} delta={k.revenueDelta} sub="전월 대비" href="/ax/sales" tone="primary" spark={data.dailySales.slice(-14).map((d) => d.revenue)} big />
@@ -70,7 +70,7 @@ export default function DashboardView() {
       {/* 2: 재고·발주 */}
       <div>
         <div className="flex items-center gap-2 mb-2 text-sm font-bold text-muted"><Boxes size={15} />2. 재고·발주</div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
           <KpiCard label="품절위험 SKU" value={`${k.stockoutRisk}개`} sub={`품절률 ${pct(k.stockoutRate)}`} href="/ax/inventory?status=risk" tone={k.stockoutRisk > 0 ? "danger" : "good"} />
           <KpiCard label="긴급발주 후보" value={`${k.urgentPo}개`} sub="예상 소진 < 리드타임" href="/ax/inventory?status=urgent" tone="warn" />
           <KpiCard label="저회전·과잉 재고" value={`${k.slowCount}개`} sub={showMoney ? `재고금액 ${wonShort(k.slowValue)}` : "재고일수 75일 이상"} href="/ax/inventory?status=slow" tone="neutral" />
@@ -81,7 +81,7 @@ export default function DashboardView() {
       {/* 3: 주문·배송 */}
       <div>
         <div className="flex items-center gap-2 mb-2 text-sm font-bold text-muted"><Truck size={15} />3. 주문·배송 (오늘)</div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
           <KpiCard label="신규주문" value={num(fk.newOrders)} sub={`오늘 출고대상 ${fk.todayShip}건`} href="/ax/fulfillment" tone="primary" />
           <KpiCard label="배송지연 위험" value={`${highRisk.length}건`} sub={`마감임박 ${fk.cutoffSoon}건`} href="/ax/fulfillment?tab=risk" tone={highRisk.length ? "danger" : "good"} />
           <KpiCard label="정시출고율" value={pct(fk.onTimeRate, 0)} sub={`평균 처리 ${fk.avgCycleHours.toFixed(1)}시간`} href="/ax/fulfillment" tone="good" />
@@ -111,7 +111,7 @@ export default function DashboardView() {
         <Panel title={<span className="inline-flex items-center gap-2"><AlertTriangle size={17} className="text-danger" />품절위험 SKU {stockoutRisk.length}개</span>} sub="클릭 → SKU Detail → 근거 → 발주 Action" right={<Link href="/ax/inventory?status=risk" className="text-sm font-semibold text-primary">전체</Link>}>
           <ul className="divide-y divide-line -mx-1">
             {stockoutRisk.slice(0, 6).map((i) => (
-              <li key={i.sku.id}><button onClick={() => setSkuId(i.sku.id)} className="w-full flex items-center gap-3 px-1 py-2.5 text-left hover:bg-mist rounded-lg"><div className="min-w-0 flex-1"><div className="font-semibold text-sm truncate">{i.product.name} <span className="text-muted font-normal">· {i.sku.name}</span></div><div className="text-xs text-muted">{i.reasons[0]}</div></div><div className="text-right shrink-0"><div className="text-sm font-bold tabular-nums">{i.daysOfStock === Infinity ? "-" : `${i.daysOfStock.toFixed(1)}일`}</div><div className="text-[11px] text-muted">가용 {i.available}</div></div></button></li>
+              <li key={i.sku.id}><button onClick={() => setSkuId(i.sku.id)} className="w-full flex items-center gap-3 px-1 py-2.5 text-left hover:bg-mist rounded-lg"><div className="min-w-0 flex-1"><div className="font-semibold text-sm truncate">{i.product.name} <span className="text-muted font-normal">· {i.sku.name}</span></div><div className="text-xs text-muted">{i.reasons[0]}</div></div><div className="text-right shrink-0"><div className="text-sm font-bold tabular-nums">{i.daysOfStock === Infinity ? "-" : `${i.daysOfStock.toFixed(1)}일`}</div><div className="text-[13px] text-muted">가용 {i.available}</div></div></button></li>
             ))}
           </ul>
         </Panel>

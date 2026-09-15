@@ -82,7 +82,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
 
           {/* delivery promise — 언제 받는가 */}
           <div className={`mt-4 rounded-2xl border p-4 ${promise.kind === "fast" ? "border-teal/40 bg-teal/5" : promise.kind === "reserve" ? "border-orange/40 bg-orange/5" : promise.kind === "soldout" ? "border-danger/30 bg-danger/5" : "border-line bg-mist"}`}>
-            <div className="flex items-center gap-2 font-bold text-[17px]">
+            <div className="flex items-center gap-2 font-bold text-[19px]">
               {promise.kind === "fast" ? <Zap size={18} className="text-teal fill-teal" /> : <Truck size={18} className="text-muted" />}
               {promise.text}
             </div>
@@ -143,7 +143,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
         <Tabs tabs={[{ key: "desc", label: "상품설명" }, { key: "review", label: "리뷰", count: product.reviewCount }, { key: "ship", label: "배송·교환·반품" }]} value={tab} onChange={setTab} />
         <div className="py-6 max-w-3xl">
           {tab === "desc" && (
-            <div className="space-y-4 text-[16px] leading-relaxed">
+            <div className="space-y-4 text-[18px] leading-relaxed">
               <p>{product.description}</p>
               <div className="grid sm:grid-cols-3 gap-3">
                 {[["구성", summary.skus.map((s) => s.name).join(" / ")], ["배송유형", product.deliveryType === "fast" ? "빠른배송 (15시 전 주문 시 익일)" : "일반배송"], ["반복구매", product.isRepeatable ? `평균 ${product.avgRepeatCycleDays}일 주기` : "-"]].map(([k, v]) => <div key={k} className="card p-3"><div className="text-xs text-muted">{k}</div><div className="font-semibold text-sm mt-0.5">{v}</div></div>)}
@@ -155,11 +155,11 @@ export default function ProductDetailView({ productId }: { productId: string }) 
           {tab === "review" && (
             <div className="space-y-3">
               <div className="flex items-center gap-4 card p-4"><div className="text-4xl font-black">{product.rating}</div><div><div className="flex text-highlight">{[1, 2, 3, 4, 5].map((i) => <Star key={i} size={16} className={i <= Math.round(product.rating) ? "fill-highlight" : ""} />)}</div><div className="text-sm text-muted">{product.reviewCount.toLocaleString()}개 리뷰 (시연용 가상 리뷰)</div></div></div>
-              {REVIEWS.map((r, i) => <div key={i} className="card p-4"><div className="flex items-center justify-between text-sm"><span className="font-semibold">{r.name}</span><span className="text-muted">{r.date}</span></div><div className="flex text-highlight mt-1">{[1, 2, 3, 4, 5].map((k) => <Star key={k} size={13} className={k <= r.rating ? "fill-highlight" : ""} />)}</div><p className="mt-2 text-[15px]">{r.text}</p></div>)}
+              {REVIEWS.map((r, i) => <div key={i} className="card p-4"><div className="flex items-center justify-between text-sm"><span className="font-semibold">{r.name}</span><span className="text-muted">{r.date}</span></div><div className="flex text-highlight mt-1">{[1, 2, 3, 4, 5].map((k) => <Star key={k} size={13} className={k <= r.rating ? "fill-highlight" : ""} />)}</div><p className="mt-2 text-[17px]">{r.text}</p></div>)}
             </div>
           )}
           {tab === "ship" && (
-            <div className="space-y-3 text-[15px] leading-relaxed">
+            <div className="space-y-3 text-[17px] leading-relaxed">
               <div className="card p-4"><div className="font-semibold">배송</div><p className="text-muted mt-1">빠른배송 상품은 오후 3시 이전 주문 시 다음날 도착(도서산간 제외). 일반배송은 출고 후 2~3일. 3만원 이상 무료배송.</p></div>
               <div className="card p-4"><div className="font-semibold">교환·반품</div><p className="text-muted mt-1">배송완료 후 7일 이내 마이페이지에서 신청. 상품 불량·오배송·파손은 배송비 없이 처리. 단순 변심은 왕복 배송비 고객 부담.</p></div>
               <div className="card p-4"><div className="font-semibold">품절·입고</div><p className="text-muted mt-1">재고가 없는 구성은 입고예정일이 표시되며 예약 주문 시 입고 후 순차 출고됩니다.</p></div>

@@ -26,8 +26,8 @@ export default function ProductCard({ s, size = "md", rank }: { s: ProductSummar
   const badge = p.tags.includes("베스트") ? "베스트" : s.trend > 0.3 ? "인기급상승" : p.tags.includes("반복구매") ? "반복구매" : null;
 
   return (
-    <article className="group card overflow-hidden flex flex-col hover:shadow-raised transition-shadow duration-150 relative">
-      <Link href={`/product/${p.id}`} className="block relative" aria-label={p.name}>
+    <article className="group card overflow-hidden flex flex-col lift relative">
+      <Link href={`/product/${p.id}`} className="block relative overflow-hidden zoom-hover" aria-label={p.name}>
         <AssetImage assetKey={`product/${p.id}`} category={p.categorySlug} label={p.name} seed={parseInt(p.id.slice(2), 10)} className="rounded-none" />
         {rank !== undefined && <span className="absolute left-2 top-2 w-7 h-7 rounded-lg bg-navy text-white text-sm font-bold flex items-center justify-center">{rank}</span>}
         {badge && <span className="absolute left-2 bottom-2 badge bg-white/95 text-navy shadow-sm">{badge}</span>}
@@ -38,10 +38,10 @@ export default function ProductCard({ s, size = "md", rank }: { s: ProductSummar
       </button>
       <div className={`flex flex-col flex-1 ${size === "sm" ? "p-2.5" : "p-3"}`}>
         <div className="text-xs text-muted">{brandById.get(p.brandId)?.name}</div>
-        <Link href={`/product/${p.id}`} className={`font-semibold leading-snug line-clamp-2 mt-0.5 ${size === "sm" ? "text-[14px]" : "text-[15px]"}`}>{p.name}</Link>
+        <Link href={`/product/${p.id}`} className={`font-semibold leading-snug line-clamp-2 mt-0.5 ${size === "sm" ? "text-[16px]" : "text-[17px]"}`}>{p.name}</Link>
         <div className="mt-1.5 flex items-baseline gap-1.5 flex-wrap">
           {s.discountRate > 0 && <span className="text-orange font-bold">{s.discountRate}%</span>}
-          <span className="font-bold text-[17px] tabular-nums">{won(s.defaultSku.salePrice)}</span>
+          <span className="font-bold text-[19px] tabular-nums">{won(s.defaultSku.salePrice)}</span>
           {s.discountRate > 0 && <span className="text-xs text-muted line-through tabular-nums">{won(s.listPrice)}</span>}
         </div>
         {s.skus.length > 1 && <div className="text-xs text-muted mt-0.5">{s.defaultSku.name} · 묶음 {s.skus.length}종</div>}

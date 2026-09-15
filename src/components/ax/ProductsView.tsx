@@ -86,7 +86,7 @@ function RowGroup({ r, open, onToggle, onOpenSku, showCost, catName, brandName, 
         <td><div className="font-semibold whitespace-nowrap">{r.p.name}</div><div className="text-xs text-muted flex gap-1 items-center">{r.p.tags.map((t) => <Badge key={t} tone="soft">{t}</Badge>)}<Link href={`/product/${r.p.id}`} target="_blank" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-0.5 hover:text-primary">고객화면 <ExternalLink size={11} /></Link></div></td>
         <td className="text-xs whitespace-nowrap">{catName}<div className="text-muted">{brandName}</div></td>
         <td><StatusBadge status={r.worst?.status ?? "normal"} /></td>
-        <td className="text-right tabular-nums"><b>{num(r.available)}</b> / {num(r.onHand)}<div className="text-[11px] text-muted">예약 {r.reserved}</div></td>
+        <td className="text-right tabular-nums"><b>{num(r.available)}</b> / {num(r.onHand)}<div className="text-[13px] text-muted">예약 {r.reserved}</div></td>
         <td className="text-right tabular-nums">{r.inbound ? num(r.inbound) : <span className="text-muted">-</span>}</td>
         <td className="text-right tabular-nums">{num(r.sales7)}</td>
         <td><Sparkline values={r.daily} width={72} height={22} /></td>

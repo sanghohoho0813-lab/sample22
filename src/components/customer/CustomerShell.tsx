@@ -56,7 +56,7 @@ export function SearchBox({ autoFocus = false, onDone, size = "md" }: { autoFocu
           autoFocus={autoFocus}
           placeholder="물티슈, 생수, 배변패드… 필요한 생활상품을 검색"
           aria-label="통합검색"
-          className={`input ${size === "lg" ? "pl-12 pr-24 !min-h-[56px] text-[17px]" : "pl-10 pr-20 !min-h-[46px]"} rounded-full border-2 border-line focus:border-primary`}
+          className={`input ${size === "lg" ? "pl-12 pr-24 !min-h-[56px] text-[19px]" : "pl-10 pr-20 !min-h-[46px]"} rounded-full border-2 border-line focus:border-primary`}
         />
         {q && <button type="button" onClick={() => setQ("")} aria-label="지우기" className="absolute right-[76px] top-1/2 -translate-y-1/2 text-muted hover:text-ink"><X size={16} /></button>}
         <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 btn-primary !min-h-[36px] rounded-full !px-4 text-sm">검색</button>
@@ -67,7 +67,7 @@ export function SearchBox({ autoFocus = false, onDone, size = "md" }: { autoFocu
             sugg.length ? (
               <ul>
                 {sugg.map((s) => (
-                  <li key={s}><button type="button" onMouseDown={() => go(s)} className="w-full text-left px-2.5 py-2.5 rounded-lg hover:bg-mist flex items-center gap-2 text-[15px]"><Search size={15} className="text-muted" />{s}</button></li>
+                  <li key={s}><button type="button" onMouseDown={() => go(s)} className="w-full text-left px-2.5 py-2.5 rounded-lg hover:bg-mist flex items-center gap-2 text-[17px]"><Search size={15} className="text-muted" />{s}</button></li>
                 ))}
               </ul>
             ) : (
@@ -99,7 +99,7 @@ export function DeliveryStrip({ compact = false }: { compact?: boolean }) {
   if (!now) return <div className="h-9 bg-navy" aria-hidden />;
   const c = shipCutdown(now);
   return (
-    <div className={`bg-navy text-white ${compact ? "text-[12px]" : "text-[13px]"}`}>
+    <div className={`bg-navy text-white ${compact ? "text-[14px]" : "text-[15px]"}`}>
       <div className="mx-auto max-w-[1280px] px-4 h-9 flex items-center gap-2 overflow-x-auto hide-scrollbar whitespace-nowrap">
         <Clock3 size={13} className="shrink-0 text-white/70" />
         <time dateTime={now.toISOString()} className="text-white/80 tabular-nums shrink-0" suppressHydrationWarning>
@@ -189,7 +189,7 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
               <span className="font-black text-xl tracking-tight text-navy hidden xs:inline">NEXMART</span>
             </Link>
             {!inIframe && (
-              <button type="button" onClick={() => setDemoOpen(true)} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-bold tracking-wide bg-orange/15 text-[#B84F1A] hover:bg-orange/25 transition-colors inline-flex items-center gap-1" aria-label="Demo 메뉴 — Business AX 열기">
+              <button type="button" onClick={() => setDemoOpen(true)} className="shrink-0 rounded-md px-2 py-1 text-[13px] font-bold tracking-wide bg-orange/15 text-[#B84F1A] hover:bg-orange/25 transition-colors inline-flex items-center gap-1" aria-label="Demo 메뉴 — Business AX 열기">
                 DEMO <ChevronRight size={11} />
               </button>
             )}
@@ -202,7 +202,7 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
               </Link>
               <Link href="/cart" className="btn-ghost !px-2.5 relative" aria-label={`장바구니 ${cartCount}개`}>
                 <ShoppingCart size={22} />
-                {hydrated && cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 rounded-full bg-orange text-white text-[11px] font-bold flex items-center justify-center">{cartCount}</span>}
+                {hydrated && cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 rounded-full bg-orange text-white text-[13px] font-bold flex items-center justify-center">{cartCount}</span>}
               </Link>
               <Link href="/my" className="btn-ghost !px-2.5 hidden sm:inline-flex" aria-label="마이페이지"><User size={22} /></Link>
             </nav>
@@ -210,7 +210,7 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
           {!plain && (
             <nav className="hidden md:flex items-center gap-1 h-11 -mx-1" aria-label="주요 메뉴">
               {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className={`px-3 h-9 inline-flex items-center gap-1.5 rounded-lg text-[15px] font-semibold transition-colors ${isActive(n.href) ? "text-primary bg-soft" : "text-ink hover:bg-mist"}`}>
+                <Link key={n.href} href={n.href} className={`px-3 h-9 inline-flex items-center gap-1.5 rounded-lg text-[17px] font-semibold transition-colors ${isActive(n.href) ? "text-primary bg-soft" : "text-ink hover:bg-mist"}`}>
                   <n.icon size={16} />{n.label}
                 </Link>
               ))}
@@ -302,10 +302,10 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
               const on = isActive(n.href);
               return (
                 <li key={n.href}>
-                  <Link href={n.href} className={`h-full flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold relative ${on ? "text-primary" : "text-muted"}`}>
+                  <Link href={n.href} className={`h-full flex flex-col items-center justify-center gap-0.5 text-[13px] font-semibold relative ${on ? "text-primary" : "text-muted"}`}>
                     <n.icon size={22} strokeWidth={on ? 2.4 : 2} />
                     {n.label}
-                    {hydrated && n.count ? <span className="absolute top-1.5 right-1/2 translate-x-4 min-w-[18px] h-[18px] px-1 rounded-full bg-orange text-white text-[10px] font-bold flex items-center justify-center">{n.count}</span> : null}
+                    {hydrated && n.count ? <span className="absolute top-1.5 right-1/2 translate-x-4 min-w-[18px] h-[18px] px-1 rounded-full bg-orange text-white text-[12px] font-bold flex items-center justify-center">{n.count}</span> : null}
                   </Link>
                 </li>
               );

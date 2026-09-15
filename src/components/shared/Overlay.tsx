@@ -70,7 +70,7 @@ export default function Overlay({ open, onClose, title, subtitle, variant = "mod
 
   return createPortal(
     <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
-      <div className="absolute inset-0 bg-shell/55 backdrop-blur-[2px] fade-up" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-shell/55 backdrop-blur-[2px] fade-in" onClick={onClose} aria-hidden="true" />
       <div className={isDrawer || isSheet ? "" : "absolute inset-0 flex items-center justify-center p-4"}>
         <div ref={panelRef} className={`${panelClass} fade-up`} onClick={(e) => e.stopPropagation()}>
           {(isDrawer || isSheet) && <div className="sm:hidden mx-auto mt-2 h-1.5 w-12 rounded-full bg-line" />}

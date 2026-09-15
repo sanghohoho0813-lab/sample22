@@ -101,7 +101,7 @@ export default function ProductListView({ title, subtitle, base, lockCategory = 
         </aside>
         <section>
           <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
-            <button className="chip lg:hidden shrink-0" onClick={() => setSheet(true)}><SlidersHorizontal size={14} />필터{activeCount > 0 && <span className="ml-1 rounded-full bg-primary text-white text-[10px] px-1.5">{activeCount}</span>}</button>
+            <button className="chip lg:hidden shrink-0" onClick={() => setSheet(true)}><SlidersHorizontal size={14} />필터{activeCount > 0 && <span className="ml-1 rounded-full bg-primary text-white text-[12px] px-1.5">{activeCount}</span>}</button>
             {showCategoryChips && !lockCategory && (
               <div className="flex gap-1.5 shrink-0 lg:hidden">
                 {data.categories.map((c) => <button key={c.slug} className={`chip ${f.category === c.slug ? "chip-on" : ""}`} onClick={() => setF((s) => ({ ...s, category: s.category === c.slug ? "all" : (c.slug as CategorySlug) }))}>{c.name}</button>)}

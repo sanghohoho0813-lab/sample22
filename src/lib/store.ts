@@ -22,6 +22,15 @@ export const ACTION_STAGE_LABEL: Record<ActionStage, string> = {
   recommended: "추천됨", reviewing: "검토중", approved: "승인", requested: "발주요청", in_progress: "실행중", done: "완료", dismissed: "보류해제", held: "보류",
 };
 
+/** localStorage 래퍼 — 용량 초과·Private 모드 등에서 예외로 앱이 죽지 않도록 */
+let lastWritten: string | null = null;
+const memoryFallback = new Map<string, string>();
+const safeStorage = {
+  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return memoryFallback.get(k) ?? null; } },
+  setItem: (k: string, v: string) => { lastWritten = v; try { localStorage.setItem(k, v); } catch { memoryFallback.set(k, v); } },
+  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { memoryFallback.delete(k); } },
+};
+
 const uid = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const nowIso = () => new Date().toISOString();
 
@@ -442,7 +451,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "nexmart-demo-v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ data: s.data, ui: s.ui }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<StoreState>;
@@ -455,9 +464,14 @@ export const useStore = create<StoreState>()(
   ),
 );
 
-// cross-tab / iframe sync: reload persisted state when another window writes
+// cross-tab / iframe sync: reload persisted state when another window writes.
+// - 같은 값이면 무시 (재수화 → 재기록 → 다른 창 이벤트 … 왕복 방지)
+// - 짧은 시간에 몰린 이벤트는 한 번만 처리
 if (typeof window !== "undefined") {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   window.addEventListener("storage", (e) => {
-    if (e.key === "nexmart-demo-v1") useStore.persist.rehydrate();
+    if (e.key !== "nexmart-demo-v1" || e.newValue == null || e.newValue === lastWritten) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => { try { useStore.persist.rehydrate(); } catch { /* ignore */ } }, 150);
   });
 }

@@ -81,7 +81,7 @@ export default function EvidenceView() {
         <div className="space-y-4">
           <Panel title="Evidence Pack (12주 실증 후)" sub="지금은 구조만 준비 — 숫자는 실측 후 채웁니다" right={<button className="btn-outline btn-sm" onClick={() => { downloadText(`NEXMART_Evidence_Pack_${new Date().toISOString().slice(0, 10)}.md`, buildEvidencePack(data, ui)); toast({ title: "Evidence Pack 초안을 내려받았습니다", tone: "success" }); }}><Download size={14} />초안</button>}>
             <ol className="text-sm space-y-1.5">
-              {["Before / Baseline", "Trigger / Problem", "Recommendation / Decision", "Human Approval", "Action", "Result", "KPI Delta", "Data Source / Provenance", "User / Time Log", "Screenshot / Report"].map((s, i) => <li key={s} className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-mist text-[11px] font-bold flex items-center justify-center">{i + 1}</span>{s}</li>)}
+              {["Before / Baseline", "Trigger / Problem", "Recommendation / Decision", "Human Approval", "Action", "Result", "KPI Delta", "Data Source / Provenance", "User / Time Log", "Screenshot / Report"].map((s, i) => <li key={s} className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-mist text-[13px] font-bold flex items-center justify-center">{i + 1}</span>{s}</li>)}
             </ol>
             <div className="mt-3 rounded-xl bg-mist p-3 text-xs text-muted">BASELINE STATUS: <b className="text-ink">{baselineCount ? `${baselineCount} / 11 입력 (나머지 UNKNOWN / REQUIRED)` : "UNKNOWN / REQUIRED"}</b><br />TARGET: DO NOT INVENT<br />CURRENT NUMBERS: DEMO SIMULATION ONLY</div>
           </Panel>

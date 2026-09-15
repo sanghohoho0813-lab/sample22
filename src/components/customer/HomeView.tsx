@@ -51,8 +51,8 @@ export default function HomeView() {
         <div className="mx-auto max-w-[1280px] px-4 pt-8 pb-10 sm:pt-12 sm:pb-14 grid lg:grid-cols-[1.15fr_1fr] gap-8 items-center">
           <div>
             <p className="text-teal font-semibold text-sm tracking-wide">생활에 필요한 모든 것, 한 번에</p>
-            <h1 className="mt-2 text-[34px] leading-[1.15] sm:text-[52px] font-black tracking-tight text-balance">찾고, 배송일 확인하고,<br className="hidden sm:block" /> 오늘 바로 주문하세요</h1>
-            <p className="mt-3 text-white/75 text-[17px] max-w-xl">식품·생활·주방·리빙·디지털·반려·유아·건강. 재고와 배송예정일을 구매 전에 확인하고, 자주 쓰는 상품은 한 번에 다시 담습니다.</p>
+            <h1 className="mt-2 text-[32px] leading-[1.2] sm:text-[54px] font-black tracking-tight text-balance">찾고, 배송일 확인하고,<br className="hidden sm:block" /> 오늘 바로 주문하세요</h1>
+            <p className="mt-3 text-white/75 text-[19px] max-w-xl">식품·생활·주방·리빙·디지털·반려·유아·건강. 재고와 배송예정일을 구매 전에 확인하고, 자주 쓰는 상품은 한 번에 다시 담습니다.</p>
             <div className="mt-6 max-w-2xl text-ink"><SearchBox size="lg" /></div>
             <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/80">
               <li className="inline-flex items-center gap-1.5"><Zap size={15} className="text-teal fill-teal" />{cut ? (cut.beforeCutoff ? `오늘 15:00까지 ${cut.remain} 남음 · ${cut.arriveLabel} 도착` : `지금 주문 시 ${cut.arriveLabel} 도착`) : "15:00 전 주문 시 내일 도착"}</li>
@@ -65,7 +65,7 @@ export default function HomeView() {
             {/* 사진 자산이 들어오기 전에도 비어 보이지 않도록: 실시간 배송 현황 오버레이 */}
             <div className="absolute left-4 top-4 right-4">
               <div className="rounded-2xl bg-white/95 text-ink px-4 py-3 shadow-card">
-                <div className="text-[11px] font-semibold text-muted">{cut ? todayLabel(cut.now, false) : "오늘"} 빠른배송</div>
+                <div className="text-[13px] font-semibold text-muted">{cut ? todayLabel(cut.now, false) : "오늘"} 빠른배송</div>
                 {cut?.beforeCutoff ? (
                   <div className="mt-0.5 flex items-baseline gap-1.5"><span className="text-2xl sm:text-3xl font-black tabular-nums text-navy">{cut.remain}</span><span className="text-sm font-semibold text-muted">남음</span></div>
                 ) : (
@@ -76,7 +76,7 @@ export default function HomeView() {
             </div>
             <div className="absolute left-4 bottom-4 right-4 grid grid-cols-3 gap-2">
               {[["카테고리 8", "생활 필수품 중심"], ["배송예정", "구매 전 확인"], ["재구매 추천", "구매주기 기반"]].map(([a, b]) => (
-                <div key={a} className="rounded-xl bg-white/95 text-ink px-2.5 py-2"><div className="font-bold text-[13px] sm:text-sm whitespace-nowrap">{a}</div><div className="text-[10px] sm:text-[11px] text-muted leading-tight mt-0.5">{b}</div></div>
+                <div key={a} className="rounded-xl bg-white/95 text-ink px-2.5 py-2"><div className="font-bold text-[15px] sm:text-sm whitespace-nowrap">{a}</div><div className="text-[12px] sm:text-[13px] text-muted leading-tight mt-0.5">{b}</div></div>
               ))}
             </div>
           </div>
@@ -85,9 +85,9 @@ export default function HomeView() {
 
       {/* Category quick action */}
       <section className="mx-auto max-w-[1280px] px-4 -mt-6">
-        <div className="card-raised p-3 sm:p-4 grid grid-cols-4 sm:grid-cols-8 gap-1 sm:gap-2">
+        <div className="card-raised p-3 sm:p-4 grid grid-cols-4 sm:grid-cols-8 gap-1 sm:gap-2 stagger">
           {data.categories.map((c) => (
-            <Link key={c.slug} href={`/category/${c.slug}`} className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl hover:bg-mist transition-colors">
+            <Link key={c.slug} href={`/category/${c.slug}`} className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl hover:bg-mist transition-[background-color,transform] duration-150 hover:-translate-y-0.5">
               <span className="w-12 h-12 rounded-2xl bg-soft flex items-center justify-center text-2xl" aria-hidden>{CAT_ICON[c.slug]}</span>
               <span className="text-sm font-semibold">{c.name}</span>
             </Link>
@@ -96,7 +96,7 @@ export default function HomeView() {
       </section>
 
       <Section title="빠른배송 상품" sub="오늘 15:00 전 주문하면 내일 도착" href="/fast">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{fast.slice(0, 4).map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 stagger">{fast.slice(0, 4).map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
       </Section>
 
       {repeat.length > 0 && (
@@ -110,7 +110,7 @@ export default function HomeView() {
                   <div key={r.product.id} className="flex items-center gap-3 p-3">
                     <Link href={`/product/${r.product.id}`} className="shrink-0"><AssetImage assetKey={`product/${r.product.id}`} category={r.product.categorySlug} label={r.product.name} className="w-16 h-16 rounded-xl" ratio="" /></Link>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/product/${r.product.id}`} className="font-semibold text-[15px] line-clamp-1">{r.product.name}</Link>
+                      <Link href={`/product/${r.product.id}`} className="font-semibold text-[17px] line-clamp-1">{r.product.name}</Link>
                       <div className="text-xs text-muted mt-0.5">{sku.name} · 평균 {r.avgCycleDays}일마다 · <span className={r.dueInDays <= 0 ? "text-orange font-semibold" : ""}>{due}</span>{r.altSku && <span className="text-[#B84F1A]"> · 대체구성</span>}</div>
                       <div className="font-bold mt-0.5 tabular-nums">{won(sku.salePrice)}</div>
                     </div>
@@ -128,21 +128,21 @@ export default function HomeView() {
       )}
 
       <Section title="오늘의 추천" sub="평점이 높고 재고가 넉넉한 상품">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{recommended.map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 stagger">{recommended.map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
       </Section>
 
       <Section title="지금 많이 찾는 상품" sub="최근 7일 주문 기준" href="/search?q=">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{popular.slice(0, 8).map((s, i) => <ProductCard key={s.product.id} s={s} rank={i + 1} />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 stagger">{popular.slice(0, 8).map((s, i) => <ProductCard key={s.product.id} s={s} rank={i + 1} />)}</div>
       </Section>
 
       {together.length > 0 && (
         <Section title="함께 사면 좋은 상품" sub="자주 구매한 카테고리에서 골랐습니다">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{together.map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 stagger">{together.map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
         </Section>
       )}
 
       <Section title="이번 주 특가" sub="할인율 높은 순" href="/deals">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{deals.slice(0, 4).map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 stagger">{deals.slice(0, 4).map((s) => <ProductCard key={s.product.id} s={s} />)}</div>
       </Section>
 
       {/* Brand story */}

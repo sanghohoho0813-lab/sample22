@@ -39,7 +39,7 @@ export function Term({ term, children, desc }: { term: string; children?: ReactN
         {children ?? term}<HelpCircle size={13} className="text-muted" />
       </button>
       <Overlay open={open} onClose={() => setOpen(false)} title={term} size="sm">
-        <p className="text-[15px] leading-relaxed">{desc}</p>
+        <p className="text-[17px] leading-relaxed">{desc}</p>
       </Overlay>
     </>
   );
@@ -63,11 +63,11 @@ export function AiReady({ title, now, next, method, compact = false }: { title: 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`inline-flex items-center gap-1.5 rounded-lg border border-dashed border-secondary/60 bg-secondary/8 text-secondary font-semibold ${compact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs"} hover:bg-secondary/15 transition-colors`}>
+      <button type="button" onClick={() => setOpen(true)} className={`inline-flex items-center gap-1.5 rounded-lg border border-dashed border-secondary/60 bg-secondary/8 text-secondary font-semibold ${compact ? "px-2 py-1 text-[13px]" : "px-2.5 py-1.5 text-xs"} hover:bg-secondary/15 transition-colors`}>
         <Sparkles size={compact ? 12 : 14} /> AI READY
       </button>
       <Overlay open={open} onClose={() => setOpen(false)} title={title} subtitle="AI 적용 상태 — 정직한 표시" size="sm">
-        <dl className="space-y-3 text-[15px]">
+        <dl className="space-y-3 text-[17px]">
           <div><dt className="text-xs font-semibold text-muted uppercase">현재</dt><dd className="mt-0.5">{now}</dd></div>
           <div><dt className="text-xs font-semibold text-muted uppercase">계산 방식</dt><dd className="mt-0.5">{method}</dd></div>
           <div><dt className="text-xs font-semibold text-muted uppercase">향후 (API 연결 시)</dt><dd className="mt-0.5">{next}</dd></div>

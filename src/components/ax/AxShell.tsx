@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LayoutDashboard, Rocket, TrendingUp, Package, Boxes, Factory, Truck, Users, Megaphone, Undo2, FileCheck2, BookOpenText, Presentation, Settings, Menu, X, Store, Smartphone, Monitor, ChevronDown, HelpCircle, Bell, RotateCcw, ExternalLink, ChevronLeft } from "lucide-react";
 import { ROLE_LABEL, ROLE_PERSON, useStore } from "@/lib/store";
 import { useData, useHydrated, useIsInIframe } from "@/lib/hooks";
@@ -13,27 +13,37 @@ import { THEMES } from "@/lib/themes";
 import Tutorial from "./Tutorial";
 import { useToast } from "@/components/shared/Toast";
 
-export interface NavItem { no: string; href: string; label: string; icon: typeof LayoutDashboard; color: string; roles: RoleKey[]; }
+export type NavGroupKey = "exec" | "supply" | "ops" | "proof" | "system";
+export interface NavItem { no: string; href: string; label: string; icon: typeof LayoutDashboard; color: string; group: NavGroupKey; roles: RoleKey[]; }
+/** 비슷한 메뉴끼리 묶고, 그룹은 같은 색상 계열 · 항목은 톤만 다르게 */
+export const NAV_GROUPS: { key: NavGroupKey; label: string; base: string }[] = [
+  { key: "exec", label: "경영 · 판단", base: "#2F6FED" },
+  { key: "supply", label: "상품 · 재고 · 공급", base: "#E0A526" },
+  { key: "ops", label: "주문 · 고객 · 운영", base: "#17A889" },
+  { key: "proof", label: "실증 · 스토리", base: "#8B5AA6" },
+  { key: "system", label: "시스템", base: "#6D8899" },
+];
 export const AX_NAV: NavItem[] = [
-  { no: "01", href: "/ax", label: "경영 대시보드", icon: LayoutDashboard, color: "#2F6FED", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "02", href: "/ax/actions", label: "Growth & Action Center", icon: Rocket, color: "#D2704C", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "03", href: "/ax/sales", label: "매출·마진", icon: TrendingUp, color: "#17A889", roles: ["owner"] },
-  { no: "04", href: "/ax/products", label: "상품·SKU", icon: Package, color: "#8B5AA6", roles: ["owner", "buyer"] },
-  { no: "05", href: "/ax/inventory", label: "재고·발주", icon: Boxes, color: "#E0A526", roles: ["owner", "buyer", "ops"] },
-  { no: "06", href: "/ax/suppliers", label: "공급사·구매", icon: Factory, color: "#4C9AAA", roles: ["owner", "buyer"] },
-  { no: "07", href: "/ax/fulfillment", label: "주문·Fulfillment", icon: Truck, color: "#F47A3C", roles: ["owner", "ops", "cs"] },
-  { no: "08", href: "/ax/customers", label: "고객·재구매", icon: Users, color: "#1597A3", roles: ["owner", "cs"] },
-  { no: "09", href: "/ax/promotions", label: "프로모션", icon: Megaphone, color: "#C0577A", roles: ["owner", "buyer"] },
-  { no: "10", href: "/ax/returns", label: "반품·VOC", icon: Undo2, color: "#D93A3A", roles: ["owner", "ops", "cs"] },
-  { no: "11", href: "/ax/evidence", label: "AX Evidence", icon: FileCheck2, color: "#356E58", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "12", href: "/ax/why", label: "기획의도 (Why AX)", icon: BookOpenText, color: "#6D5DD3", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "13", href: "/ax/presentation", label: "Presentation Mode", icon: Presentation, color: "#B89032", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "14", href: "/ax/settings", label: "설정", icon: Settings, color: "#6D8899", roles: ["owner", "buyer", "ops", "cs"] },
+  { no: "01", href: "/ax", label: "경영 대시보드", icon: LayoutDashboard, color: "#2F6FED", group: "exec", roles: ["owner", "buyer", "ops", "cs"] },
+  { no: "02", href: "/ax/actions", label: "Action Center", icon: Rocket, color: "#5B8DF2", group: "exec", roles: ["owner", "buyer", "ops", "cs"] },
+  { no: "03", href: "/ax/sales", label: "매출·마진", icon: TrendingUp, color: "#1F55C9", group: "exec", roles: ["owner"] },
+  { no: "04", href: "/ax/products", label: "상품·SKU", icon: Package, color: "#E0A526", group: "supply", roles: ["owner", "buyer"] },
+  { no: "05", href: "/ax/inventory", label: "재고·발주", icon: Boxes, color: "#F0B94A", group: "supply", roles: ["owner", "buyer", "ops"] },
+  { no: "06", href: "/ax/suppliers", label: "공급사·구매", icon: Factory, color: "#C98E12", group: "supply", roles: ["owner", "buyer"] },
+  { no: "07", href: "/ax/fulfillment", label: "주문·Fulfillment", icon: Truck, color: "#17A889", group: "ops", roles: ["owner", "ops", "cs"] },
+  { no: "08", href: "/ax/customers", label: "고객·재구매", icon: Users, color: "#3DBFA3", group: "ops", roles: ["owner", "cs"] },
+  { no: "09", href: "/ax/promotions", label: "프로모션", icon: Megaphone, color: "#0F8C71", group: "ops", roles: ["owner", "buyer"] },
+  { no: "10", href: "/ax/returns", label: "반품·VOC", icon: Undo2, color: "#5FD0B8", group: "ops", roles: ["owner", "ops", "cs"] },
+  { no: "11", href: "/ax/evidence", label: "AX Evidence", icon: FileCheck2, color: "#8B5AA6", group: "proof", roles: ["owner", "buyer", "ops", "cs"] },
+  { no: "12", href: "/ax/why", label: "기획의도 (Why AX)", icon: BookOpenText, color: "#A87BC0", group: "proof", roles: ["owner", "buyer", "ops", "cs"] },
+  { no: "13", href: "/ax/presentation", label: "Presentation Mode", icon: Presentation, color: "#6E4590", group: "proof", roles: ["owner", "buyer", "ops", "cs"] },
+  { no: "14", href: "/ax/settings", label: "설정", icon: Settings, color: "#6D8899", group: "system", roles: ["owner", "buyer", "ops", "cs"] },
 ];
 
 export function DevicePreview({ src, onClose, title }: { src: string; onClose: () => void; title: string }) {
   const [w, setW] = useState<390 | 430 | 360>(390);
-  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", onKey); document.body.style.overflow = "hidden"; return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; }; }, [onClose]);
+  const closeRef = useRef(onClose); closeRef.current = onClose;
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); }; window.addEventListener("keydown", onKey); document.body.style.overflow = "hidden"; return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; }; }, []);
   return (
     <div className="fixed inset-0 z-[900] bg-shell/85 backdrop-blur-sm flex flex-col" role="dialog" aria-label={title}>
       <div className="flex items-center justify-between px-4 h-14 text-white shrink-0">
@@ -94,18 +104,30 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
     <div className="flex flex-col h-full text-white" style={{ background: "var(--t-shell)" }}>
       <div className="h-16 flex items-center gap-2 px-4 border-b border-white/10 shrink-0">
         <span className="w-9 h-9 rounded-xl bg-white/12 font-black flex items-center justify-center">N</span>
-        <div className="leading-tight"><div className="font-black tracking-tight">NEXMART</div><div className="text-[11px] text-white/60 font-semibold tracking-wider">Business AX</div></div>
+        <div className="leading-tight"><div className="font-black tracking-tight">NEXMART</div><div className="text-[13px] text-white/60 font-semibold tracking-wider">Business AX</div></div>
         <button className="ml-auto lg:hidden btn-ghost !text-white !px-2" onClick={() => setMenu(false)} aria-label="메뉴 닫기"><X size={20} /></button>
       </div>
-      <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5" data-tour="sidebar" aria-label="AX 메뉴">
-        {nav.map((n) => {
-          const on = isActive(n.href);
+      <nav className="flex-1 overflow-y-auto py-2 px-2.5" data-tour="sidebar" aria-label="AX 메뉴">
+        {NAV_GROUPS.map((g) => {
+          const items = nav.filter((n) => n.group === g.key);
+          if (!items.length) return null;
           return (
-            <Link key={n.href} href={n.href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-semibold transition-colors min-h-[46px] ${on ? "bg-white text-shell" : "text-white/85 hover:bg-white/10"}`} aria-current={on ? "page" : undefined}>
-              <span className="ax-icon" style={{ background: on ? `${n.color}22` : "rgba(255,255,255,0.08)", color: on ? n.color : "#fff" }}><n.icon size={17} /></span>
-              <span className="flex-1 truncate">{n.label}</span>
-              {n.href === "/ax/actions" && hydrated && openActions > 0 && <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold ${on ? "bg-accent text-white" : "bg-accent text-white"}`}>{openActions}</span>}
-            </Link>
+            <div key={g.key} className="mb-2.5">
+              <div className="flex items-center gap-2 px-3 pt-2.5 pb-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: g.base }} /><span className="text-[14px] font-bold tracking-wider text-white/55 uppercase">{g.label}</span></div>
+              <div className="space-y-0.5">
+                {items.map((n) => {
+                  const on = isActive(n.href);
+                  return (
+                    <Link key={n.href} href={n.href} className={`nav-item group/nav relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[18px] font-semibold min-h-[48px] transition-[background-color,transform,color] duration-150 ease-out ${on ? "bg-white text-shell shadow-card" : "text-white/85 hover:bg-white/10 hover:translate-x-0.5"}`} aria-current={on ? "page" : undefined}>
+                      <span className={`absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full transition-all duration-200 ${on ? "opacity-100" : "opacity-0"}`} style={{ background: n.color }} />
+                      <span className="ax-icon transition-transform duration-150 group-hover/nav:scale-105" style={{ background: on ? `${n.color}22` : `${n.color}33`, color: on ? n.color : "#fff" }}><n.icon size={18} /></span>
+                      <span className="flex-1 truncate">{n.label}</span>
+                      {n.href === "/ax/actions" && hydrated && openActions > 0 && <span className="text-xs rounded-full px-1.5 py-0.5 font-bold bg-accent text-white">{openActions}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
@@ -120,12 +142,12 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
   return (
     <div className="min-h-screen flex bg-mist">
       {/* desktop sidebar */}
-      <aside className="hidden lg:block w-[272px] shrink-0 sticky top-0 h-screen">{Sidebar}</aside>
+      <aside className="hidden lg:block w-[288px] shrink-0 sticky top-0 h-screen">{Sidebar}</aside>
       {/* mobile drawer */}
       {menu && (
         <div className="fixed inset-0 z-[800] lg:hidden">
           <div className="absolute inset-0 bg-shell/60" onClick={() => setMenu(false)} />
-          <div className="absolute inset-y-0 left-0 w-[290px] max-w-[85vw] shadow-raised fade-up">{Sidebar}</div>
+          <div className="absolute inset-y-0 left-0 w-[300px] max-w-[85vw] shadow-raised slide-in-left">{Sidebar}</div>
         </div>
       )}
 
@@ -150,7 +172,7 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
                 <button data-tour="role" onClick={() => setRoleOpen((v) => !v)} className="btn-outline btn-sm" aria-haspopup="menu" aria-expanded={roleOpen}><span className="w-6 h-6 rounded-full bg-soft text-shell text-xs font-bold flex items-center justify-center">{ROLE_LABEL[role].charAt(0)}</span><span className="hidden sm:inline">{ROLE_LABEL[role]}</span><ChevronDown size={14} /></button>
                 {roleOpen && (
                   <div className="absolute right-0 mt-1 w-56 card-raised p-1.5 z-50 fade-up" role="menu" onMouseLeave={() => setRoleOpen(false)}>
-                    <div className="px-2 py-1 text-[11px] font-semibold text-muted">역할 전환 (Demo RLS)</div>
+                    <div className="px-2 py-1 text-[13px] font-semibold text-muted">역할 전환 (Demo RLS)</div>
                     {(Object.keys(ROLE_LABEL) as RoleKey[]).map((r) => (
                       <button key={r} role="menuitem" onClick={() => { setRole(r); setRoleOpen(false); toast({ title: `${ROLE_LABEL[r]} 화면으로 전환`, body: `${ROLE_PERSON[r]} · 메뉴·KPI·민감정보가 역할에 맞게 바뀝니다.`, tone: "info" }); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-sm flex items-center justify-between hover:bg-mist ${r === role ? "font-bold text-primary" : ""}`}>{ROLE_PERSON[r]}{r === role && <span className="text-xs">현재</span>}</button>
                     ))}
@@ -164,7 +186,7 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
           {subtitle && <div className="px-3 sm:px-5 pb-3 -mt-1 text-sm text-muted">{subtitle}</div>}
         </header>
 
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto">{children}</main>
+        <main key={pathname} className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto page-enter">{children}</main>
 
         <footer className="px-5 py-3 text-xs text-muted flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-white">
           <span>NEXMART Business AX · Demo Repository · 모든 수치는 시연용 Simulation</span>
@@ -177,7 +199,7 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
       {preview && <DevicePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />}
       {tutorial && <Tutorial onClose={() => setTutorial(false)} />}
       <Overlay open={resetOpen} onClose={() => setResetOpen(false)} title="Demo Reset" size="sm" footer={<div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setResetOpen(false)}>취소</button><button className="btn-danger flex-1" onClick={() => { resetDemo(); setResetOpen(false); toast({ title: "Demo 데이터를 초기화했습니다", body: "주문·Action·Evidence·장바구니가 초기 시나리오로 돌아갑니다.", tone: "info" }); router.push("/ax"); }}>초기화</button></div>}>
-        <p className="text-[15px]">고객 주문, Action 처리, Evidence, 장바구니 등 시연 중 변경한 모든 상태를 초기 시나리오(A~E)로 되돌립니다. Theme·글자크기 설정은 유지됩니다.</p>
+        <p className="text-[17px]">고객 주문, Action 처리, Evidence, 장바구니 등 시연 중 변경한 모든 상태를 초기 시나리오(A~E)로 되돌립니다. Theme·글자크기 설정은 유지됩니다.</p>
       </Overlay>
       {/* quick theme dots (desktop) */}
       {!inIframe && (

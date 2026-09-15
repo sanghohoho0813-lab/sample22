@@ -102,6 +102,17 @@ Hover/Pressed/Selected/Focus(ring) · Loading(skeleton) · Empty(검색/장바�
 
 Red Team R2: P1 1건(pilot 탭 grid overflow) 수정. P2 — Baseline 입력값 검증(음수·범위) 없음, 체크리스트 수동 항목 근거 첨부 없음 → RECOMMENDATIONS.
 
+## R3 (2026-09-15) — 안정성·가독성·모션
+
+| 항목 | 결과 |
+|---|---|
+| 프리즈 재현 (튜토리얼 열린 채 28회 연속 내비 / Presentation iframe + 역할 전환) | 응답 2ms · heap 14MB · localStorage 재기록 1회 (왕복 없음) |
+| 21 라우트 × 360/390/430/768/1024/1280/1440/1920 가로 overflow | 0 (초기 sales·customers·returns·settings 발견 → grid `min-w-0`·overflow-wrap 수정) |
+| 페이지 오류 (모든 라우트·폭) | 0 |
+| 전체 Journey 회귀 (주문→AX→승인→출고→고객→Repeat→Reset) | ✅ |
+| body font-size | 17px (이전 16px) · 사이드바 16px · 표 15px · 배지 13px |
+| 사이드바 5그룹·톤 색상·활성 바 | 스크린샷 확인 |
+
 ## Known Issues
 
 - 외부 폰트 CDN 차단 환경에서 시스템 폰트 폴백 (기능 무관)

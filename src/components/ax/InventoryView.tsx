@@ -63,7 +63,7 @@ export default function InventoryView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 stagger">
         <KpiCard label="품절위험" value={counts(["stockout", "urgent", "low"])} tone="danger" onClick={() => setGroup("risk")} sub="예상 소진 < 리드타임×1.8" />
         <KpiCard label="긴급발주" value={counts(["urgent", "stockout"])} tone="warn" onClick={() => setGroup("urgent")} sub="예상 소진 < 리드타임" />
         <KpiCard label="발주·입고 진행" value={counts(["po_progress", "inbound"])} tone="primary" onClick={() => setGroup("inbound")} sub={`발주서 ${openPos.length}건`} />
@@ -114,12 +114,12 @@ function Row({ i, onOpen, onCreate, supplierName, catName }: { i: SkuInsight; on
     <tr className={`row-clickable ${i.priority >= 70 ? "bg-danger/[0.04]" : ""}`} onClick={onOpen}>
       <td><div className="font-semibold whitespace-nowrap">{i.product.name}</div><div className="text-xs text-muted">{i.sku.name} · {catName} · {supplierName}{i.hasOpenAction && <span className="ml-1 text-accent font-semibold">· Action</span>}</div></td>
       <td><StatusBadge status={i.status} /></td>
-      <td className="text-right tabular-nums font-semibold">{num(i.available)}<div className="text-[11px] text-muted font-normal">예약 {i.inv.reserved}</div></td>
+      <td className="text-right tabular-nums font-semibold">{num(i.available)}<div className="text-[13px] text-muted font-normal">예약 {i.inv.reserved}</div></td>
       <td className="text-right tabular-nums">{i.avgDaily.toFixed(1)}</td>
       <td className={`text-right tabular-nums font-bold ${i.daysOfStock < i.leadTimeDays ? "text-danger" : i.daysOfStock > 180 ? "text-muted" : ""}`}>{i.daysOfStock === Infinity ? "-" : `${i.daysOfStock.toFixed(1)}일`}</td>
       <td><Sparkline values={i.demand.dailySales} width={80} height={24} stroke={trend > 0.3 ? "#D2704C" : "var(--t-primary)"} /></td>
       <td className="text-right tabular-nums text-xs"><span className={i.searchTrend > 0.3 ? "text-accent font-semibold" : ""}>{i.searchTrend >= 0 ? "+" : ""}{Math.round(i.searchTrend * 100)}%</span> · <span className={i.cartTrend > 0.3 ? "text-accent font-semibold" : ""}>{i.cartTrend >= 0 ? "+" : ""}{Math.round(i.cartTrend * 100)}%</span></td>
-      <td className="text-right tabular-nums">{i.expectedInbound ? <>{num(i.expectedInbound.qty)}<div className="text-[11px] text-muted">{i.expectedInbound.eta}</div></> : <span className="text-muted">-</span>}</td>
+      <td className="text-right tabular-nums">{i.expectedInbound ? <>{num(i.expectedInbound.qty)}<div className="text-[13px] text-muted">{i.expectedInbound.eta}</div></> : <span className="text-muted">-</span>}</td>
       <td className="text-right tabular-nums">{i.leadTimeDays}일</td>
       <td className="text-right tabular-nums font-semibold">{i.recommendedQty ? num(i.recommendedQty) : <span className="text-muted">-</span>}</td>
       <td className="text-right"><div className="inline-flex items-center gap-1.5"><span className="font-bold tabular-nums w-7 text-right">{i.priority}</span><span className="w-12 h-1.5 rounded-full bg-mist overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${i.priority}%`, background: i.priority >= 70 ? "#D93A3A" : i.priority >= 40 ? "#F47A3C" : "var(--t-primary)" }} /></span></div></td>

@@ -53,7 +53,7 @@ export default function ActionsView() {
           {types.map((t) => <button key={t} onClick={() => setType(t)} className={`chip !min-h-[32px] text-xs ${type === t ? "chip-on" : ""}`}>{actionTypeLabel(t)}</button>)}
           {role === "owner" && <><span className="text-muted ml-3 mr-1">담당</span>{(["all", "owner", "buyer", "ops", "cs"] as const).map((o) => <button key={o} onClick={() => setOwner(o)} className={`chip !min-h-[32px] text-xs ${owner === o ? "chip-on" : ""}`}>{o === "all" ? "전체" : ROLE_LABEL[o]}</button>)}</>}
         </div>
-        <div className="mt-4 grid md:grid-cols-2 gap-3">
+        <div className="mt-4 grid md:grid-cols-2 gap-3 stagger">
           {list.map((a) => <ActionCard key={a.id} a={a} onOpen={setAction} />)}
         </div>
         {!list.length && <EmptyState title="조건에 맞는 Action이 없습니다" body="필터를 줄이거나 다른 탭을 확인하세요." />}

@@ -21,10 +21,15 @@
 html[data-font="large"] { --font-scale: 1.12; }
 
 html, body { height: 100%; }
+/* 글자 크기 옵션은 root에 적용 → rem 기반 Tailwind 크기가 함께 커진다 */
+html { font-size: calc(16px * var(--font-scale)); }
 body {
   @apply bg-mist text-ink antialiased;
-  font-size: calc(16px * var(--font-scale));
+  font-size: 1.0625rem;
+  line-height: 1.6;
   -webkit-tap-highlight-color: transparent;
+  word-break: keep-all;        /* 한국어 어절 단위 줄바꿈 — "확 / 인하고" 방지 */
+  overflow-wrap: anywhere;     /* 긴 토큰(주문번호·URL)은 넘치지 않게 */
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
@@ -48,6 +53,8 @@ body {
 .badge { @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap; }
 .kbd { @apply rounded border border-line bg-mist px-1.5 text-[11px] text-muted; }
 .table-wrap { @apply overflow-x-auto rounded-2xl border border-line bg-white; }
+/* grid 자식의 min-width:auto 때문에 표·긴 텍스트가 페이지 밖으로 밀리는 것을 방지 */
+[class*="grid-cols"] > * { min-width: 0; }
 .table { @apply w-full text-sm; }
 .table th { @apply bg-mist text-left text-muted font-semibold px-3 py-2.5 whitespace-nowrap border-b border-line; }
 .table td { @apply px-3 py-2.5 border-b border-line/70 align-middle; }
@@ -61,9 +68,45 @@ body {
 .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
 .pattern-dots { background-image: radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px); background-size: 14px 14px; }
 .section-title { @apply text-xl font-bold tracking-tight; }
-.ax-icon { @apply inline-flex items-center justify-center rounded-lg w-8 h-8 shrink-0; }
+.ax-icon { @apply inline-flex items-center justify-center rounded-lg w-9 h-9 shrink-0; }
 }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* ===== Motion system — MD 규칙: 140~180ms ease-out 기본, Bounce/Pulse/Neon/큰 Scale 금지 ===== */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+@keyframes growBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes drawLine { from { stroke-dashoffset: var(--len, 1200); } to { stroke-dashoffset: 0; } }
+@keyframes riseIn { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
 .fade-up { animation: fadeUp 180ms ease-out both; }
+.fade-in { animation: fadeIn 160ms ease-out both; }
+.slide-in-right { animation: slideInRight 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.slide-in-left { animation: slideInLeft 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.slide-up { animation: slideUp 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (min-width: 640px) { .sm\:slide-in-right { animation-name: slideInRight; } }
+.page-enter { animation: riseIn 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+/* 자식 요소 순차 등장 — 카드·KPI·리스트 */
+.stagger > * { animation: riseIn 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }  .stagger > *:nth-child(2) { animation-delay: 45ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; } .stagger > *:nth-child(4) { animation-delay: 135ms; }
+.stagger > *:nth-child(5) { animation-delay: 180ms; } .stagger > *:nth-child(6) { animation-delay: 225ms; }
+.stagger > *:nth-child(7) { animation-delay: 270ms; } .stagger > *:nth-child(8) { animation-delay: 315ms; }
+.stagger > *:nth-child(n+9) { animation-delay: 360ms; }
+/* 호버 리프트 — 카드/상품/Action */
+.lift { transition: transform 160ms ease-out, box-shadow 160ms ease-out; }
+.lift:hover { transform: translateY(-2px); box-shadow: 0 2px 6px rgba(16,36,62,0.08), 0 14px 32px rgba(16,36,62,0.12); }
+/* 차트 그리기 */
+.draw-line { stroke-dasharray: var(--len, 1200); animation: drawLine 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.grow-bar { transform-origin: bottom; animation: growBar 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.grow-x { transform-origin: left; animation: growBar 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; transform: scaleX(1); }
+@keyframes growX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.grow-x { animation-name: growX; }
+/* 이미지 호버 확대(소폭) */
+.zoom-hover img, .zoom-hover > .zoom-target { transition: transform 220ms ease-out; }
+.zoom-hover:hover img, .zoom-hover:hover > .zoom-target { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) {
+  .stagger > *, .page-enter, .slide-in-right, .slide-in-left, .slide-up, .draw-line, .grow-bar, .grow-x { animation: none !important; opacity: 1; transform: none; stroke-dashoffset: 0; }
+}
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .skeleton { @apply rounded-lg bg-mist; background-image: linear-gradient(90deg, #f3f6f8 0px, #e9eef2 200px, #f3f6f8 400px); background-size: 800px 100%; animation: shimmer 1.4s infinite linear; }

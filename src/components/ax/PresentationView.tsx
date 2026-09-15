@@ -30,6 +30,8 @@ export default function PresentationView() {
   const router = useRouter();
   const [i, setI] = useState(Math.min(STEPS.length - 1, Math.max(0, Number(sp.get("step") ?? 1) - 1)));
   const [full, setFull] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => { const mq = window.matchMedia("(min-width: 768px)"); const on = () => setIsDesktop(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
   const step = STEPS[i];
   useEffect(() => { router.replace(`/ax/presentation?step=${i + 1}`, { scroll: false }); }, [i, router]);
   useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === "ArrowRight") setI((x) => Math.min(STEPS.length - 1, x + 1)); if (e.key === "ArrowLeft") setI((x) => Math.max(0, x - 1)); if (e.key === "Escape") setFull(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
@@ -39,7 +41,7 @@ export default function PresentationView() {
       <div className={`grid gap-4 ${full ? "flex-1 min-h-0 lg:grid-cols-[340px_1fr]" : "lg:grid-cols-[340px_1fr]"} items-start`}>
         <Panel className={full ? "h-full overflow-y-auto" : ""} title={<span className="inline-flex items-center gap-2"><Play size={16} className="text-accent" />3~5분 Guided Journey</span>} sub="정적 슬라이드가 아니라 실제 앱 화면을 순서대로 따라갑니다. ← → 키로 이동" right={<button className="btn-ghost btn-sm !px-2" onClick={() => setFull((v) => !v)} aria-label="전체화면">{full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>}>
           <ol className="space-y-1 max-h-[46vh] lg:max-h-none overflow-y-auto pr-1">
-            {STEPS.map((s, k) => <li key={k}><button onClick={() => setI(k)} className={`w-full text-left rounded-lg px-2.5 py-2 text-sm flex items-center gap-2 ${k === i ? "bg-soft text-shell font-bold" : "hover:bg-mist text-muted"}`}><span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${k === i ? "bg-primary text-white" : k < i ? "bg-line text-ink" : "bg-mist"}`}>{k + 1}</span><span className="truncate">{s.title}</span><span className={`ml-auto text-[10px] font-semibold ${s.surface === "customer" ? "text-teal" : "text-secondary"}`}>{s.surface === "customer" ? "고객" : "AX"}</span></button></li>)}
+            {STEPS.map((s, k) => <li key={k}><button onClick={() => setI(k)} className={`w-full text-left rounded-lg px-2.5 py-2 text-sm flex items-center gap-2 ${k === i ? "bg-soft text-shell font-bold" : "hover:bg-mist text-muted"}`}><span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${k === i ? "bg-primary text-white" : k < i ? "bg-line text-ink" : "bg-mist"}`}>{k + 1}</span><span className="truncate">{s.title}</span><span className={`ml-auto text-[12px] font-semibold ${s.surface === "customer" ? "text-teal" : "text-secondary"}`}>{s.surface === "customer" ? "고객" : "AX"}</span></button></li>)}
           </ol>
         </Panel>
         <div className={`flex flex-col gap-3 ${full ? "h-full min-h-0" : ""}`}>
@@ -48,11 +50,16 @@ export default function PresentationView() {
             <div className="min-w-0 flex-1"><div className="font-bold text-lg leading-tight">{step.title}</div><p className="text-sm text-ink/80 mt-1">{step.body}</p></div>
             <div className="flex gap-1.5 shrink-0"><button className="btn-outline btn-sm !px-2.5" disabled={i === 0} onClick={() => setI((x) => x - 1)} aria-label="이전"><ChevronLeft size={16} /></button><button className="btn-primary btn-sm !px-2.5" disabled={i === STEPS.length - 1} onClick={() => setI((x) => x + 1)} aria-label="다음"><ChevronRight size={16} /></button></div>
           </div>
-          <div className={`card overflow-hidden relative ${full ? "flex-1 min-h-0" : "h-[62vh] min-h-[420px]"}`}>
-            <div className="absolute top-2 right-2 z-10 flex gap-1"><a href={step.src} target="_blank" rel="noreferrer" className="btn-outline btn-sm bg-white/95"><ExternalLink size={14} />새 탭에서 열기</a></div>
-            <iframe key={step.src} title={step.title} src={step.src} className="w-full h-full border-0" />
+          {/* 모바일: 앱 안에 앱을 띄우지 않고(메모리·터치 문제) 해당 단계 화면으로 바로 이동 */}
+          <div className="md:hidden card p-4">
+            <a href={step.src} className="btn-primary btn-lg w-full"><ExternalLink size={18} />이 단계 화면 열기</a>
+            <p className="text-sm text-muted mt-2">모바일에서는 각 단계를 실제 화면으로 이동해 진행합니다. 뒤로가기로 이 목록에 돌아옵니다.</p>
           </div>
-          <div className="text-xs text-muted">화면 안에서 직접 클릭·조작할 수 있습니다. 여기서 만든 주문·승인은 실제 Demo 상태에 반영됩니다. Demo Reset은 설정 또는 하단 링크에서.</div>
+          <div className={`hidden md:block card overflow-hidden relative ${full ? "flex-1 min-h-0" : "h-[62vh] min-h-[420px]"}`}>
+            <div className="absolute top-2 right-2 z-10 flex gap-1"><a href={step.src} target="_blank" rel="noreferrer" className="btn-outline btn-sm bg-white/95"><ExternalLink size={14} />새 탭에서 열기</a></div>
+            {isDesktop && <iframe key={step.src} title={step.title} src={step.src} className="w-full h-full border-0" />}
+          </div>
+          <div className="hidden md:block text-xs text-muted">화면 안에서 직접 클릭·조작할 수 있습니다. 여기서 만든 주문·승인은 실제 Demo 상태에 반영됩니다. Demo Reset은 설정 또는 하단 링크에서.</div>
         </div>
       </div>
     </div>

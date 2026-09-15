@@ -6,7 +6,7 @@
 
 | 구분 | 점수 | 근거 |
 |---|---|---|
-| **Strategy Score A** | **93 / 100** | Problem/Constraint 15 · Process 9 · Data 13 · AI Fit 10 · Proof/KPI 12 (Baseline 미측정 −3) · Customer/Platform Fit 10 · Scale/Unit Economics 7 (CAC/LTV 측정항목만 정의) · Moat 5 · Adoption 4 (AX Owner 전용 UI 없음) · Financeability 5 → 90+ 통과, Strategic P0 0 |
+| **Strategy Score A** | **95 / 100** (R2, 93→95) | Problem/Constraint 15 · Process 9 · Data 13 · AI Fit 10 · Proof/KPI 13 (Baseline 입력 화면·Evidence Pack 완성, 실측값 대기 −2) · Customer/Platform Fit 10 · Scale/Unit Economics 7 · Moat 5 · Adoption 5 (AX Owner UI·체크리스트) · Financeability 5 → Strategic P0 0 |
 | **Product Score B** | **92 / 100** (R2, 91→92) | Product Shell 14/15 · Business AX 20/20 (Insight→Action 생성으로 KPI→Detail→Insight→Action 전 구간 완성) · Customer 18/20 (사진 자산 미적용 −2) · Cross-Surface 15/15 · Visual/Interaction 13/15 · Theme 9/10 · Story/Growth 5/5 |
 | **Strategic P0** | **0** | 13항목 전수 확인 (아래) |
 | **Product P0 / P1** | **0 / 0** (수정 완료) | Red Team 발견 P0 3 · P1 2 → 모두 수정 후 재검증 |

@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { useData, useHydrated, useIsInIframe, useNow } from "@/lib/hooks";
 import { autocomplete, SUGGESTED_SEARCHES } from "@/lib/catalog";
 import Overlay from "@/components/shared/Overlay";
+import SampleBridgeCTA from "@/components/shared/SampleBridgeCTA";
 import { shipCutdown, todayLabel } from "@/lib/format";
 
 const NAV = [
@@ -232,8 +233,11 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
 
       <main className={`flex-1 ${hideBottomNav ? "" : plain ? "pb-24 md:pb-0" : "pb-2 md:pb-0"}`}>{children}</main>
 
+      {/* 미래AI랩 공통 CTA 브릿지 — 핵심 콘텐츠를 다 본 뒤 (주문·결제 흐름 중인 Checkout에서는 제외) */}
+      {!plain && <div className="mt-10 sm:mt-14"><SampleBridgeCTA surface="customer" /></div>}
+
       {!plain && (
-        <footer className="border-t border-line bg-mist mt-10 hidden md:block">
+        <footer className="border-t border-line bg-mist mt-10 sm:mt-12 hidden md:block">
           <div className="mx-auto max-w-[1280px] px-4 py-10 grid grid-cols-4 gap-8 text-sm">
             <div>
               <div className="font-black text-lg text-navy">NEXMART</div>

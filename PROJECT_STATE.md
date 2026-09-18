@@ -104,3 +104,14 @@
 2. **실제 유통사 대표 1명에게 Presentation Mode 시연** → "돈 낼 만한가" 피드백 (기능 추가보다 우선)
 3. 피드백 있을 때만: CSV Import 마법사(상품·재고·주문) → Supabase Adapter — Pilot 진입의 실데이터 경로
 4. Front Reference 도착 후 Hero/Card/Nav 재해석
+
+## 2026-09-18 R4 — 미래AI랩 공통 CTA 브릿지 (전 샘플 공용)
+
+- [x] `src/lib/brand.ts` 신규: `MIRAE_LINKS`(상담/다른 샘플/홈) · `BRIDGE_COPY`(배지·헤드라인·소개·메인 CTA·서브·안내) **단일 Source of Truth**
+- [x] `src/components/shared/SampleBridgeCTA.tsx` 신규: ① 미래AI랩 소개 ② 메인 CTA "**우리 회사도 만들어보기**" ③ 다른 샘플·홈페이지 이동. `surface="customer" | "ax"`로 고객 고정 팔레트 / AX Theme Token 자동 전환
+- [x] `SidebarBridgeCTA`(같은 파일): AX 사이드바 좌측 하단 초소형 3버튼 버전
+- [x] 배치: `CustomerShell`·`AxShell`의 `</main>` 직후 1회 → **25 라우트 전부 상속**. Checkout(주문 진행)만 제외
+- [x] 모션(globals.css): 4~6s 주기 라이트 스윕(6s, 1.4s 지연) · hover 리프트 2px + 글로우 · 배지 점 3.6s 페이드. `prefers-reduced-motion`에서 전부 정지. 점멸·네온·광고배너 톤 없음
+- [x] 접근성: `<section aria-labelledby>` · 링크는 `<a>` · 터치 타깃 58px(메인) / 48px(서브) · focus ring 유지
+- [x] QA: 25 라우트 노출 검증(Checkout 제외 확인) · 390px 모바일 overflow 0 · Theme 07에서 재착색 확인 · 콘솔 오류 0 · tsc/build 통과
+- [ ] (의도적 보류) 모바일 스티키 미니 CTA — 사용자가 "선택" 항목으로 지정, 하단 섹션 우선. 하단 내비와 중첩 위험도 있어 요청 시 추가

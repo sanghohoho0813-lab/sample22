@@ -113,6 +113,19 @@ Red Team R2: P1 1건(pilot 탭 grid overflow) 수정. P2 — Baseline 입력값 
 | body font-size | 17px (이전 16px) · 사이드바 16px · 표 15px · 배지 13px |
 | 사이드바 5그룹·톤 색상·활성 바 | 스크린샷 확인 |
 
+## R4 (2026-09-18) — 미래AI랩 공통 CTA 브릿지
+
+| 항목 | 결과 |
+|---|---|
+| 25 라우트 CTA 노출 (Checkout 제외 의도) | PASS |
+| 메인 CTA 문구 = "우리 회사도 만들어보기" (본문·사이드바 동일) | ✅ |
+| 사이드바 미니 CTA 링크 3개 | ✅ |
+| 메인 버튼 대비 (배경 rgb(16,36,62) / 글자 #fff · 높이 58px) | ✅ |
+| 390px 모바일 CTA 폭·높이 (308~316 × 58) · 가로 overflow | 0 |
+| Theme 07 Burgundy에서 Accent 자동 재착색 | ✅ (스크린샷) |
+| 콘솔/페이지 오류 | **0** |
+| prefers-reduced-motion | 스윕·점멸 정지, 리프트 없음 |
+
 ## Known Issues
 
 - 외부 폰트 CDN 차단 환경에서 시스템 폰트 폴백 (기능 무관)

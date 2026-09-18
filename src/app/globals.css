@@ -105,6 +105,31 @@ body {
 /* 이미지 호버 확대(소폭) */
 .zoom-hover img, .zoom-hover > .zoom-target { transition: transform 220ms ease-out; }
 .zoom-hover:hover img, .zoom-hover:hover > .zoom-target { transform: scale(1.03); }
+/* ===== Sample Bridge CTA — 아주 약한 반짝임만 (6초 주기 light sweep · hover lift/glow) ===== */
+@keyframes ctaSweep {
+  0%   { transform: translateX(-160%) skewX(-16deg); opacity: 0; }
+  5%   { opacity: 0.5; }
+  15%  { transform: translateX(280%) skewX(-16deg); opacity: 0; }
+  100% { transform: translateX(280%) skewX(-16deg); opacity: 0; }
+}
+.cta-sweep { position: relative; isolation: isolate; }
+.cta-sweep::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: ctaSweep 6s ease-in-out infinite; animation-delay: 1.4s;
+  pointer-events: none; z-index: 5;
+}
+.cta-primary { transition: transform 160ms ease-out, box-shadow 220ms ease-out; box-shadow: 0 2px 8px rgb(var(--cta-rgb) / 0.18); }
+.cta-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgb(var(--cta-rgb) / 0.32); }
+.cta-primary:active { transform: translateY(0); }
+@keyframes ctaDot { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.cta-dot { animation: ctaDot 3.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cta-sweep::after { animation: none; opacity: 0; }
+  .cta-dot { animation: none; opacity: 1; }
+  .cta-primary, .cta-primary:hover { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stagger > *, .page-enter, .slide-in-right, .slide-in-left, .slide-up, .draw-line, .grow-bar, .grow-x { animation: none !important; opacity: 1; transform: none; stroke-dashoffset: 0; }
 }

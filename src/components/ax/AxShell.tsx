@@ -11,6 +11,7 @@ import { Freshness } from "@/components/shared/Bits";
 import Overlay from "@/components/shared/Overlay";
 import { THEMES } from "@/lib/themes";
 import Tutorial from "./Tutorial";
+import SampleBridgeCTA, { SidebarBridgeCTA } from "@/components/shared/SampleBridgeCTA";
 import { useToast } from "@/components/shared/Toast";
 
 export type NavGroupKey = "exec" | "supply" | "ops" | "proof" | "system";
@@ -131,6 +132,9 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
           );
         })}
       </nav>
+      <div className="border-t border-white/10">
+        <SidebarBridgeCTA />
+      </div>
       <div className="px-4 py-3 border-t border-white/10 text-xs text-white/60 space-y-1.5">
         <div className="flex items-center justify-between"><span>기술·사업화 자산</span><Link href="/ax/settings?tab=tech" className="text-white/85 hover:text-white underline underline-offset-2">보기</Link></div>
         <div className="flex items-center justify-between"><span>Stage</span><span className="badge bg-white/15 text-white">{stage}</span></div>
@@ -187,6 +191,9 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
         </header>
 
         <main key={pathname} className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto page-enter">{children}</main>
+
+        {/* 미래AI랩 공통 CTA 브릿지 — AX 화면 하단 */}
+        <div className="px-3 sm:px-5 lg:px-6 pb-5 lg:pb-6"><SampleBridgeCTA surface="ax" /></div>
 
         <footer className="px-5 py-3 text-xs text-muted flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-white">
           <span>NEXMART Business AX · Demo Repository · 모든 수치는 시연용 Simulation</span>

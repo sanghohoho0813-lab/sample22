@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Providers from "@/components/shared/Providers";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: { default: "NEXMART — 생활에 필요한 모든 것, 한 번에", template: "%s | NEXMART" },
@@ -18,6 +19,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
       </head>
       <body>
+        {/* 미래AI랩 데모 공용 뒤로·앞으로 버튼 */}
+        <Script src="/mirae-history-nav.js" strategy="beforeInteractive" />
         <Providers>{children}</Providers>
       </body>
     </html>

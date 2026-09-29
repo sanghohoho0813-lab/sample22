@@ -50,9 +50,9 @@ export default function FulfillmentView() {
   const uncovered = pickingWaitRisk.filter((r) => !coveredByAction.has(r.order.id));
   const makePriorityAction = () => {
     const id = createPriorityAction(uncovered.map((r) => r.order.id));
-    if (!id) { toast({ title: "생성할 대상이 없습니다", body: "위험 주문이 이미 진행 중인 Action에 포함되어 있습니다.", tone: "info" }); return; }
+    if (!id) { toast({ title: "생성할 대상이 없습니다", body: "위험 주문이 이미 진행 중인 실행에 포함되어 있습니다.", tone: "info" }); return; }
     setAction(useStore.getState().data.actions.find((x) => x.id === id) ?? null);
-    toast({ title: "우선처리 Action을 생성했습니다", body: "승인하면 해당 주문이 피킹 단계로 전환됩니다.", tone: "success" });
+    toast({ title: "우선처리 실행을 생성했습니다", body: "승인하면 해당 주문이 피킹 단계로 전환됩니다.", tone: "success" });
   };
 
   return (
@@ -60,15 +60,15 @@ export default function FulfillmentView() {
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 stagger">
         <KpiCard label="신규주문" value={num(fk.newOrders)} tone="primary" />
         <KpiCard label="오늘 출고대상" value={num(fk.todayShip)} />
-        <KpiCard label="마감임박" value={num(fk.cutoffSoon)} tone="warn" sub="15:00 마감 4h 이내" />
+        <KpiCard label="마감임박" value={num(fk.cutoffSoon)} tone="warn" sub="15:00 마감 4시간 이내" />
         <KpiCard label="지연위험" value={num(highRisk.length)} tone={highRisk.length ? "danger" : "good"} onClick={() => setTab("risk")} />
         <KpiCard label="피킹 처리량" value={num(fk.pickingThroughput)} sub="오늘" />
         <KpiCard label="포장 처리량" value={num(fk.packingThroughput)} sub="오늘" />
         <KpiCard label="정시출고율" value={pct(fk.onTimeRate, 0)} tone="good" />
-        <KpiCard label="평균 처리시간" value={`${fk.avgCycleHours.toFixed(1)}h`} sub="주문→출고" />
+        <KpiCard label="평균 처리시간" value={`${fk.avgCycleHours.toFixed(1)}시간`} sub="주문→출고" />
       </div>
 
-      <Panel title={<span className="inline-flex items-center gap-2"><Truck size={18} className="text-accent" />Fulfillment Control Tower</span>} sub={<span><Term term="Fulfillment" desc={TERMS.fulfillment}>Fulfillment</Term>: 주문 이후 상품을 피킹·포장·출고·배송하는 전체 처리과정 — 지연위험과 우선처리 대상을 한눈에</span>} right={<AiReady title="Fulfillment Risk" now="마감·배송약속·구역 적체·재고예외 규칙 점수 (L2 추천)" method="RULE + STATISTICAL" next="시간대별 처리량 예측으로 마감 초과 확률 계산" />}>
+      <Panel title={<span className="inline-flex items-center gap-2"><Truck size={18} className="text-accent" />출고 관제</span>} sub={<span><Term term="Fulfillment" desc={TERMS.fulfillment}>주문·출고</Term>: 주문 이후 상품을 피킹·포장·출고·배송하는 전체 처리과정 — 지연위험과 우선처리 대상을 한눈에</span>} right={<AiReady title="배송 지연 위험" now="마감·배송약속·구역 적체·재고예외 규칙 점수 (L2 추천)" method="규칙 + 통계" next="시간대별 처리량 예측으로 마감 초과 확률 계산" />}>
         <div className="grid sm:grid-cols-5 gap-2 mb-4">
           {data.warehouses.map((w) => <button key={w.id} onClick={() => setWh(wh === w.id ? "all" : w.id)} className={`rounded-xl border p-3 text-left ${wh === w.id ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}><div className="text-xs text-muted">{w.name}</div><div className={`font-bold ${w.congestion > 0.7 ? "text-danger" : ""}`}>적체 {Math.round(w.congestion * 100)}%</div><Meter value={w.congestion} color={w.congestion > 0.7 ? "#D93A3A" : w.congestion > 0.5 ? "#F47A3C" : "var(--t-primary)"} className="mt-1.5" /><div className="text-[13px] text-muted mt-1">대기 {data.orders.filter((o) => o.warehouseId === w.id && ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"].includes(o.stage)).length}건</div></button>)}
         </div>
@@ -100,8 +100,8 @@ export default function FulfillmentView() {
               <div className="rounded-xl border border-danger/30 bg-danger/5 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap text-sm">
                 <div className="inline-flex items-center gap-2"><AlertTriangle size={16} className="text-danger" /><b>피킹 전 단계 고위험 주문 {pickingWaitRisk.length}건</b> — 마감 전 우선 피킹이 필요합니다.</div>
                 <div className="flex gap-2 flex-wrap">
-                  {uncovered.length > 0 && <button className="btn-outline btn-sm" onClick={makePriorityAction}><Rocket size={14} />Action 생성 ({uncovered.length}건)</button>}
-                  <button className="btn-primary btn-sm" onClick={() => { pickingWaitRisk.forEach((r) => advance(r.order.id, "picking", "박운영")); toast({ title: `${pickingWaitRisk.length}건 우선 피킹 시작`, body: "고객 My Page '상품준비' 반영", tone: "success" }); }}>전체 우선처리</button>
+                  {uncovered.length > 0 && <button className="btn-outline btn-sm" onClick={makePriorityAction}><Rocket size={14} />실행 생성 ({uncovered.length}건)</button>}
+                  <button className="btn-primary btn-sm" onClick={() => { pickingWaitRisk.forEach((r) => advance(r.order.id, "picking", "박운영")); toast({ title: `${pickingWaitRisk.length}건 우선 피킹 시작`, body: "고객 마이페이지 '상품준비' 반영", tone: "success" }); }}>전체 우선처리</button>
                 </div>
               </div>
             )}
@@ -120,7 +120,7 @@ export default function FulfillmentView() {
         )}
       </Panel>
 
-      <Panel title="상태 정의" sub="Business AX에서 단계를 바꾸면 고객 My Page에도 같은 시각에 반영됩니다">
+      <Panel title="상태 정의" sub="AX 운영화면에서 단계를 바꾸면 고객 마이페이지에도 같은 시각에 반영됩니다">
         <div className="flex flex-wrap gap-1.5 text-xs">{(Object.keys(ORDER_STAGE_LABEL) as OrderStage[]).map((s) => <StatusBadge key={s} status={s} />)}</div>
         <div className="mt-2 text-xs text-muted">고객 표시: 주문접수 → 상품준비 → 출고완료 → 배송중 → 배송완료</div>
       </Panel>

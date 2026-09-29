@@ -33,7 +33,7 @@ export default function DashboardView() {
   return (
     <div className="space-y-4 sm:space-y-5">
       {/* Today Brief */}
-      <Panel tour="brief" title={<span className="inline-flex items-center gap-2"><Sparkles size={18} className="text-accent" />Today Brief — {ROLE_LABEL[role]}님, 오늘 확인할 순서</span>} sub="어디에서 돈이 새고, 무엇을 먼저 발주하고, 어떤 주문을 먼저 처리할지" right={<AiReady title="Executive Briefing" now="KPI·Action을 규칙으로 정렬한 우선순위 (L1 Assist)" method="Structured Rule" next="LLM이 여러 지표와 Action을 한 문단 자연어로 설명" />}>
+      <Panel tour="brief" title={<span className="inline-flex items-center gap-2"><Sparkles size={18} className="text-accent" />오늘의 브리핑 — {ROLE_LABEL[role]}님, 오늘 확인할 순서</span>} sub="어디에서 돈이 새고, 무엇을 먼저 발주하고, 어떤 주문을 먼저 처리할지" right={<AiReady title="경영 브리핑" now="KPI·실행을 규칙으로 정렬한 우선순위 (L1 보조)" method="구조화 규칙" next="LLM이 여러 지표와 실행을 한 문단 자연어로 설명" />}>
         <ol className="grid md:grid-cols-2 gap-2 stagger">
           {briefing.map((b) => (
             <li key={b.rank}>
@@ -93,22 +93,22 @@ export default function DashboardView() {
       <div className="grid lg:grid-cols-[1fr_1fr] gap-4">
         <Panel title={<span className="inline-flex items-center gap-2"><Users size={17} />4. 고객·재구매</span>} sub="주기 도래 고객에게 다시 제안" right={<Link href="/ax/customers" className="text-sm font-semibold text-primary">자세히</Link>}>
           <div className="grid grid-cols-3 gap-2">
-            {[["재구매 주기 도래", 42, "Repeat Basket 노출"], ["장바구니 이탈", 18, "복귀 안내"], ["재구매 지연", 27, "리마인드"]].map(([l, v, a]) => <div key={l as string} className="rounded-xl bg-mist p-3"><div className="text-xs text-muted">{l}</div><div className="text-2xl font-black">{v}<span className="text-sm font-semibold text-muted">명</span></div><div className="text-xs text-primary font-semibold mt-0.5">{a}</div></div>)}
+            {[["재구매 주기 도래", 42, "다시 구매 노출"], ["장바구니 이탈", 18, "복귀 안내"], ["재구매 지연", 27, "리마인드"]].map(([l, v, a]) => <div key={l as string} className="rounded-xl bg-mist p-3"><div className="text-xs text-muted">{l}</div><div className="text-2xl font-black">{v}<span className="text-sm font-semibold text-muted">명</span></div><div className="text-xs text-primary font-semibold mt-0.5">{a}</div></div>)}
           </div>
-          <div className="mt-3 text-xs text-muted">고객 주문·재구매가 발생하면 이 화면과 Evidence에 즉시 반영됩니다. (Customer → AX Data Bridge)</div>
+          <div className="mt-3 text-xs text-muted">고객 주문·재구매가 발생하면 이 화면과 성과 기록에 즉시 반영됩니다. (고객 → AX 데이터 연결)</div>
         </Panel>
-        <Panel tour="actions" title={<span className="inline-flex items-center gap-2"><Rocket size={17} className="text-accent" />5. 오늘의 Action</span>} sub={`${ROLE_LABEL[role]} 권한 기준 미처리 ${myActions.length}건`} right={<Link href="/ax/actions" className="text-sm font-semibold text-primary">Action Center</Link>}>
+        <Panel tour="actions" title={<span className="inline-flex items-center gap-2"><Rocket size={17} className="text-accent" />5. 오늘의 실행</span>} sub={`${ROLE_LABEL[role]} 권한 기준 미처리 ${myActions.length}건`} right={<Link href="/ax/actions" className="text-sm font-semibold text-primary">실행 센터</Link>}>
           <div className="space-y-2">{myActions.slice(0, 3).map((a) => <ActionCard key={a.id} a={a} onOpen={setAction} compact />)}</div>
-          {!myActions.length && <div className="text-sm text-muted">처리할 Action이 없습니다.</div>}
+          {!myActions.length && <div className="text-sm text-muted">처리할 실행이 없습니다.</div>}
         </Panel>
       </div>
 
       {/* charts + drill list */}
       <div className="grid lg:grid-cols-[1.2fr_1fr] gap-4">
-        <Panel title="최근 14일 매출 · 추정 마진" sub={showMoney ? "매출이 올라도 할인·배송비로 마진이 줄어드는 날을 확인" : "주문·처리량 추이"} right={<Link href="/ax/sales" className="text-sm font-semibold text-primary">Detail</Link>}>
+        <Panel title="최근 14일 매출 · 추정 마진" sub={showMoney ? "매출이 올라도 할인·배송비로 마진이 줄어드는 날을 확인" : "주문·처리량 추이"} right={<Link href="/ax/sales" className="text-sm font-semibold text-primary">상세</Link>}>
           {showMoney ? <LineChart data={series} label1="매출" label2="추정마진" format={wonShort} showEvery={2} /> : <BarChart data={data.dailySales.slice(-14).map((d) => ({ label: fmtDate(d.date, "md"), value: d.orders }))} label1="주문수" showEvery={2} />}
         </Panel>
-        <Panel title={<span className="inline-flex items-center gap-2"><AlertTriangle size={17} className="text-danger" />품절위험 SKU {stockoutRisk.length}개</span>} sub="클릭 → SKU Detail → 근거 → 발주 Action" right={<Link href="/ax/inventory?status=risk" className="text-sm font-semibold text-primary">전체</Link>}>
+        <Panel title={<span className="inline-flex items-center gap-2"><AlertTriangle size={17} className="text-danger" />품절위험 SKU {stockoutRisk.length}개</span>} sub="클릭 → SKU 상세 → 근거 → 발주 실행" right={<Link href="/ax/inventory?status=risk" className="text-sm font-semibold text-primary">전체</Link>}>
           <ul className="divide-y divide-line -mx-1">
             {stockoutRisk.slice(0, 6).map((i) => (
               <li key={i.sku.id}><button onClick={() => setSkuId(i.sku.id)} className="w-full flex items-center gap-3 px-1 py-2.5 text-left hover:bg-mist rounded-lg"><div className="min-w-0 flex-1"><div className="font-semibold text-sm truncate">{i.product.name} <span className="text-muted font-normal">· {i.sku.name}</span></div><div className="text-xs text-muted">{i.reasons[0]}</div></div><div className="text-right shrink-0"><div className="text-sm font-bold tabular-nums">{i.daysOfStock === Infinity ? "-" : `${i.daysOfStock.toFixed(1)}일`}</div><div className="text-[13px] text-muted">가용 {i.available}</div></div></button></li>

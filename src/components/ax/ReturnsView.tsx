@@ -30,16 +30,16 @@ export default function ReturnsView() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="반품·교환 (90일)" value={num(data.returns.length)} sub={`반품률 ${pct(safeDiv(data.aggregates.returnCount90d, data.aggregates.orderCount90d))}`} tone="primary" />
-        <KpiCard label="상품불량·파손" value={num(data.returns.filter((r) => ["defect", "damaged"].includes(r.reason)).length)} tone="danger" sub="공급사 Action 대상" />
+        <KpiCard label="상품불량·파손" value={num(data.returns.filter((r) => ["defect", "damaged"].includes(r.reason)).length)} tone="danger" sub="공급사 실행 대상" />
         <KpiCard label="오배송·구성누락" value={num(data.returns.filter((r) => ["wrong_item", "missing"].includes(r.reason)).length)} tone="warn" sub="피킹·포장 개선" />
         <KpiCard label="처리 대기" value={num(data.returns.filter((r) => r.status === "requested").length)} sub="CS 확인 필요" />
       </div>
       <div className="grid lg:grid-cols-3 gap-4">
         <Panel title="반품 사유"><Donut parts={byReason.filter((r) => r.value > 0)} size={140} /></Panel>
         <Panel title="문제 발생 단계" sub="어느 단계에서 문제가 생기는지 — 개선 담당이 달라집니다"><BarChart data={delivStage} horizontal /></Panel>
-        <Panel title="공급사별 불량·파손" sub="불량 반복 공급사는 Action Center에서 평가 갱신">
+        <Panel title="공급사별 불량·파손" sub="불량 반복 공급사는 실행 센터에서 평가 갱신">
           <ul className="space-y-2 text-sm">{bySupplier.slice(0, 6).map((r) => <li key={r.s.id} className="flex items-center justify-between"><span className="font-semibold">{r.s.name}</span><span className="inline-flex items-center gap-2"><Badge tone={r.defect >= 6 ? "danger" : "neutral"}>불량 {r.defect}</Badge><span className="text-muted">전체 {r.total}</span></span></li>)}</ul>
-          {bySupplier[0]?.defect >= 6 && <Link href="/ax/actions?id=act-011" className="mt-3 inline-flex text-sm text-primary font-semibold">공급사 평가 갱신 Action →</Link>}
+          {bySupplier[0]?.defect >= 6 && <Link href="/ax/actions?id=act-011" className="mt-3 inline-flex text-sm text-primary font-semibold">공급사 평가 갱신 실행 →</Link>}
         </Panel>
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
@@ -48,7 +48,7 @@ export default function ReturnsView() {
         </Panel>
         <Panel title={<span className="inline-flex items-center gap-2"><Undo2 size={17} />반품·VOC 목록</span>} right={<select className="input !min-h-[36px] w-auto text-sm" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="사유"><option value="all">전체 사유</option>{Object.entries(REASON).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>}>
           <div className="table-wrap max-h-[420px] overflow-y-auto"><table className="table"><thead><tr><th>접수</th><th>주문</th><th>상품</th><th>사유</th><th>상태</th></tr></thead><tbody>{list.map((r) => { const s = skuById.get(r.skuId); const p = s && productById.get(s.productId); return <tr key={r.id} className="row-clickable" onClick={() => setSkuId(r.skuId)}><td className="text-muted whitespace-nowrap">{fmtDate(r.createdAt, "md")}</td><td className="text-xs">{role === "buyer" ? "—" : r.orderId}</td><td>{p?.name}</td><td><Badge tone={["defect", "damaged"].includes(r.reason) ? "danger" : "neutral"}>{REASON[r.reason]}</Badge></td><td><StatusBadge status={r.status === "requested" ? "recommended" : r.status === "refunded" ? "done" : "in_progress"} /></td></tr>; })}</tbody></table></div>
-          <p className="text-xs text-muted mt-2">고객에게 불이익을 자동 적용하지 않습니다. 반복 VOC는 상품·공급사·포장 개선 Action으로 연결합니다.</p>
+          <p className="text-xs text-muted mt-2">고객에게 불이익을 자동 적용하지 않습니다. 반복 VOC는 상품·공급사·포장 개선 실행으로 연결합니다.</p>
         </Panel>
       </div>
       <SkuDrawer skuId={skuId} onClose={() => setSkuId(null)} />

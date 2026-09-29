@@ -4,13 +4,13 @@ import { createPortal } from "react-dom";
 import { useStore } from "@/lib/store";
 
 const STEPS = [
-  { target: "sidebar", title: "14개 메뉴, 하나의 흐름", body: "대시보드 → Action → 상품·재고·공급사 → 주문 → 고객 → Evidence. 왼쪽 메뉴는 '무엇이 문제인가'에서 '무엇을 했고 결과가 무엇인가'까지 순서대로 배치되어 있습니다." },
-  { target: "brief", title: "Today Brief — 오늘 무엇부터", body: "대표가 10초 안에 '어디서 돈이 새는지, 무엇을 먼저 발주할지, 어떤 주문을 먼저 처리할지'를 보는 곳입니다. 각 항목을 누르면 근거와 Action으로 이어집니다." },
-  { target: "kpi", title: "KPI는 클릭하면 Detail로", body: "숫자만 보여주지 않습니다. 품절위험 SKU 16개를 누르면 위험 목록 → SKU 상세 → 추천 근거 → 발주 Action → 공급사 선택까지 내려갑니다." },
-  { target: "actions", title: "Action Card — 추천에는 근거가 있다", body: "모든 추천에는 사용 데이터, 핵심 근거 2~4개, 주의사항, 대안이 붙습니다. 승인·실행하면 실제 데이터(발주·재고·주문상태·고객 알림)가 바뀌고 Evidence가 남습니다." },
+  { target: "sidebar", title: "7개 메뉴, 하나의 흐름", body: "경영 대시보드 → 실행 센터 → 상품·재고 → 주문·배송 → 고객·마케팅 → 경영분석. 비슷한 기능끼리 묶었고, 그룹을 누르면 세부 메뉴가 펼쳐집니다. 메뉴는 '무엇이 문제인가'에서 '무엇을 했고 결과가 무엇인가'까지 순서대로 배치되어 있습니다." },
+  { target: "brief", title: "오늘의 브리핑 — 오늘 무엇부터", body: "대표가 10초 안에 '어디서 돈이 새는지, 무엇을 먼저 발주할지, 어떤 주문을 먼저 처리할지'를 보는 곳입니다. 각 항목을 누르면 근거와 실행으로 이어집니다." },
+  { target: "kpi", title: "KPI는 클릭하면 상세로", body: "숫자만 보여주지 않습니다. 품절위험 SKU 16개를 누르면 위험 목록 → SKU 상세 → 추천 근거 → 발주 실행 → 공급사 선택까지 내려갑니다." },
+  { target: "actions", title: "실행 카드 — 추천에는 근거가 있다", body: "모든 추천에는 사용 데이터, 핵심 근거 2~4개, 주의사항, 대안이 붙습니다. 승인·실행하면 실제 데이터(발주·재고·주문상태·고객 알림)가 바뀌고 성과 기록이 남습니다." },
   { target: "role", title: "역할 전환 — 권한이 다르다", body: "대표·구매담당·운영담당·CS 전환 시 메뉴, KPI, 테이블, 민감정보가 실제로 달라집니다. 실제 운영에서는 로그인 역할과 RLS로 강제됩니다." },
-  { target: "customer", title: "고객 화면 ↔ AX 왕복", body: "고객이 주문하면 여기 신규주문 Queue와 재고 예약이 바뀌고, 여기서 출고 처리하면 고객 My Page 상태가 바뀝니다. 한 저장소를 함께 씁니다." },
-  { target: "theme", title: "9 Theme · 설정", body: "9개 Theme 전부에서 Sidebar·CTA·Badge·Chart·Modal이 일관되게 바뀝니다. 설정에서 글자 크기, 역할, Demo Reset도 관리합니다." },
+  { target: "customer", title: "고객 플랫폼 ↔ AX 왕복", body: "고객이 주문하면 AX의 신규주문 대기열과 재고 예약이 바뀌고, AX에서 출고 처리하면 고객 마이페이지 상태가 바뀝니다. 한 저장소를 함께 씁니다." },
+  { target: "theme", title: "9개 테마 · 설정", body: "9개 테마 전부에서 사이드바·버튼·배지·차트·팝업이 일관되게 바뀝니다. 설정에서 글자 크기, 역할, 시연 데이터 초기화도 관리합니다." },
 ];
 
 export default function Tutorial({ onClose }: { onClose: () => void }) {

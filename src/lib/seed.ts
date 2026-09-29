@@ -577,7 +577,7 @@ export function generateDemoData(now = new Date()): DemoData {
     id: "act-003", type: "stop_po", scenario: "C",
     title: "무선 미니가습기 발주중단·프로모션 조정 검토",
     summary: "재고일수가 465일이고 최근 4주 판매가 감소했습니다. 직전 25% 할인 프로모션은 매출 대비 실질마진이 마이너스였습니다.",
-    trigger: "재고일수 > 180일 AND 판매량 4주 연속 감소",
+    trigger: "재고일수 > 180일 그리고 판매량 4주 연속 감소",
     reasons: ["가용재고 185개, 일 0.4개 판매 → 465일치", "상세조회 31% 감소, 검색 32% 감소", "미니가전 재고정리 프로모션 실질마진 -18%", "계절성 상품(가을~겨울)으로 11월 이후 수요 회복 가능"],
     expectedImpact: "추가 발주 보류로 약 280만원 재고자금 절감",
     caution: "완전 단종보다는 11월 재평가를 권장합니다.",
@@ -590,7 +590,7 @@ export function generateDemoData(now = new Date()): DemoData {
     id: "act-004", type: "priority_order", scenario: "D",
     title: "C구역 마감임박 배송약속 주문 12건 우선처리",
     summary: "오후 3시 출고마감까지 C구역 피킹 적체율 82%입니다. 오늘 배송약속이 있는 주문 12건이 피킹 대기 중입니다.",
-    trigger: "출고마감 D-3h AND 구역 적체 > 70% AND 배송약속 주문 존재",
+    trigger: "출고마감 3시간 전 그리고 구역 적체 > 70% 그리고 배송약속 주문 존재",
     reasons: ["C구역 피킹 적체율 82% (평균 40%)", "배송약속 오늘인 주문 12건이 피킹 이전 단계", "동일 시간대 평균 처리량 대비 38% 부족", "지연 시 고객 사전안내 필요"],
     expectedImpact: "정시출고율 하락 방지, 배송지연 VOC 예방",
     urgency: "critical", owner: "ops", assignee: "박운영", recommendedAt: ago(1), dueAt: iso(cutoffToday), stage: "recommended",
@@ -609,11 +609,11 @@ export function generateDemoData(now = new Date()): DemoData {
   });
   pushAction({
     id: "act-006", type: "repeat_expose", scenario: "E",
-    title: "재구매 주기 도래 고객 42명 Repeat Basket 노출",
-    summary: "물티슈·세제·반려패드 평균 구매주기가 도래한 고객 42명에게 Repeat Basket을 노출합니다.",
+    title: "재구매 주기 도래 고객 42명 다시 구매 노출",
+    summary: "물티슈·세제·반려패드 평균 구매주기가 도래한 고객 42명에게 '다시 구매'를 노출합니다.",
     trigger: "마지막 구매일 + 평균 구매주기 ≤ 오늘 + 3일",
-    reasons: ["반복상품 구매고객 42명이 주기 도래", "해당 상품 현재 재고 보유(물티슈 20팩 제외)", "지난달 Repeat Basket 전환율 31% (Demo 집계)"],
-    expectedImpact: "재구매 주문 약 13건 예상 (Demo 시뮬레이션)",
+    reasons: ["반복상품 구매고객 42명이 주기 도래", "해당 상품 현재 재고 보유(물티슈 20팩 제외)", "지난달 다시 구매 전환율 31% (시연 집계)"],
+    expectedImpact: "재구매 주문 약 13건 예상 (시연 시뮬레이션)",
     caution: "물티슈 20팩은 품절위험이라 10팩으로 대체 노출합니다.",
     urgency: "mid", owner: "owner", assignee: "대표", recommendedAt: ago(8), dueAt: dueIn(48), stage: "recommended",
     related: { customerIds: customers.slice(0, 8).map((c) => c.id), skuId: skuWipe10.id },
@@ -631,7 +631,7 @@ export function generateDemoData(now = new Date()): DemoData {
   pushAction({
     id: "act-008", type: "urgent_po", title: "KF94 마스크 50매 품절 — 입고 D+1 확인 및 예약판매 전환",
     summary: "현재 품절 상태이며 300개가 내일 입고 예정입니다. 상품 상세를 예약배송으로 전환합니다.",
-    trigger: "가용재고 0 AND 입고예정 존재",
+    trigger: "가용재고 0 그리고 입고예정 존재",
     reasons: ["가용재고 0", "PO-2609-015 내일 입고 300개", "최근 7일 검색 유지"],
     expectedImpact: "품절 이탈 대신 예약주문 확보",
     urgency: "high", owner: "buyer", assignee: "김구매", recommendedAt: ago(12), dueAt: dueIn(12), stage: "in_progress",
@@ -659,7 +659,7 @@ export function generateDemoData(now = new Date()): DemoData {
   pushAction({
     id: "act-011", type: "alt_supplier", title: "그린키친코리아 불량·납기 복합위험 — 공급사 평가 갱신",
     summary: "최근 40일 불량 반품 9건과 납기지연 2회가 겹쳤습니다. 주방 카테고리 대체 공급사 비중 확대를 검토합니다.",
-    trigger: "공급사 불량률 > 1% AND 정시납품률 < 80%",
+    trigger: "공급사 불량률 > 1% 그리고 정시납품률 < 80%",
     reasons: ["불량 반품 9건 (동일 공급사)", "정시납품률 78%", "리빙앤홈·한빛생활유통 대체 가능"],
     expectedImpact: "반품비용·품절위험 동시 감소",
     urgency: "mid", owner: "buyer", assignee: "김구매", recommendedAt: ago(40), dueAt: dueIn(96), stage: "reviewing",
@@ -669,7 +669,7 @@ export function generateDemoData(now = new Date()): DemoData {
     id: "act-012", type: "repeat_expose", title: "장바구니 이탈 고객 18명 복귀 안내",
     summary: "생수·즉석밥을 장바구니에 담고 48시간 내 주문하지 않은 고객에게 안내합니다.",
     trigger: "장바구니 담기 후 48시간 미주문",
-    reasons: ["장바구니 이탈 18명", "해당 상품 재고 정상", "복귀 쿠폰 프로모션 전환율 22% (Demo)"],
+    reasons: ["장바구니 이탈 18명", "해당 상품 재고 정상", "복귀 쿠폰 프로모션 전환율 22% (시연)"],
     expectedImpact: "약 4건 주문 회복 (추정)",
     urgency: "low", owner: "cs", assignee: "이CS", recommendedAt: ago(15), dueAt: dueIn(30), stage: "recommended",
     related: { customerIds: customers.slice(8, 14).map((c) => c.id) },
@@ -713,7 +713,7 @@ export function generateDemoData(now = new Date()): DemoData {
     expectedImpact: "재운영 시 동일 구조 적용",
     urgency: "low", owner: "owner", assignee: "대표", recommendedAt: ago(24 * 1), dueAt: ago(2), stage: "done",
     related: { promotionId: "promo-05" },
-    result: "종료. 결과를 Evidence로 기록.", createdAt: ago(24 * 1),
+    result: "종료. 결과를 성과 기록으로 기록.", createdAt: ago(24 * 1),
   });
   pushAction({
     id: "act-017", type: "stop_po", title: "아기 욕조 접이식 발주 보류",
@@ -727,18 +727,18 @@ export function generateDemoData(now = new Date()): DemoData {
 
   // ---------- evidence ----------
   const evidence: EvidenceLog[] = [
-    { ...base, id: "ev-001", createdAt: ago(24 * 14), type: "BASELINE", title: "재고·발주 Baseline 측정 시작", detail: "주간 재고분석 소요시간, 긴급발주 비중, 품절률 Baseline은 실운영 데이터로 측정 예정. Demo 값은 Simulation입니다.", actor: "AX Owner", dataSource: "Demo Repository", mode: "실증 준비" },
-    { ...base, id: "ev-002", createdAt: ago(24 * 10), type: "ACTION", title: "롤화장지 긴급발주 승인", detail: "예상 소진일 2.4일 < 리드타임 5일. 한빛생활유통 200개 발주 승인.", actor: "김구매", actionId: "act-013", skuId: findSku("3겹 롤화장지 30롤", 1).id, supplierId: supHanbit.id, dataSource: "Demand Signal + Inventory", mode: "Demo Evidence" },
-    { ...base, id: "ev-003", createdAt: ago(24 * 4), type: "RESULT", title: "롤화장지 입고 완료 · 품절 0일", detail: "PO-2609-011 200개 입고. 발주~입고 5일. 해당 기간 품절 0일.", actor: "박운영", actionId: "act-013", skuId: findSku("3겹 롤화장지 30롤", 1).id, kpiDelta: "품절일수 0 / 긴급발주 1건", dataSource: "Inbound + Inventory", mode: "Demo Evidence" },
-    { ...base, id: "ev-004", createdAt: ago(24 * 13), type: "ACTION", title: "배변패드 2개 묶음 150개 발주", detail: "재구매 예상 고객 31명 대비 가용재고 22개.", actor: "김구매", actionId: "act-014", skuId: skuPad.id, dataSource: "Repeat Prediction + Inventory", mode: "Demo Evidence" },
-    { ...base, id: "ev-005", createdAt: ago(24 * 7), type: "REVENUE", title: "배변패드 입고 후 7일간 재구매 27건", detail: "Repeat Basket 노출 고객 중 27건 주문. 품절 없이 처리.", actor: "시스템", actionId: "act-014", skuId: skuPad.id, kpiDelta: "재구매 주문 27건 (Demo)", dataSource: "Orders", mode: "Simulation" },
-    { ...base, id: "ev-006", createdAt: ago(24 * 2), type: "EFFICIENCY", title: "B구역 냉장 9건 마감 전 출고", detail: "우선처리 Action 실행 후 9건 모두 마감 전 출고. 정시출고율 97%.", actor: "박운영", actionId: "act-015", kpiDelta: "정시출고율 97%", dataSource: "Fulfillment", mode: "Demo Evidence" },
-    { ...base, id: "ev-007", createdAt: ago(3), type: "RISK", title: "그린키친코리아 납기지연 감지", detail: "PO-2609-018 예정일 초과. 주방세제 리필 2L 품절 위험 상승.", actor: "시스템", actionId: "act-002", supplierId: supGreen.id, skuId: skuB.id, dataSource: "Purchase Orders", mode: "Demo Evidence" },
-    { ...base, id: "ev-008", createdAt: ago(2), type: "RISK", title: "프리미엄 물티슈 20팩 품절위험 감지", detail: "판매속도 65% 증가, 예상 소진 2.7일.", actor: "시스템", actionId: "act-001", skuId: skuA.id, dataSource: "Demand Signal", mode: "Demo Evidence" },
-    { ...base, id: "ev-009", createdAt: ago(24), type: "CUSTOMER", title: "장바구니 복귀 쿠폰 결과", detail: "노출 18명 중 4명 주문 (22%). 할인비용 대비 마진 양호.", actor: "이CS", actionId: "act-016", kpiDelta: "전환율 22%", dataSource: "Promotion Events", mode: "Simulation" },
-    { ...base, id: "ev-010", createdAt: ago(24 * 6), type: "ADOPTION", title: "주간 AX 사용 집계", detail: "대표 5일, 구매담당 5일, 운영담당 5일 접속. Action 12건 중 9건 처리.", actor: "시스템", kpiDelta: "Action 실행률 75%", dataSource: "App Usage", mode: "Simulation" },
-    { ...base, id: "ev-011", createdAt: ago(24 * 1), type: "EXCEPTION", title: "C구역 피킹 적체 82%", detail: "동시간대 평균 40% 대비 2배. 인력 재배치 필요.", actor: "시스템", actionId: "act-004", dataSource: "Fulfillment", mode: "Demo Evidence" },
-    { ...base, id: "ev-012", createdAt: ago(24 * 20), type: "SCALE", title: "구매담당 1인당 관리 SKU", detail: "구매담당 1명이 관리하는 SKU 수를 측정지점으로 정의. 실측은 Pilot에서.", actor: "AX Owner", kpiDelta: "측정지점 정의", dataSource: "Product Master", mode: "실증 준비" },
+    { ...base, id: "ev-001", createdAt: ago(24 * 14), type: "BASELINE", title: "재고·발주 기준값 측정 시작", detail: "주간 재고분석 소요시간, 긴급발주 비중, 품절률 기준값은 실운영 데이터로 측정 예정. 시연 값은 시뮬레이션입니다.", actor: "AX 책임자", dataSource: "시연 데이터", mode: "실증 준비" },
+    { ...base, id: "ev-002", createdAt: ago(24 * 10), type: "ACTION", title: "롤화장지 긴급발주 승인", detail: "예상 소진일 2.4일 < 리드타임 5일. 한빛생활유통 200개 발주 승인.", actor: "김구매", actionId: "act-013", skuId: findSku("3겹 롤화장지 30롤", 1).id, supplierId: supHanbit.id, dataSource: "수요신호 + 재고", mode: "Demo Evidence" },
+    { ...base, id: "ev-003", createdAt: ago(24 * 4), type: "RESULT", title: "롤화장지 입고 완료 · 품절 0일", detail: "PO-2609-011 200개 입고. 발주~입고 5일. 해당 기간 품절 0일.", actor: "박운영", actionId: "act-013", skuId: findSku("3겹 롤화장지 30롤", 1).id, kpiDelta: "품절일수 0 / 긴급발주 1건", dataSource: "입고 + 재고", mode: "Demo Evidence" },
+    { ...base, id: "ev-004", createdAt: ago(24 * 13), type: "ACTION", title: "배변패드 2개 묶음 150개 발주", detail: "재구매 예상 고객 31명 대비 가용재고 22개.", actor: "김구매", actionId: "act-014", skuId: skuPad.id, dataSource: "재구매 예측 + 재고", mode: "Demo Evidence" },
+    { ...base, id: "ev-005", createdAt: ago(24 * 7), type: "REVENUE", title: "배변패드 입고 후 7일간 재구매 27건", detail: "다시 구매 노출 고객 중 27건 주문. 품절 없이 처리.", actor: "시스템", actionId: "act-014", skuId: skuPad.id, kpiDelta: "재구매 주문 27건 (시연)", dataSource: "주문", mode: "Simulation" },
+    { ...base, id: "ev-006", createdAt: ago(24 * 2), type: "EFFICIENCY", title: "B구역 냉장 9건 마감 전 출고", detail: "우선처리 실행 후 9건 모두 마감 전 출고. 정시출고율 97%.", actor: "박운영", actionId: "act-015", kpiDelta: "정시출고율 97%", dataSource: "주문·출고", mode: "Demo Evidence" },
+    { ...base, id: "ev-007", createdAt: ago(3), type: "RISK", title: "그린키친코리아 납기지연 감지", detail: "PO-2609-018 예정일 초과. 주방세제 리필 2L 품절 위험 상승.", actor: "시스템", actionId: "act-002", supplierId: supGreen.id, skuId: skuB.id, dataSource: "발주서", mode: "Demo Evidence" },
+    { ...base, id: "ev-008", createdAt: ago(2), type: "RISK", title: "프리미엄 물티슈 20팩 품절위험 감지", detail: "판매속도 65% 증가, 예상 소진 2.7일.", actor: "시스템", actionId: "act-001", skuId: skuA.id, dataSource: "수요신호", mode: "Demo Evidence" },
+    { ...base, id: "ev-009", createdAt: ago(24), type: "CUSTOMER", title: "장바구니 복귀 쿠폰 결과", detail: "노출 18명 중 4명 주문 (22%). 할인비용 대비 마진 양호.", actor: "이CS", actionId: "act-016", kpiDelta: "전환율 22%", dataSource: "프로모션 이벤트", mode: "Simulation" },
+    { ...base, id: "ev-010", createdAt: ago(24 * 6), type: "ADOPTION", title: "주간 AX 사용 집계", detail: "대표 5일, 구매담당 5일, 운영담당 5일 접속. 실행 12건 중 9건 처리.", actor: "시스템", kpiDelta: "실행 실행률 75%", dataSource: "앱 사용 기록", mode: "Simulation" },
+    { ...base, id: "ev-011", createdAt: ago(24 * 1), type: "EXCEPTION", title: "C구역 피킹 적체 82%", detail: "동시간대 평균 40% 대비 2배. 인력 재배치 필요.", actor: "시스템", actionId: "act-004", dataSource: "주문·출고", mode: "Demo Evidence" },
+    { ...base, id: "ev-012", createdAt: ago(24 * 20), type: "SCALE", title: "구매담당 1인당 관리 SKU", detail: "구매담당 1명이 관리하는 SKU 수를 측정지점으로 정의. 실측은 실증에서.", actor: "AX 책임자", kpiDelta: "측정지점 정의", dataSource: "상품 마스터", mode: "실증 준비" },
   ];
   actions.forEach((a) => { a.evidenceIds = evidence.filter((e) => e.actionId === a.id).map((e) => e.id); });
 

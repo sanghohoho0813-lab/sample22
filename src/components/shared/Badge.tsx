@@ -34,7 +34,7 @@ export function StatusBadge({ status }: { status: string }) {
     critical: ["긴급", "danger"], high: ["높음", "warn"], mid: ["보통", "secondary"], low_u: ["낮음", "neutral"],
     recommended: ["추천됨", "accent"], reviewing: ["검토중", "secondary"], approved: ["승인", "primary"], requested: ["발주요청", "primary"], in_progress: ["실행중", "primary"], done: ["완료", "success"], dismissed: ["보류해제", "neutral"], held: ["보류", "neutral"],
     new: ["신규주문", "accent"], confirmed: ["주문확인", "secondary"], picking_wait: ["피킹대기", "warn"], picking: ["피킹중", "primary"], packing_wait: ["포장대기", "primary"], ship_wait: ["출고대기", "primary"], shipped: ["출고완료", "success"], in_transit: ["배송중", "success"], delivered: ["배송완료", "neutral"], cancelled: ["취소", "neutral"], return: ["반품·교환", "danger"],
-    draft: ["초안", "neutral"], received: ["입고완료", "success"], LIVE: ["LIVE", "success"], DEMO: ["DEMO", "warn"], READY: ["READY", "primary"], NEXT: ["NEXT", "neutral"], PILOT: ["PILOT", "secondary"],
+    draft: ["초안", "neutral"], received: ["입고완료", "success"], LIVE: ["작동 중", "success"], DEMO: ["시연", "warn"], READY: ["연결 준비", "primary"], NEXT: ["예정", "neutral"], PILOT: ["실증", "secondary"],
     active: ["계약중", "success"], review: ["검토중", "warn"], paused: ["중지", "neutral"],
     running: ["진행중", "success"], planned: ["예정", "secondary"], ended: ["종료", "neutral"],
   };

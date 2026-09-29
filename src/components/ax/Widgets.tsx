@@ -31,13 +31,13 @@ export function KpiCard({ label, value, sub, delta, href, tone = "neutral", spar
     <div className={`card p-4 h-full flex flex-col relative overflow-hidden ${href || onClick ? "lift cursor-pointer" : ""}`}>
       <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r grow-bar ${toneBar}`} />
       <div className="flex items-start justify-between gap-2">
-        <div className="text-sm text-muted font-semibold flex items-center gap-1.5">{icon}{label}</div>
+        <div className="text-sm text-muted font-semibold flex items-center gap-1.5 min-w-0 leading-snug">{icon}<span className="min-w-0">{label}</span></div>
         {(href || onClick) && <ChevronRight size={16} className="text-muted" />}
       </div>
-      <div className={`mt-1.5 font-black tabular-nums tracking-tight ${big ? "text-3xl sm:text-4xl" : "text-2xl sm:text-[30px]"}`}>{typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}</div>
-      <div className="mt-1 flex items-center gap-2 text-xs text-muted min-h-[18px]">
+      <div className={`mt-1.5 font-black tabular-nums tracking-tight whitespace-nowrap leading-tight ${big ? "text-[clamp(1.5rem,7vw,2.25rem)]" : "text-[clamp(1.375rem,6vw,1.875rem)]"}`}>{typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}</div>
+      <div className="mt-1 flex items-start gap-2 text-xs text-muted min-h-[18px]">
         {delta !== undefined && <span className={`inline-flex items-center gap-0.5 font-semibold ${delta >= 0 ? "text-teal" : "text-danger"}`}>{delta >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(delta * 100).toFixed(1)}%</span>}
-        {sub && <span className="truncate">{sub}</span>}
+        {sub && <span className="min-w-0 line-clamp-2 leading-snug">{sub}</span>}
       </div>
       {spark && <div className="mt-2 -mb-1"><Sparkline values={spark} width={160} height={30} /></div>}
     </div>
@@ -51,9 +51,9 @@ export function Panel({ title, sub, right, children, className = "", id, tour }:
   return (
     <section id={id} data-tour={tour} className={`card p-4 sm:p-5 ${className}`}>
       {(title || right) && (
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0">{title && <h2 className="font-bold text-lg leading-tight">{title}</h2>}{sub && <p className="text-sm text-muted mt-0.5">{sub}</p>}</div>
-          {right && <div className="shrink-0 flex items-center gap-2">{right}</div>}
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-3">
+          <div className="min-w-0 flex-1 basis-[15rem]">{title && <h2 className="font-bold text-lg leading-snug">{title}</h2>}{sub && <p className="text-sm text-muted mt-0.5 leading-relaxed">{sub}</p>}</div>
+          {right && <div className="shrink-0 flex flex-wrap items-center gap-2">{right}</div>}
         </div>
       )}
       {children}
@@ -62,7 +62,7 @@ export function Panel({ title, sub, right, children, className = "", id, tour }:
 }
 
 export function Stat({ label, value, sub, className = "" }: { label: ReactNode; value: ReactNode; sub?: ReactNode; className?: string }) {
-  return <div className={`rounded-xl bg-mist px-3 py-2.5 ${className}`}><div className="text-xs text-muted">{label}</div><div className="font-bold tabular-nums text-[19px] leading-tight mt-0.5">{value}</div>{sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}</div>;
+  return <div className={`rounded-xl bg-mist px-3 py-2.5 ${className}`}><div className="text-xs text-muted">{label}</div><div className="font-bold tabular-nums text-[19px] leading-tight mt-0.5 whitespace-nowrap">{value}</div>{sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}</div>;
 }
 
 export function Reasons({ items, title = "판단근거" }: { items: string[]; title?: string }) {

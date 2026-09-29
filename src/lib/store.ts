@@ -5,6 +5,7 @@ import { generateDemoData } from "./seed";
 import { assessOrderRisks, buildSkuInsights, compareSuppliers } from "./engines";
 import type { AXAction, ActionStage, CartItem, DemoData, EvidenceLog, EvidenceType, Order, OrderStage, RoleKey } from "./types";
 import { DEFAULT_THEME } from "./themes";
+import { STAGE_LABEL } from "./labels";
 
 export type FontScale = "normal" | "large";
 export type DeviceMode = "desktop" | "mobile";
@@ -73,15 +74,15 @@ export const BASELINE_KPIS: { key: string; group: "COST" | "REVENUE" | "SCALE"; 
   { key: "promo_margin", group: "REVENUE", label: "프로모션 실질마진율", unit: "%", point: "(매출 − 원가 − 할인 − 배송비) ÷ 매출, 캠페인별" },
   { key: "sku_per_buyer", group: "SCALE", label: "구매담당 1인당 관리 SKU", unit: "개", point: "활성 SKU ÷ 구매담당 인원" },
   { key: "orders_per_ops", group: "SCALE", label: "운영직원 1인당 처리 주문", unit: "건/일", point: "일 출고 주문 ÷ 물류·운영 인원" },
-  { key: "self_service_ratio", group: "SCALE", label: "Portal Self-Service 조회 비율", unit: "%", point: "배송 문의 중 My Page에서 자체 확인한 비율" },
+  { key: "self_service_ratio", group: "SCALE", label: "마이페이지 자체 조회 비율", unit: "%", point: "배송 문의 중 마이페이지에서 자체 확인한 비율" },
 ];
 
 export const PILOT_CHECKLIST: { key: string; label: string; auto?: boolean }[] = [
-  { key: "owner", label: "AX Owner 1명 지정 (KPI·데이터 품질·교육·Issue 책임)", auto: true },
-  { key: "baseline", label: "Cost · Revenue · Scale 각 1개 이상 Baseline 입력", auto: true },
-  { key: "data_intake", label: "상품·SKU·공급사·재고 실데이터 정리 (CSV Import READY)" },
+  { key: "owner", label: "AX 책임자 1명 지정 (KPI·데이터 품질·교육·이슈 책임)", auto: true },
+  { key: "baseline", label: "비용 · 매출 · 확장성 각 1개 이상 기준값 입력", auto: true },
+  { key: "data_intake", label: "상품·SKU·공급사·재고 실데이터 정리 (CSV 가져오기 준비)" },
   { key: "training", label: "대표·구매·운영·CS 역할별 사용 교육 1회" },
-  { key: "event", label: "핵심 Event 19종 수집 구조 확인 (Adapter READY)" },
+  { key: "event", label: "핵심 행동 이벤트 19종 수집 구조 확인 (연결 모듈 준비)" },
 ];
 
 export interface StoreState {
@@ -221,8 +222,8 @@ export const useStore = create<StoreState>()(
         const dailySales = s.data.dailySales.map((p) => (p.date === todayKey ? { ...p, orders: p.orders + 1, revenue: p.revenue + order.total, grossMargin: p.grossMargin + items.reduce((a, it) => a + (it.unitPrice - it.unitCost) * it.qty, 0) - shippingFee } : p));
         const ev: EvidenceLog = {
           id: uid("ev"), createdAt: now.toISOString(), updatedAt: now.toISOString(), source: "demo",
-          type: "CUSTOMER", title: `${isRepeat ? "Repeat Basket 재구매" : "고객 DEMO 주문"} ${id}`, detail: `${customer.name} · ${items.map((i) => `${i.name} ${i.skuName} ×${i.qty}`).join(", ")} · ${order.total.toLocaleString()}원. 재고 예약 및 수요신호 반영.`,
-          actor: customer.name, orderId: id, customerId: customer.id, dataSource: "Customer Platform → Shared Store", mode: "Demo Evidence",
+          type: "CUSTOMER", title: `${isRepeat ? "다시 구매 주문" : "고객 시연 주문"} ${id}`, detail: `${customer.name} · ${items.map((i) => `${i.name} ${i.skuName} ×${i.qty}`).join(", ")} · ${order.total.toLocaleString()}원. 재고 예약 및 수요신호 반영.`,
+          actor: customer.name, orderId: id, customerId: customer.id, dataSource: "고객 플랫폼 → 공유 저장소", mode: "Demo Evidence",
         };
         set({
           data: { ...s.data, orders: [order, ...s.data.orders], inventory, demand, dailySales, evidence: [ev, ...s.data.evidence] },
@@ -259,7 +260,7 @@ export const useStore = create<StoreState>()(
         let promotions = s.data.promotions;
         const newEvidence: EvidenceLog[] = [];
         const push = (type: EvidenceType, title: string, detail: string, extra: Partial<EvidenceLog> = {}) =>
-          newEvidence.push({ id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type, title, detail, actor, actionId: id, dataSource: "AX Action", mode: "Demo Evidence", skuId: a.related.skuId, supplierId: a.related.supplierId, ...extra });
+          newEvidence.push({ id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type, title, detail, actor, actionId: id, dataSource: "AX 실행", mode: "Demo Evidence", skuId: a.related.skuId, supplierId: a.related.supplierId, ...extra });
         const patch: Partial<AXAction> = { stage, updatedAt: t };
 
         if (stage === "approved" && (a.type === "urgent_po" || a.type === "alt_supplier")) {
@@ -289,11 +290,11 @@ export const useStore = create<StoreState>()(
           orders = orders.map((o) => (ids.has(o.id) ? { ...o, customerNotified: true, updatedAt: t } : o));
           patch.stage = "done";
           patch.result = `${ids.size}건 고객 사전안내 발송`;
-          push("CUSTOMER", `${a.title} — 발송`, `${ids.size}명에게 배송지연 사전안내. My Page 알림 반영.`);
+          push("CUSTOMER", `${a.title} — 발송`, `${ids.size}명에게 배송지연 사전안내. 마이페이지 알림 반영.`);
         } else if (stage === "approved" && a.type === "repeat_expose") {
           patch.stage = "done";
-          patch.result = "Repeat Basket 노출 시작 (Customer 홈 '다시 구매할 때' 섹션)";
-          push("CUSTOMER", `${a.title} — 노출`, "재구매 주기 도래 고객에게 Repeat Basket 노출. 전환 결과는 주문 Evidence로 누적.");
+          patch.result = "다시 구매 노출 시작 (고객 홈 '다시 구매할 때' 섹션)";
+          push("CUSTOMER", `${a.title} — 노출`, "재구매 주기 도래 고객에게 다시 구매 노출. 전환 결과는 주문 성과 기록으로 누적.");
         } else if (stage === "approved" && a.type === "promo_adjust") {
           promotions = promotions.map((p) => (p.id === a.related.promotionId ? { ...p, discountRate: Math.max(0.05, p.discountRate - 0.05), updatedAt: t } : p));
           patch.stage = "done";
@@ -302,16 +303,16 @@ export const useStore = create<StoreState>()(
         } else if (stage === "approved" && a.type === "stop_po") {
           patch.stage = "done";
           patch.result = "발주 보류 확정, 재평가 일정 기록";
-          push("EFFICIENCY", `${a.title} — 발주 보류`, "추가 발주 보류. 재고자금 절감 효과는 Pilot에서 실측.");
+          push("EFFICIENCY", `${a.title} — 발주 보류`, "추가 발주 보류. 재고자금 절감 효과는 실증에서 실측.");
         } else if (stage === "done") {
           if (a.type === "priority_order") {
             const ids = new Set(a.related.orderIds ?? []);
             orders = orders.map((o) => (ids.has(o.id) && !["shipped", "in_transit", "delivered", "cancelled"].includes(o.stage) ? { ...o, stage: "shipped" as OrderStage, updatedAt: t, history: [...o.history, { at: t, stage: "shipped" as OrderStage, actor }] } : o));
-            patch.result = `${ids.size}건 출고 완료. Customer 배송상태 반영.`;
-            push("RESULT", `${a.title} — 출고 완료`, `${ids.size}건 마감 전 출고. 고객 My Page '출고완료' 반영.`, { kpiDelta: "정시출고 +12건" });
+            patch.result = `${ids.size}건 출고 완료. 고객 배송상태 반영.`;
+            push("RESULT", `${a.title} — 출고 완료`, `${ids.size}건 마감 전 출고. 고객 마이페이지 '출고완료' 반영.`, { kpiDelta: "정시출고 +12건" });
           } else {
             patch.result = a.result ?? "완료";
-            push("RESULT", `${a.title} — 완료`, opts?.reason ?? "Action 완료 처리.");
+            push("RESULT", `${a.title} — 완료`, opts?.reason ?? "실행 완료 처리.");
           }
         } else if (stage === "held" || stage === "dismissed") {
           patch.holdReason = opts?.reason;
@@ -334,7 +335,7 @@ export const useStore = create<StoreState>()(
           inventory = inventory.map((inv) => { const it = o.items.find((x) => x.skuId === inv.skuId); return it ? { ...inv, onHand: Math.max(0, inv.onHand - it.qty), reserved: Math.max(0, inv.reserved - it.qty), updatedAt: t } : inv; });
         }
         const orders = s.data.orders.map((x) => (x.id === orderId ? { ...x, stage, updatedAt: t, assignee: x.assignee ?? who, history: [...x.history, { at: t, stage, actor: who }] } : x));
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: stage === "delivered" ? "RESULT" : "ACTION", title: `주문 ${orderId} ${ORDER_STAGE_LABEL[stage]}`, detail: `${who} 처리. 고객 My Page 상태 '${CUSTOMER_STAGE_LABEL[stage]}' 반영.${stage === "shipped" ? " 재고 차감." : ""}`, actor: who, orderId, dataSource: "Fulfillment", mode: "Demo Evidence" };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: stage === "delivered" ? "RESULT" : "ACTION", title: `주문 ${orderId} ${ORDER_STAGE_LABEL[stage]}`, detail: `${who} 처리. 고객 마이페이지 상태 '${CUSTOMER_STAGE_LABEL[stage]}' 반영.${stage === "shipped" ? " 재고 차감." : ""}`, actor: who, orderId, dataSource: "주문·출고", mode: "Demo Evidence" };
         const notifications = ["shipped", "in_transit", "delivered"].includes(stage)
           ? [{ id: uid("n"), createdAt: t, updatedAt: t, source: "demo" as const, customerId: o.customerId, title: `주문 ${orderId} ${CUSTOMER_STAGE_LABEL[stage]}`, body: stage === "shipped" ? "상품이 출고되었습니다." : stage === "in_transit" ? "배송이 시작되었습니다." : "배송이 완료되었습니다.", read: false }, ...s.data.notifications]
           : s.data.notifications;
@@ -355,7 +356,7 @@ export const useStore = create<StoreState>()(
         const inventory = s.data.inventory.map((inv) => (inv.skuId === po.skuId ? { ...inv, onHand: inv.onHand + po.qty, inboundExpected: Math.max(0, inv.inboundExpected - po.qty), inboundEta: undefined, updatedAt: t } : inv));
         const purchaseOrders = s.data.purchaseOrders.map((p) => (p.id === poId ? { ...p, status: "received" as const, receivedAt: t.slice(0, 10), updatedAt: t } : p));
         const actions = s.data.actions.map((a) => (a.related.poId === poId ? { ...a, stage: "done" as ActionStage, result: `${po.qty}개 입고 완료`, updatedAt: t } : a));
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RESULT", title: `${poId} 입고 완료`, detail: `${po.qty}개 입고. 가용재고 증가, 고객 상품 상세 재고상태 갱신.`, actor: ROLE_PERSON[s.ui.role], skuId: po.skuId, supplierId: po.supplierId, actionId: po.actionId, kpiDelta: `가용재고 +${po.qty}`, dataSource: "Inbound", mode: "Demo Evidence" };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RESULT", title: `${poId} 입고 완료`, detail: `${po.qty}개 입고. 가용재고 증가, 고객 상품 상세 재고상태 갱신.`, actor: ROLE_PERSON[s.ui.role], skuId: po.skuId, supplierId: po.supplierId, actionId: po.actionId, kpiDelta: `가용재고 +${po.qty}`, dataSource: "입고", mode: "Demo Evidence" };
         set({ data: { ...s.data, inventory, purchaseOrders, actions, evidence: [ev, ...s.data.evidence] } });
       },
       addEvidence: (e) => {
@@ -391,7 +392,7 @@ export const useStore = create<StoreState>()(
               urgency: urgent ? "critical" : ins.status === "low" ? "high" : "mid",
               owner: "buyer", assignee: "김구매", recommendedAt: t, dueAt: new Date(Date.now() + (urgent ? 6 : 48) * 3600000).toISOString(), stage: "recommended",
               related: { productId: ins.product.id, skuId, supplierId: ins.sku.primarySupplierId, altSupplierId: best?.supplier.id },
-              proposal: { qty: ins.recommendedQty, supplierId: best?.supplier.id ?? ins.sku.primarySupplierId, note: `Radar 계산 · ${actor} 생성` },
+              proposal: { qty: ins.recommendedQty, supplierId: best?.supplier.id ?? ins.sku.primarySupplierId, note: `레이더 계산 · ${actor} 생성` },
               evidenceIds: [],
             }
           : {
@@ -403,10 +404,10 @@ export const useStore = create<StoreState>()(
               expectedImpact: `재고자금 약 ${Math.round(ins.stockValue / 10000).toLocaleString()}만원 보류`,
               urgency: "low", owner: "buyer", assignee: "김구매", recommendedAt: t, dueAt: new Date(Date.now() + 120 * 3600000).toISOString(), stage: "recommended",
               related: { productId: ins.product.id, skuId },
-              proposal: { note: `Radar 계산 · ${actor} 생성` },
+              proposal: { note: `레이더 계산 · ${actor} 생성` },
               evidenceIds: [],
             };
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RISK", title: `${action.title} — Radar에서 Action 생성`, detail: `${actor}가 Stock & Purchase Radar 계산 결과로 Action을 생성. 근거: ${ins.reasons[0]}`, actor, actionId: id, skuId, dataSource: "Demand Signal + Inventory", mode: "Demo Evidence" };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RISK", title: `${action.title} — 레이더에서 실행 생성`, detail: `${actor}가 재고·발주 레이더 계산 결과로 실행을 생성. 근거: ${ins.reasons[0]}`, actor, actionId: id, skuId, dataSource: "수요신호 + 재고", mode: "Demo Evidence" };
         action.evidenceIds = [ev.id];
         set({ data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] } });
         return id;
@@ -426,15 +427,15 @@ export const useStore = create<StoreState>()(
           id, createdAt: t, updatedAt: t, source: "demo", type: "priority_order",
           title: `${zones} 지연위험 주문 ${ids.length}건 우선처리`,
           summary: `배송약속·출고마감·구역 적체 기준으로 지연위험이 감지된 주문 ${ids.length}건을 마감 전 우선 피킹합니다.`,
-          trigger: "Fulfillment Risk 점수 ≥ 60",
+          trigger: "배송 지연 위험 점수 ≥ 60",
           reasons: causes.length ? causes : ["지연위험 점수 상위 주문"],
           expectedImpact: "정시출고율 하락 방지, 배송지연 VOC 예방",
           urgency: "critical", owner: "ops", assignee: "박운영", recommendedAt: t, dueAt: risks[0]?.order.cutoffAt ?? t, stage: "recommended",
           related: { orderIds: ids },
-          proposal: { note: `Control Tower 계산 · ${actor} 생성` },
+          proposal: { note: `출고 관제 계산 · ${actor} 생성` },
           evidenceIds: [],
         };
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "EXCEPTION", title: `${action.title} — Control Tower에서 Action 생성`, detail: `${actor}가 지연위험 ${ids.length}건에 대해 우선처리 Action 생성. ${causes[0] ?? ""}`, actor, actionId: id, dataSource: "Fulfillment Risk", mode: "Demo Evidence" };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "EXCEPTION", title: `${action.title} — 출고 관제에서 실행 생성`, detail: `${actor}가 지연위험 ${ids.length}건에 대해 우선처리 실행 생성. ${causes[0] ?? ""}`, actor, actionId: id, dataSource: "배송 지연 위험", mode: "Demo Evidence" };
         action.evidenceIds = [ev.id];
         set({ data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] } });
         return id;
@@ -444,13 +445,19 @@ export const useStore = create<StoreState>()(
       setStage: (stage) => {
         const s = get();
         const t = nowIso();
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "BASELINE", title: `Delivery Stage → ${stage}`, detail: stage === "PILOT" ? `AX Owner ${s.ui.pilot.owner ?? "-"} · Baseline ${Object.values(s.ui.pilot.baselines).filter((b) => b.value !== undefined).length}개 입력. 12주 실증 시작. 화면 데이터는 실데이터 연결(READY) 전까지 Demo Simulation.` : `Stage 변경 (${ROLE_PERSON[s.ui.role]})`, actor: ROLE_PERSON[s.ui.role], dataSource: "Pilot Readiness", mode: "실증 준비" };
+        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "BASELINE", title: `진행 단계 → ${STAGE_LABEL[stage]}`, detail: stage === "PILOT" ? `AX 책임자 ${s.ui.pilot.owner ?? "-"} · 기준값 ${Object.values(s.ui.pilot.baselines).filter((b) => b.value !== undefined).length}개 입력. 12주 실증 시작. 화면 데이터는 실데이터 연결 전까지 시연용 시뮬레이션.` : `진행 단계 변경 (${ROLE_PERSON[s.ui.role]})`, actor: ROLE_PERSON[s.ui.role], dataSource: "실증 준비", mode: "실증 준비" };
         set({ ui: { ...s.ui, stage, pilot: { ...s.ui.pilot, startedAt: stage === "PILOT" ? t : s.ui.pilot.startedAt } }, data: { ...s.data, evidence: [ev, ...s.data.evidence] } });
       },
       resetDemo: () => set((s) => ({ data: generateDemoData(), ui: { ...initialUi(), theme: s.ui.theme, fontScale: s.ui.fontScale, tutorialDone: s.ui.tutorialDone, demoResetAt: nowIso() } })),
     }),
     {
       name: "nexmart-demo-v1",
+      // v2: 화면 문구 한글화(시드 데이터 포함) — 이전 방문자의 저장 데이터는 새 시드로 교체하고 설정(테마·글자·역할)은 유지
+      version: 2,
+      migrate: (persisted, version) => {
+        const p = (persisted ?? {}) as Partial<StoreState>;
+        return (version < 2 ? { ...p, data: generateDemoData() } : p) as StoreState;
+      },
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ data: s.data, ui: s.ui }),
       merge: (persisted, current) => {

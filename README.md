@@ -13,18 +13,21 @@ npm run dev        # http://localhost:3000
 npm run build && npm start
 ```
 
-| Surface | URL | 설명 |
+| 화면 | URL | 설명 |
 |---|---|---|
-| Customer Platform | `/` | 검색 → 상세 → 배송예정 → 장바구니 → DEMO 주문 → 배송조회 → Repeat Basket |
-| Business AX | `/ax` | Today Brief → KPI → Stock & Purchase Radar → 공급사 비교 → Action 승인 → Fulfillment Control Tower → Evidence |
-| Why AX | `/ax/why` | 기획의도 16 섹션 |
-| Presentation | `/ax/presentation` | 18 step Guided Journey (실제 화면) |
+| 고객 플랫폼 | `/` | 검색 → 상세 → 배송예정 → 장바구니 → 시연 주문 → 배송조회 → 다시 구매 |
+| AX 운영화면 | `/ax` | 오늘의 브리핑 → KPI → 재고·발주 레이더 → 공급사 비교 → 실행 승인 → 출고 관제 → 성과 기록 |
+| 기획 의도 | `/ax/why` | 16개 섹션 |
+| 시연 모드 | `/ax/presentation` | 18단계 단계별 시연 (실제 화면) |
+
+AX 메뉴 구조(최대 2단계): 경영 대시보드 · 실행 센터 · 상품·재고 ▸(상품·SKU / 재고·발주 / 공급사·구매) · 주문·배송 ▸(주문·출고 / 반품·문의) · 고객·마케팅 ▸(고객·재구매 / 프로모션) · 경영분석 ▸(매출·마진 / AX 성과 기록) · 설정 — 샘플 안내: 기획 의도 · 시연 모드.
+화면 표기 사전은 `src/lib/labels.ts`, 미래AI랩 CTA 링크·문구는 `src/lib/brand.ts`.
 
 ## 구조
 
 ```
-src/lib/        types · seed(Demo Data, 시나리오 A~E) · engines(규칙/통계 엔진 5) · kpi · store(공유 Store) · themes(9) · catalog · format · hooks
-src/components/ shared(Overlay·Charts·Badge·Toast·AssetImage·Bits) · customer(Shell·Home·List·Detail·Cart·Checkout·Orders) · ax(Shell·Tutorial·Drawers·14 View)
+src/lib/        labels(한글 표기 사전) · brand(CTA 링크·문구) · types · seed(Demo Data, 시나리오 A~E) · engines(규칙/통계 엔진 5) · kpi · store(공유 Store) · themes(9) · catalog · format · hooks
+src/components/ shared(Overlay·MobileDrawer·Charts·Badge·Toast·AssetImage·Bits·SampleBridgeCTA) · customer(Shell·Home·List·Detail·Cart·Checkout·Orders) · ax(Shell·Tutorial·Drawers·14 View)
 src/app/        Customer 14 routes · /ax 14 routes
 public/assets/  사진 자산 슬롯 (README 참조 — 파일 추가만으로 반영)
 ```

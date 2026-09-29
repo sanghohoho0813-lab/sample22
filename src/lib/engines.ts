@@ -310,11 +310,11 @@ export function buildSegments(data: DemoData): CustomerSegmentRow[] {
   return [
     { key: "first", name: "첫 주문 전환후보", description: "회원가입 후 상세조회·장바구니만 있고 주문 없음", count: 214, action: "첫 주문 웰컴 5천원 노출", customers: c.slice(14, 18) },
     { key: "cart_abandon", name: "장바구니 이탈", description: "담기 후 48시간 미주문", count: 18, action: "복귀 안내", customers: c.slice(8, 14) },
-    { key: "repeat_due", name: "반복상품 구매주기 도래", description: "마지막 구매일 + 평균주기 ≤ 3일 이내", count: 42, action: "Repeat Basket 노출", customers: c.slice(0, 8) },
+    { key: "repeat_due", name: "반복상품 구매주기 도래", description: "마지막 구매일 + 평균주기 ≤ 3일 이내", count: 42, action: "다시 구매 노출", customers: c.slice(0, 8) },
     { key: "repeat_late", name: "재구매 지연", description: "주기 경과 후 10일 이상 미주문", count: 27, action: "재구매 리마인드 + 대체상품", customers: c.slice(18, 22) },
     { key: "loyal_cat", name: "카테고리 충성고객", description: "동일 카테고리 3회 이상 구매", count: 96, action: "신상품·묶음 우선노출", customers: c.slice(2, 8) },
     { key: "delay_exp", name: "배송지연 경험고객", description: "최근 30일 배송지연 1회 이상", count: 11, action: "사전안내 + 사과 쿠폰 검토", customers: c.slice(3, 7) },
-    { key: "high_value", name: "고가치 반복고객", description: "월 3회 이상 · 월 10만원 이상", count: 58, action: "정기배송 Preview 초대 (NEXT)", customers: c.slice(0, 5) },
+    { key: "high_value", name: "고가치 반복고객", description: "월 3회 이상 · 월 10만원 이상", count: 58, action: "정기배송 미리보기 초대 (예정)", customers: c.slice(0, 5) },
   ];
 }
 
@@ -336,12 +336,12 @@ export function buildBriefing(data: DemoData, insights: SkuInsight[], risks: Ord
   const slowValue = slow.reduce((a, i) => a + i.stockValue, 0);
   const delayedPo = data.purchaseOrders.filter((po) => ["confirmed", "in_transit"].includes(po.status) && new Date(po.expectedAt).getTime() > now.getTime() + 7 * 86400000);
 
-  if (openCritical.length) items.push({ rank: 0, title: `긴급 Action ${openCritical.length}건이 승인 대기 중입니다`, why: openCritical.map((a) => a.title).slice(0, 2).join(" · "), href: "/ax/actions", tone: "danger" });
+  if (openCritical.length) items.push({ rank: 0, title: `긴급 실행 ${openCritical.length}건이 승인 대기 중입니다`, why: openCritical.map((a) => a.title).slice(0, 2).join(" · "), href: "/ax/actions", tone: "danger" });
   if (stockoutRisk.length) items.push({ rank: 0, title: `품절위험 SKU ${stockoutRisk.length}개 — 발주 판단이 오늘 필요합니다`, why: `${stockoutRisk[0].product.name} 등, 예상 소진일이 공급 리드타임보다 짧습니다`, href: "/ax/inventory", tone: "danger" });
   if (highRisk.length) items.push({ rank: 0, title: `배송지연 위험 주문 ${highRisk.length}건 — 마감 전 우선처리`, why: highRisk[0].causes.slice(0, 2).join(", "), href: "/ax/fulfillment", tone: "warn" });
   if (delayedPo.length) items.push({ rank: 0, title: `공급사 입고지연 ${delayedPo.length}건 — 대체구매 검토`, why: "입고 예정일이 재고 소진일보다 늦습니다", href: "/ax/suppliers", tone: "warn" });
   if (slowValue > 0) items.push({ rank: 0, title: `저회전·과잉재고 ${slow.length}개 SKU, 재고금액 ${Math.round(slowValue / 10000).toLocaleString()}만원`, why: "추가 발주 보류와 프로모션 조정을 검토하세요", href: "/ax/inventory?status=slow", tone: "info" });
-  items.push({ rank: 0, title: "재구매 주기 도래 고객 42명에게 Repeat Basket 노출 가능", why: "지난달 Repeat Basket 전환율 31% (Demo 집계)", href: "/ax/customers", tone: "good" });
+  items.push({ rank: 0, title: "재구매 주기 도래 고객 42명에게 다시 구매 노출 가능", why: "지난달 다시 구매 전환율 31% (시연 집계)", href: "/ax/customers", tone: "good" });
   return items.map((it, i) => ({ ...it, rank: i + 1 }));
 }
 

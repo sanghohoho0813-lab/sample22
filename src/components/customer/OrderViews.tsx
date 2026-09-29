@@ -71,7 +71,7 @@ export function OrderCompleteView({ orderId }: { orderId: string }) {
         <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center"><CheckCircle2 size={34} /></div>
         <h1 className="mt-3 text-2xl sm:text-3xl font-bold">주문이 접수되었습니다</h1>
         <p className="text-muted mt-1">주문번호 <b className="text-ink">{order.id}</b> · {promise} 도착 예정</p>
-        <div className="mt-2 badge bg-orange/15 text-[#B84F1A]">DEMO 주문 — 실제 결제 없음</div>
+        <div className="mt-2 badge bg-orange/15 text-[#B84F1A]">시연 주문 — 실제 결제 없음</div>
       </div>
       <div className="card mt-6 p-5">
         <OrderProgress order={order} />
@@ -88,8 +88,8 @@ export function OrderCompleteView({ orderId }: { orderId: string }) {
       </div>
       <div className="mt-6 card p-4 text-sm">
         <div className="font-semibold flex items-center gap-2"><LayoutDashboard size={16} className="text-primary" />이 주문은 지금 내부 시스템에 반영되었습니다</div>
-        <p className="text-muted mt-1">재고 예약 → 신규주문 Queue → 수요신호 갱신. Business AX의 <b>주문·Fulfillment</b>와 <b>재고·발주</b> 화면에서 이 주문({order.id})을 확인할 수 있습니다.</p>
-        {!inIframe && <Link href={`/ax/fulfillment?order=${order.id}`} className="inline-flex items-center gap-1 text-primary font-semibold mt-2 hover:underline">Business AX에서 확인 (관리자 Demo) <ChevronRight size={14} /></Link>}
+        <p className="text-muted mt-1">재고 예약 → 신규주문 대기열 → 수요신호 갱신. AX 운영화면의 <b>주문·출고</b>와 <b>재고·발주</b> 화면에서 이 주문({order.id})을 확인할 수 있습니다.</p>
+        {!inIframe && <Link href={`/ax/fulfillment?order=${order.id}`} className="inline-flex items-center gap-1 text-primary font-semibold mt-2 hover:underline">AX 운영화면에서 확인 (관리자 시연) <ChevronRight size={14} /></Link>}
       </div>
     </div>
   );
@@ -263,15 +263,15 @@ export function RepeatBasketView() {
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-5">
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div><h1 className="text-2xl sm:text-3xl font-bold tracking-tight inline-flex items-center gap-2"><RotateCcw className="text-primary" />다시 구매 · Repeat Basket</h1><p className="text-muted mt-1">구매주기와 현재 재고를 확인해 수량을 추천합니다. 한 번에 다시 담아 주문하세요.</p></div>
-        <span className="badge bg-mist text-muted">정기배송 <b className="ml-1">NEXT</b></span>
+        <div><h1 className="text-2xl sm:text-3xl font-bold tracking-tight inline-flex items-center gap-2"><RotateCcw className="text-primary" />다시 구매</h1><p className="text-muted mt-1">구매주기와 현재 재고를 확인해 수량을 추천합니다. 한 번에 다시 담아 주문하세요.</p></div>
+        <span className="badge bg-mist text-muted">정기배송 <b className="ml-1">예정</b></span>
       </div>
 
       {done ? (
         <div className="card mt-5 p-6 text-center">
           <CheckCircle2 size={36} className="mx-auto text-primary" />
           <div className="mt-2 text-xl font-bold">재구매 주문 완료 · {done.id}</div>
-          <p className="text-muted mt-1">다음 구매주기가 오늘 기준으로 갱신되었습니다. 내부 AX에는 재구매 Evidence가 기록됩니다.</p>
+          <p className="text-muted mt-1">다음 구매주기가 오늘 기준으로 갱신되었습니다. 내부 AX에는 재구매 성과 기록이 기록됩니다.</p>
           <div className="mt-4 flex gap-2 justify-center"><Link href={`/my/orders/${done.id}`} className="btn-primary btn-sm">배송조회</Link><Link href="/" className="btn-outline btn-sm">홈으로</Link></div>
         </div>
       ) : items.length === 0 ? (
@@ -312,7 +312,7 @@ export function RepeatBasketView() {
               <div className="flex justify-between"><dt className="text-muted">배송비</dt><dd>{shipping ? won(shipping) : "무료"}</dd></div>
               <div className="flex justify-between border-t border-line pt-3"><dt className="font-semibold">결제 예정</dt><dd className="font-black text-xl tabular-nums">{won(total + shipping)}</dd></div>
             </dl>
-            <button className="btn-primary btn-lg w-full mt-4" disabled={!active.length} onClick={orderAll}>한 번에 다시 주문 (DEMO)</button>
+            <button className="btn-primary btn-lg w-full mt-4" disabled={!active.length} onClick={orderAll}>한 번에 다시 주문 (시연)</button>
             <button className="btn-outline w-full mt-2" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success" }); }}>장바구니에 모두 담기</button>
             <p className="text-xs text-muted mt-3">정기배송(자동 반복주문)은 다음 단계 기능입니다. 지금은 한 번에 담기까지 제공합니다.</p>
           </aside>

@@ -1,12 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LayoutDashboard, Rocket, TrendingUp, Package, Boxes, Factory, Truck, Users, Megaphone, Undo2, FileCheck2, BookOpenText, Presentation, Settings, Menu, X, Store, Smartphone, Monitor, ChevronDown, HelpCircle, Bell, RotateCcw, ExternalLink, ChevronLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { LayoutDashboard, Rocket, TrendingUp, Package, Boxes, Factory, Truck, Users, Megaphone, Undo2, FileCheck2, BookOpenText, Presentation, Settings, Menu, X, Store, Smartphone, ChevronDown, HelpCircle, Bell, RotateCcw, ExternalLink, ArrowRight } from "lucide-react";
 import { ROLE_LABEL, ROLE_PERSON, useStore } from "@/lib/store";
-import { useData, useHydrated, useIsInIframe } from "@/lib/hooks";
+import { useData, useHydrated, useIsInIframe, useNow } from "@/lib/hooks";
+import { DOW } from "@/lib/format";
+import { STAGE_LABEL } from "@/lib/labels";
+import MobileDrawer from "@/components/shared/MobileDrawer";
 import type { RoleKey } from "@/lib/types";
-import Clock from "@/components/shared/Clock";
 import { Freshness } from "@/components/shared/Bits";
 import Overlay from "@/components/shared/Overlay";
 import { THEMES } from "@/lib/themes";
@@ -14,32 +16,134 @@ import Tutorial from "./Tutorial";
 import SampleBridgeCTA, { SidebarBridgeCTA } from "@/components/shared/SampleBridgeCTA";
 import { useToast } from "@/components/shared/Toast";
 
-export type NavGroupKey = "exec" | "supply" | "ops" | "proof" | "system";
-export interface NavItem { no: string; href: string; label: string; icon: typeof LayoutDashboard; color: string; group: NavGroupKey; roles: RoleKey[]; }
-/** 비슷한 메뉴끼리 묶고, 그룹은 같은 색상 계열 · 항목은 톤만 다르게 */
-export const NAV_GROUPS: { key: NavGroupKey; label: string; base: string }[] = [
-  { key: "exec", label: "경영 · 판단", base: "#2F6FED" },
-  { key: "supply", label: "상품 · 재고 · 공급", base: "#E0A526" },
-  { key: "ops", label: "주문 · 고객 · 운영", base: "#17A889" },
-  { key: "proof", label: "실증 · 스토리", base: "#8B5AA6" },
-  { key: "system", label: "시스템", base: "#6D8899" },
+type Icon = typeof LayoutDashboard;
+export type NavFamily = "exec" | "supply" | "ops" | "system";
+/**
+ * 아이콘 색상 계열 — 같은 분류는 같은 계열, 항목은 톤만 다르게.
+ * 전체 3개 계열(경영 블루 · 상품 앰버 · 주문/고객 틸) + 중립(시스템)으로 제한한다.
+ */
+export const NAV_FAMILY: Record<NavFamily, string> = { exec: "#2F6FED", supply: "#D9961A", ops: "#149C80", system: "#6D8899" };
+export interface NavItem { href: string; label: string; icon: Icon; color: string; family: NavFamily; roles: RoleKey[]; badge?: "actions" }
+export interface NavGroup { key: string; label: string; icon: Icon; family: NavFamily; items: NavItem[] }
+export type NavNode = { type: "item"; item: NavItem } | { type: "group"; group: NavGroup };
+
+const ALL: RoleKey[] = ["owner", "buyer", "ops", "cs"];
+const I = {
+  dashboard: { href: "/ax", label: "경영 대시보드", icon: LayoutDashboard, color: "#2F6FED", family: "exec", roles: ALL },
+  actions: { href: "/ax/actions", label: "실행 센터", icon: Rocket, color: "#4A82F0", family: "exec", roles: ALL, badge: "actions" },
+  products: { href: "/ax/products", label: "상품·SKU", icon: Package, color: "#D9961A", family: "supply", roles: ["owner", "buyer"] },
+  inventory: { href: "/ax/inventory", label: "재고·발주", icon: Boxes, color: "#E5AA3C", family: "supply", roles: ["owner", "buyer", "ops"] },
+  suppliers: { href: "/ax/suppliers", label: "공급사·구매", icon: Factory, color: "#BF830F", family: "supply", roles: ["owner", "buyer"] },
+  fulfillment: { href: "/ax/fulfillment", label: "주문·출고", icon: Truck, color: "#149C80", family: "ops", roles: ["owner", "ops", "cs"] },
+  returns: { href: "/ax/returns", label: "반품·문의", icon: Undo2, color: "#36B596", family: "ops", roles: ["owner", "ops", "cs"] },
+  customers: { href: "/ax/customers", label: "고객·재구매", icon: Users, color: "#0F8A72", family: "ops", roles: ["owner", "cs"] },
+  promotions: { href: "/ax/promotions", label: "프로모션", icon: Megaphone, color: "#4CC2A8", family: "ops", roles: ["owner", "buyer"] },
+  sales: { href: "/ax/sales", label: "매출·마진", icon: TrendingUp, color: "#2459CC", family: "exec", roles: ["owner"] },
+  evidence: { href: "/ax/evidence", label: "AX 성과 기록", icon: FileCheck2, color: "#5B8FF2", family: "exec", roles: ALL },
+  settings: { href: "/ax/settings", label: "설정", icon: Settings, color: "#6D8899", family: "system", roles: ALL },
+  why: { href: "/ax/why", label: "기획 의도", icon: BookOpenText, color: "#7D93A3", family: "system", roles: ALL },
+  presentation: { href: "/ax/presentation", label: "시연 모드", icon: Presentation, color: "#5E7A8C", family: "system", roles: ALL },
+} satisfies Record<string, NavItem>;
+
+/**
+ * AX 메뉴 정보구조 (최대 2단계)
+ * 14개 기능을 모두 유지하면서, 처음 보이는 상위 항목은 7개 + 샘플 안내로 줄인다.
+ * 기존 URL은 그대로 — 메뉴 위치만 바뀐다.
+ */
+export const AX_MENU: NavNode[] = [
+  { type: "item", item: I.dashboard },
+  { type: "item", item: I.actions },
+  { type: "group", group: { key: "stock", label: "상품·재고", icon: Boxes, family: "supply", items: [I.products, I.inventory, I.suppliers] } },
+  { type: "group", group: { key: "orders", label: "주문·배송", icon: Truck, family: "ops", items: [I.fulfillment, I.returns] } },
+  { type: "group", group: { key: "customers", label: "고객·마케팅", icon: Users, family: "ops", items: [I.customers, I.promotions] } },
+  { type: "group", group: { key: "analytics", label: "경영분석", icon: TrendingUp, family: "exec", items: [I.sales, I.evidence] } },
+  { type: "item", item: I.settings },
 ];
-export const AX_NAV: NavItem[] = [
-  { no: "01", href: "/ax", label: "경영 대시보드", icon: LayoutDashboard, color: "#2F6FED", group: "exec", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "02", href: "/ax/actions", label: "Action Center", icon: Rocket, color: "#5B8DF2", group: "exec", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "03", href: "/ax/sales", label: "매출·마진", icon: TrendingUp, color: "#1F55C9", group: "exec", roles: ["owner"] },
-  { no: "04", href: "/ax/products", label: "상품·SKU", icon: Package, color: "#E0A526", group: "supply", roles: ["owner", "buyer"] },
-  { no: "05", href: "/ax/inventory", label: "재고·발주", icon: Boxes, color: "#F0B94A", group: "supply", roles: ["owner", "buyer", "ops"] },
-  { no: "06", href: "/ax/suppliers", label: "공급사·구매", icon: Factory, color: "#C98E12", group: "supply", roles: ["owner", "buyer"] },
-  { no: "07", href: "/ax/fulfillment", label: "주문·Fulfillment", icon: Truck, color: "#17A889", group: "ops", roles: ["owner", "ops", "cs"] },
-  { no: "08", href: "/ax/customers", label: "고객·재구매", icon: Users, color: "#3DBFA3", group: "ops", roles: ["owner", "cs"] },
-  { no: "09", href: "/ax/promotions", label: "프로모션", icon: Megaphone, color: "#0F8C71", group: "ops", roles: ["owner", "buyer"] },
-  { no: "10", href: "/ax/returns", label: "반품·VOC", icon: Undo2, color: "#5FD0B8", group: "ops", roles: ["owner", "ops", "cs"] },
-  { no: "11", href: "/ax/evidence", label: "AX Evidence", icon: FileCheck2, color: "#8B5AA6", group: "proof", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "12", href: "/ax/why", label: "기획의도 (Why AX)", icon: BookOpenText, color: "#A87BC0", group: "proof", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "13", href: "/ax/presentation", label: "Presentation Mode", icon: Presentation, color: "#6E4590", group: "proof", roles: ["owner", "buyer", "ops", "cs"] },
-  { no: "14", href: "/ax/settings", label: "설정", icon: Settings, color: "#6D8899", group: "system", roles: ["owner", "buyer", "ops", "cs"] },
-];
+/** 샘플 안내 — 핵심 업무 메뉴보다 한 단계 낮은 시각적 중요도로 분리 */
+export const AX_EXTRA: NavItem[] = [I.why, I.presentation];
+/** 역할 가드·검색용 평면 목록 (14개 기능 전부) */
+export const AX_NAV: NavItem[] = [...AX_MENU.flatMap((n) => (n.type === "item" ? [n.item] : n.group.items)), ...AX_EXTRA];
+
+const isActiveHref = (pathname: string, href: string) => (href === "/ax" ? pathname === "/ax" : pathname.startsWith(href));
+/** 사용자가 펼친 그룹을 페이지 이동 후에도 기억 (세션 내) */
+let rememberedOpen: string[] | null = null;
+
+/** 어두운 사이드바/드로어 공용 메뉴 트리 — 현재 위치는 '흰 배경' 한 가지 방식으로만 강조 */
+function AxNavTree({ pathname, role, openActions, hydrated }: { pathname: string; role: RoleKey; openActions: number; hydrated: boolean }) {
+  const nodes = useMemo(() => AX_MENU.flatMap<NavNode>((n) => {
+    if (n.type === "item") return n.item.roles.includes(role) ? [n] : [];
+    const items = n.group.items.filter((x) => x.roles.includes(role));
+    if (!items.length) return [];
+    if (items.length === 1) return [{ type: "item", item: items[0] }]; // 하위 1개뿐이면 그룹 없이 바로 노출
+    return [{ type: "group", group: { ...n.group, items } }];
+  }), [role]);
+  const activeGroup = nodes.find((n) => n.type === "group" && n.group.items.some((x) => isActiveHref(pathname, x.href)));
+  const [open, setOpen] = useState<string[]>(() => {
+    const base = rememberedOpen ?? [];
+    return activeGroup && activeGroup.type === "group" && !base.includes(activeGroup.group.key) ? [...base, activeGroup.group.key] : base;
+  });
+  const toggle = (k: string) => setOpen((o) => { const next = o.includes(k) ? o.filter((x) => x !== k) : [...o, k]; rememberedOpen = next; return next; });
+  const extras = AX_EXTRA.filter((x) => x.roles.includes(role));
+
+  const row = (item: NavItem, sub = false) => {
+    const on = isActiveHref(pathname, item.href);
+    return (
+      <Link key={item.href} href={item.href} aria-current={on ? "page" : undefined}
+        className={`group/nav flex items-center gap-3 rounded-xl transition-colors duration-150 ${sub ? "pl-3 pr-3 min-h-[44px] text-[16px]" : "px-3 min-h-[48px] text-[17px]"} font-semibold ${on ? "bg-white text-shell shadow-card" : "text-white/85 hover:bg-white/10"}`}>
+        <span className={`inline-flex items-center justify-center shrink-0 rounded-lg ${sub ? "w-7 h-7" : "w-9 h-9"}`} style={{ background: `${item.color}${on ? "1F" : "30"}`, color: on ? item.color : "#fff" }}>
+          <item.icon size={sub ? 15 : 18} />
+        </span>
+        <span className="flex-1 min-w-0 truncate">{item.label}</span>
+        {item.badge === "actions" && hydrated && openActions > 0 && <span className="shrink-0 min-w-[26px] text-center text-[13px] rounded-full px-1.5 py-0.5 font-bold bg-accent text-white tabular-nums">{openActions > 99 ? "99+" : openActions}</span>}
+      </Link>
+    );
+  };
+
+  return (
+    <div className="space-y-1">
+      {nodes.map((n) => {
+        if (n.type === "item") return row(n.item);
+        const g = n.group;
+        const expanded = open.includes(g.key);
+        const hasActive = g.items.some((x) => isActiveHref(pathname, x.href));
+        const color = NAV_FAMILY[g.family];
+        return (
+          <div key={g.key}>
+            <button type="button" onClick={() => toggle(g.key)} aria-expanded={expanded}
+              className="w-full flex items-center gap-3 rounded-xl px-3 min-h-[48px] text-[17px] font-semibold text-white/85 hover:bg-white/10 transition-colors duration-150">
+              <span className="inline-flex items-center justify-center shrink-0 rounded-lg w-9 h-9" style={{ background: `${color}30` }}><g.icon size={18} /></span>
+              <span className="flex-1 min-w-0 truncate text-left">{g.label}</span>
+              {hasActive && !expanded && <span className="w-1.5 h-1.5 rounded-full bg-white" aria-label="현재 위치 포함" />}
+              <span className="text-[13px] text-white/45 tabular-nums">{g.items.length}</span>
+              <ChevronDown size={16} className={`shrink-0 text-white/60 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+            </button>
+            {expanded && (
+              <div className="ml-[30px] pl-2 border-l border-white/12 mt-0.5 mb-1.5 space-y-0.5 fade-in">
+                {g.items.map((x) => row(x, true))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {extras.length > 0 && (
+        <div className="pt-3 mt-2 border-t border-white/10">
+          <div className="px-3 pb-1.5 text-[13px] font-semibold text-white/45">샘플 안내</div>
+          <div className="grid grid-cols-2 gap-1.5 px-1">
+            {extras.map((x) => {
+              const on = isActiveHref(pathname, x.href);
+              return (
+                <Link key={x.href} href={x.href} aria-current={on ? "page" : undefined}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg px-2 min-h-[44px] text-[15px] font-medium whitespace-nowrap transition-colors duration-150 ${on ? "bg-white text-shell" : "bg-white/[0.06] text-white/75 hover:bg-white/10 hover:text-white"}`}>
+                  <x.icon size={16} className="shrink-0" />{x.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function DevicePreview({ src, onClose, title }: { src: string; onClose: () => void; title: string }) {
   const [w, setW] = useState<390 | 430 | 360>(390);
@@ -67,7 +171,7 @@ export function DevicePreview({ src, onClose, title }: { src: string; onClose: (
   );
 }
 
-export default function AxShell({ children, title, subtitle, actions, tour }: { children: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; tour?: boolean }) {
+export default function AxShell({ children, title, subtitle, actions }: { children: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; tour?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const hydrated = useHydrated();
@@ -91,131 +195,137 @@ export default function AxShell({ children, title, subtitle, actions, tour }: { 
   const [tutorial, setTutorial] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const openActions = data.actions.filter((a) => !["done", "dismissed"].includes(a.stage) && (role === "owner" || a.owner === role)).length;
-  const nav = useMemo(() => AX_NAV.filter((n) => n.roles.includes(role)), [role]);
+  const closeMenu = useCallback(() => setMenu(false), []);
 
   useEffect(() => { setMenu(false); }, [pathname]);
   useEffect(() => { if (hydrated && !tutorialDone && pathname === "/ax" && !inIframe) { const t = setTimeout(() => setTutorial(true), 800); return () => clearTimeout(t); } }, [hydrated, tutorialDone, pathname, inIframe]);
   // role guard: if current route not allowed for role, go to dashboard
-  useEffect(() => { if (!hydrated) return; const item = AX_NAV.find((n) => (n.href === "/ax" ? pathname === "/ax" : pathname.startsWith(n.href))); if (item && !item.roles.includes(role)) router.replace("/ax"); }, [role, pathname, hydrated, router]);
+  useEffect(() => { if (!hydrated) return; const item = AX_NAV.find((n) => isActiveHref(pathname, n.href)); if (item && !item.roles.includes(role)) router.replace("/ax"); }, [role, pathname, hydrated, router]);
 
-  const isActive = (href: string) => (href === "/ax" ? pathname === "/ax" : pathname.startsWith(href));
   const themeDef = THEMES.find((t) => t.key === theme) ?? THEMES[4];
 
-  const Sidebar = (
-    <div className="flex flex-col h-full text-white" style={{ background: "var(--t-shell)" }}>
-      <div className="h-16 flex items-center gap-2 px-4 border-b border-white/10 shrink-0">
-        <span className="w-9 h-9 rounded-xl bg-white/12 font-black flex items-center justify-center">N</span>
-        <div className="leading-tight"><div className="font-black tracking-tight">NEXMART</div><div className="text-[13px] text-white/60 font-semibold tracking-wider">Business AX</div></div>
-        <button className="ml-auto lg:hidden btn-ghost !text-white !px-2" onClick={() => setMenu(false)} aria-label="메뉴 닫기"><X size={20} /></button>
-      </div>
-      <nav className="flex-1 overflow-y-auto py-2 px-2.5" data-tour="sidebar" aria-label="AX 메뉴">
-        {NAV_GROUPS.map((g) => {
-          const items = nav.filter((n) => n.group === g.key);
-          if (!items.length) return null;
-          return (
-            <div key={g.key} className="mb-2.5">
-              <div className="flex items-center gap-2 px-3 pt-2.5 pb-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: g.base }} /><span className="text-[14px] font-bold tracking-wider text-white/55 uppercase">{g.label}</span></div>
-              <div className="space-y-0.5">
-                {items.map((n) => {
-                  const on = isActive(n.href);
-                  return (
-                    <Link key={n.href} href={n.href} className={`nav-item group/nav relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[18px] font-semibold min-h-[48px] transition-[background-color,transform,color] duration-150 ease-out ${on ? "bg-white text-shell shadow-card" : "text-white/85 hover:bg-white/10 hover:translate-x-0.5"}`} aria-current={on ? "page" : undefined}>
-                      <span className={`absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full transition-all duration-200 ${on ? "opacity-100" : "opacity-0"}`} style={{ background: n.color }} />
-                      <span className="ax-icon transition-transform duration-150 group-hover/nav:scale-105" style={{ background: on ? `${n.color}22` : `${n.color}33`, color: on ? n.color : "#fff" }}><n.icon size={18} /></span>
-                      <span className="flex-1 truncate">{n.label}</span>
-                      {n.href === "/ax/actions" && hydrated && openActions > 0 && <span className="text-xs rounded-full px-1.5 py-0.5 font-bold bg-accent text-white">{openActions}</span>}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </nav>
-      <div className="border-t border-white/10">
-        <SidebarBridgeCTA />
-      </div>
-      <div className="px-4 py-3 border-t border-white/10 text-xs text-white/60 space-y-1.5">
-        <div className="flex items-center justify-between"><span>기술·사업화 자산</span><Link href="/ax/settings?tab=tech" className="text-white/85 hover:text-white underline underline-offset-2">보기</Link></div>
-        <div className="flex items-center justify-between"><span>Stage</span><span className="badge bg-white/15 text-white">{stage}</span></div>
-        <div>Unified v3.0 · First Build</div>
-      </div>
+  const Brand = (
+    <div className="h-16 flex items-center gap-2.5 px-4">
+      <span className="w-9 h-9 rounded-xl bg-white/12 font-black flex items-center justify-center shrink-0">N</span>
+      <div className="leading-tight min-w-0"><div className="font-black tracking-tight">NEXMART</div><div className="text-[13px] text-white/60 font-semibold">AX 운영화면</div></div>
     </div>
+  );
+  const Meta = (
+    <div className="px-4 py-2.5 text-[13px] text-white/60 flex items-center justify-between gap-2">
+      <span className="inline-flex items-center gap-1.5">진행 단계 <span className="badge bg-white/15 text-white">{STAGE_LABEL[stage]}</span></span>
+      <Link href="/ax/settings?tab=tech" className="text-white/80 hover:text-white underline underline-offset-2 min-h-[32px] inline-flex items-center">기술·사업화 자산</Link>
+    </div>
+  );
+  const toCustomer = (
+    <Link href="/" className="flex items-center justify-between gap-2 w-full min-h-[52px] rounded-xl bg-white px-4 text-[17px] font-bold text-shell hover:bg-white/90 transition-colors duration-150">
+      <span className="inline-flex items-center gap-2"><Store size={19} />고객 플랫폼 보기</span><ArrowRight size={18} />
+    </Link>
   );
 
   return (
     <div className="min-h-screen flex bg-mist">
       {/* desktop sidebar */}
-      <aside className="hidden lg:block w-[288px] shrink-0 sticky top-0 h-screen">{Sidebar}</aside>
-      {/* mobile drawer */}
-      {menu && (
-        <div className="fixed inset-0 z-[800] lg:hidden">
-          <div className="absolute inset-0 bg-shell/60" onClick={() => setMenu(false)} />
-          <div className="absolute inset-y-0 left-0 w-[300px] max-w-[85vw] shadow-raised slide-in-left">{Sidebar}</div>
-        </div>
-      )}
+      <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-0 h-screen text-white" style={{ background: "var(--t-shell)" }}>
+        <div className="border-b border-white/10 shrink-0">{Brand}</div>
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-3 px-2.5" data-tour="sidebar" aria-label="AX 메뉴">
+          <AxNavTree pathname={pathname} role={role} openActions={openActions} hydrated={hydrated} />
+        </nav>
+        <div className="border-t border-white/10 shrink-0"><SidebarBridgeCTA /></div>
+        <div className="border-t border-white/10 shrink-0">{Meta}</div>
+      </aside>
+
+      {/* mobile drawer — 왼쪽에서 열림, 메뉴 영역만 스크롤, 하단 '고객 플랫폼 보기' 고정 */}
+      <MobileDrawer open={menu} onClose={closeMenu} label="AX 메뉴" tone="dark"
+        header={<div className="flex items-center pr-2">{Brand}<button className="ml-auto w-11 h-11 rounded-xl inline-flex items-center justify-center text-white hover:bg-white/10" onClick={closeMenu} aria-label="메뉴 닫기"><X size={22} /></button></div>}
+        footer={<div className="p-3">{toCustomer}</div>}>
+        <nav className="py-3 px-2.5" aria-label="AX 메뉴">
+          <AxNavTree pathname={pathname} role={role} openActions={openActions} hydrated={hydrated} />
+        </nav>
+        <div className="border-t border-white/10 pt-1"><SidebarBridgeCTA /></div>
+        {Meta}
+      </MobileDrawer>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
-          <div className="flex items-center gap-2 px-3 sm:px-5 h-16">
-            <button className="lg:hidden btn-ghost !px-2" onClick={() => setMenu(true)} aria-label="메뉴 열기"><Menu size={22} /></button>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 min-w-0"><h1 className="text-lg sm:text-xl font-bold truncate">{title}</h1><span className="badge bg-orange/15 text-[#B84F1A] hidden sm:inline-flex">{stage}</span></div>
-              <div className="text-xs text-muted hidden sm:flex items-center gap-3"><Clock />{hydrated && <Freshness updatedAt={data.generatedAt} />}</div>
+        {/* ① DEMO 도구줄 — 시연 관련 조작은 여기로 분리 */}
+        {!inIframe && (
+          <div className="bg-[#0F1B27] text-white">
+            <div className="flex items-center gap-2 px-3 sm:px-5 h-10 text-[14px]">
+              <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] font-bold tracking-wide bg-orange text-white">DEMO</span>
+              <span className="text-white/70 shrink-0"><ClockCompact /></span>
+              <span className="hidden lg:inline text-white/55 truncate min-w-0">시연용 AX 운영화면 · 모든 수치는 시뮬레이션입니다</span>
+              <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                <div className="hidden xl:flex items-center gap-1 mr-1.5 pr-2.5 border-r border-white/15" data-tour="theme" role="group" aria-label="빠른 테마 전환">
+                  {THEMES.map((t) => <button key={t.key} title={`테마 ${t.no} ${t.name}`} onClick={() => setTheme(t.key)} className={`w-[18px] h-[18px] rounded-full border ${theme === t.key ? "border-white ring-2 ring-white/70 ring-offset-1 ring-offset-[#0F1B27]" : "border-white/30 hover:border-white/70"}`} style={{ background: `linear-gradient(135deg, ${t.shell} 50%, ${t.primary} 50%)` }} aria-label={`테마 ${t.name}`} aria-pressed={theme === t.key} />)}
+                </div>
+                <button data-tour="device" onClick={() => setPreview({ src: `${pathname}${pathname.includes("?") ? "&" : "?"}embed=1`, title: "스마트폰 미리보기 — AX 운영화면" })} className="hidden md:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-white/85 hover:bg-white/10"><Smartphone size={15} />스마트폰 미리보기</button>
+                <Link data-tour="customer" href="/" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white text-[#0F1B27] font-bold hover:bg-white/90 whitespace-nowrap">고객 플랫폼 보기<ArrowRight size={15} /></Link>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
+          </div>
+        )}
+
+        {/* ② 메인 헤더 — 메뉴 · 화면 제목 · 역할 · 알림 */}
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
+          <div className="flex items-center gap-2 px-2 sm:px-5 h-14 sm:h-16">
+            <button className="lg:hidden w-11 h-11 -ml-0.5 rounded-xl inline-flex items-center justify-center text-ink hover:bg-mist shrink-0" onClick={() => setMenu(true)} aria-label="메뉴 열기" aria-expanded={menu}><Menu size={23} /></button>
+            <div className="min-w-0 flex-1 flex items-center gap-2">
+              <h1 className="text-[19px] sm:text-xl font-bold truncate">{title}</h1>
+              {stage !== "DEMO" && <span className="badge bg-secondary/12 text-secondary hidden sm:inline-flex">{STAGE_LABEL[stage]} 단계</span>}
+              {hydrated && <span className="hidden xl:inline-flex ml-1"><Freshness updatedAt={data.generatedAt} /></span>}
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {actions}
-              {!inIframe && (
-                <>
-                  <button data-tour="customer" onClick={() => setPreview({ src: "/", title: "고객 화면 보기 — Customer Platform" })} className="btn-outline btn-sm hidden md:inline-flex" title="고객 화면 보기"><Store size={16} />고객 화면</button>
-                  <Link href="/" className="btn-outline btn-sm md:hidden !px-2" aria-label="고객 화면"><Store size={18} /></Link>
-                  <button data-tour="device" onClick={() => setPreview({ src: `${pathname}${pathname.includes("?") ? "&" : "?"}embed=1`, title: "스마트폰 미리보기 — Business AX" })} className="btn-outline btn-sm hidden md:inline-flex" title="PC ↔ 스마트폰"><Smartphone size={16} /><span className="hidden xl:inline">스마트폰</span></button>
-                </>
-              )}
               <div className="relative">
-                <button data-tour="role" onClick={() => setRoleOpen((v) => !v)} className="btn-outline btn-sm" aria-haspopup="menu" aria-expanded={roleOpen}><span className="w-6 h-6 rounded-full bg-soft text-shell text-xs font-bold flex items-center justify-center">{ROLE_LABEL[role].charAt(0)}</span><span className="hidden sm:inline">{ROLE_LABEL[role]}</span><ChevronDown size={14} /></button>
+                <button data-tour="role" onClick={() => setRoleOpen((v) => !v)} className="btn-outline btn-sm !px-2 sm:!px-3" aria-haspopup="menu" aria-expanded={roleOpen} aria-label={`역할: ${ROLE_LABEL[role]}`}><span className="w-7 h-7 rounded-full bg-soft text-shell text-[13px] font-bold flex items-center justify-center">{ROLE_LABEL[role].charAt(0)}</span><span className="hidden sm:inline">{ROLE_LABEL[role]}</span><ChevronDown size={14} /></button>
                 {roleOpen && (
-                  <div className="absolute right-0 mt-1 w-56 card-raised p-1.5 z-50 fade-up" role="menu" onMouseLeave={() => setRoleOpen(false)}>
-                    <div className="px-2 py-1 text-[13px] font-semibold text-muted">역할 전환 (Demo RLS)</div>
+                  <div className="absolute right-0 mt-1 w-60 card-raised p-1.5 z-50 fade-up" role="menu" onMouseLeave={() => setRoleOpen(false)}>
+                    <div className="px-2 py-1 text-[13px] font-semibold text-muted">역할 전환 (시연용 권한)</div>
                     {(Object.keys(ROLE_LABEL) as RoleKey[]).map((r) => (
-                      <button key={r} role="menuitem" onClick={() => { setRole(r); setRoleOpen(false); toast({ title: `${ROLE_LABEL[r]} 화면으로 전환`, body: `${ROLE_PERSON[r]} · 메뉴·KPI·민감정보가 역할에 맞게 바뀝니다.`, tone: "info" }); }} className={`w-full text-left px-2.5 py-2 rounded-lg text-sm flex items-center justify-between hover:bg-mist ${r === role ? "font-bold text-primary" : ""}`}>{ROLE_PERSON[r]}{r === role && <span className="text-xs">현재</span>}</button>
+                      <button key={r} role="menuitem" onClick={() => { setRole(r); setRoleOpen(false); toast({ title: `${ROLE_LABEL[r]} 화면으로 전환`, body: `${ROLE_PERSON[r]} · 메뉴·KPI·민감정보가 역할에 맞게 바뀝니다.`, tone: "info" }); }} className={`w-full text-left px-2.5 py-2 min-h-[44px] rounded-lg text-[15px] flex items-center justify-between hover:bg-mist ${r === role ? "font-bold text-primary" : ""}`}>{ROLE_PERSON[r]}{r === role && <span className="text-[13px]">현재</span>}</button>
                     ))}
                   </div>
                 )}
               </div>
-              <Link href="/ax/actions" className="btn-ghost !px-2 relative hidden sm:inline-flex" aria-label="알림"><Bell size={20} />{hydrated && openActions > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent" />}</Link>
-              {!inIframe && <button onClick={() => setTutorial(true)} className="btn-ghost !px-2 hidden sm:inline-flex" aria-label="튜토리얼" title="튜토리얼"><HelpCircle size={20} /></button>}
+              <Link href="/ax/actions" className="w-11 h-11 rounded-xl hover:bg-mist relative hidden sm:inline-flex items-center justify-center" aria-label="알림"><Bell size={20} />{hydrated && openActions > 0 && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-accent" />}</Link>
+              {!inIframe && <button onClick={() => setTutorial(true)} className="w-11 h-11 rounded-xl hover:bg-mist hidden sm:inline-flex items-center justify-center" aria-label="사용 안내" title="사용 안내"><HelpCircle size={20} /></button>}
             </div>
           </div>
-          {subtitle && <div className="px-3 sm:px-5 pb-3 -mt-1 text-sm text-muted">{subtitle}</div>}
         </header>
 
-        <main key={pathname} className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto page-enter">{children}</main>
+        <main key={pathname} className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto page-enter">
+          {subtitle && <p className="text-[15px] sm:text-base text-muted mb-3 sm:mb-4 -mt-0.5">{subtitle}</p>}
+          {children}
+        </main>
 
         {/* 미래AI랩 공통 CTA 브릿지 — AX 화면 하단 */}
         <div className="px-3 sm:px-5 lg:px-6 pb-5 lg:pb-6"><SampleBridgeCTA surface="ax" /></div>
 
-        <footer className="px-5 py-3 text-xs text-muted flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-white">
-          <span>NEXMART Business AX · Demo Repository · 모든 수치는 시연용 Simulation</span>
-          <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm" style={{ background: themeDef.primary }} />Theme {themeDef.no} {themeDef.name}</span>
-          <button onClick={() => setResetOpen(true)} className="ml-auto inline-flex items-center gap-1 hover:text-ink"><RotateCcw size={12} />Demo Reset</button>
-          <Link href="/" className="inline-flex items-center gap-1 hover:text-ink"><ChevronLeft size={12} />Customer Platform</Link>
+        <footer className="px-5 py-3 text-[13px] text-muted flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-white">
+          <span>NEXMART AX 운영화면 · 시연용 데이터 · 모든 수치는 시뮬레이션</span>
+          <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm" style={{ background: themeDef.primary }} />테마 {themeDef.no} {themeDef.name}</span>
+          <button onClick={() => setResetOpen(true)} className="ml-auto inline-flex items-center gap-1 min-h-[36px] hover:text-ink"><RotateCcw size={13} />시연 데이터 초기화</button>
+          <Link href="/" className="inline-flex items-center gap-1 min-h-[36px] hover:text-ink"><Store size={13} />고객 플랫폼 보기</Link>
         </footer>
       </div>
 
       {preview && <DevicePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />}
       {tutorial && <Tutorial onClose={() => setTutorial(false)} />}
-      <Overlay open={resetOpen} onClose={() => setResetOpen(false)} title="Demo Reset" size="sm" footer={<div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setResetOpen(false)}>취소</button><button className="btn-danger flex-1" onClick={() => { resetDemo(); setResetOpen(false); toast({ title: "Demo 데이터를 초기화했습니다", body: "주문·Action·Evidence·장바구니가 초기 시나리오로 돌아갑니다.", tone: "info" }); router.push("/ax"); }}>초기화</button></div>}>
-        <p className="text-[17px]">고객 주문, Action 처리, Evidence, 장바구니 등 시연 중 변경한 모든 상태를 초기 시나리오(A~E)로 되돌립니다. Theme·글자크기 설정은 유지됩니다.</p>
+      <Overlay open={resetOpen} onClose={() => setResetOpen(false)} title="시연 데이터 초기화" size="sm" footer={<div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setResetOpen(false)}>취소</button><button className="btn-danger flex-1" onClick={() => { resetDemo(); setResetOpen(false); toast({ title: "시연 데이터를 초기화했습니다", body: "주문·실행·성과 기록·장바구니가 초기 시나리오로 돌아갑니다.", tone: "info" }); router.push("/ax"); }}>초기화</button></div>}>
+        <p className="text-[17px]">고객 주문, 실행 처리, 성과 기록, 장바구니 등 시연 중 변경한 모든 상태를 초기 시나리오(A~E)로 되돌립니다. 테마·글자 크기 설정은 유지됩니다.</p>
       </Overlay>
-      {/* quick theme dots (desktop) */}
-      {!inIframe && (
-        <div className="hidden xl:flex fixed bottom-4 right-4 z-30 card-raised px-2 py-1.5 items-center gap-1" data-tour="theme" aria-label="빠른 Theme 전환">
-          {THEMES.map((t) => <button key={t.key} title={`${t.no} ${t.name}`} onClick={() => setTheme(t.key)} className={`w-5 h-5 rounded-full border-2 ${theme === t.key ? "border-ink scale-110" : "border-white"}`} style={{ background: `linear-gradient(135deg, ${t.shell} 50%, ${t.primary} 50%)` }} aria-label={t.name} aria-pressed={theme === t.key} />)}
-          <Link href="/ax/settings" className="ml-1 text-xs text-muted hover:text-ink"><Settings size={14} /></Link>
-          <span className="sr-only"><Monitor /></span>
-        </div>
-      )}
     </div>
+  );
+}
+
+/** 도구줄용 짧은 날짜·시각 — 모바일 9/29 14:46 · 데스크톱 2026.09.29 (화) 14:46 */
+function ClockCompact() {
+  const now = useNow(30000);
+  if (!now) return <span className="inline-block w-20" />;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    <time dateTime={now.toISOString()} className="tabular-nums whitespace-nowrap" suppressHydrationWarning>
+      <span className="sm:hidden">{now.getMonth() + 1}/{now.getDate()} {p(now.getHours())}:{p(now.getMinutes())}</span>
+      <span className="hidden sm:inline">{now.getFullYear()}.{p(now.getMonth() + 1)}.{p(now.getDate())} ({DOW[now.getDay()]}) {p(now.getHours())}:{p(now.getMinutes())}</span>
+    </time>
   );
 }

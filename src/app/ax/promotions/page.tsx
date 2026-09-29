@@ -4,7 +4,7 @@ import AxShell from "@/components/ax/AxShell";
 import ClientGate from "@/components/shared/ClientGate";
 import PromotionsView from "@/components/ax/PromotionsView";
 
-export const metadata: Metadata = { title: "프로모션 · Business AX", robots: { index: false } };
+export const metadata: Metadata = { title: "프로모션 · AX 운영화면", robots: { index: false } };
 
 export default function Page() {
   return (

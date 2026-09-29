@@ -13,6 +13,7 @@ import { Sparkline, Meter } from "@/components/shared/Charts";
 import { Tabs, Term, TERMS, AiReady } from "@/components/shared/Bits";
 import { Field, Reasons, Stat } from "./Widgets";
 import { useToast } from "@/components/shared/Toast";
+import { EVIDENCE_TYPE_LABEL, EVIDENCE_MODE_LABEL, STAGE_LABEL, BASELINE_GROUP_LABEL } from "@/lib/labels";
 
 const URG: Record<string, { label: string; cls: string }> = { critical: { label: "긴급", cls: "bg-danger text-white" }, high: { label: "높음", cls: "bg-orange text-white" }, mid: { label: "보통", cls: "bg-secondary text-white" }, low: { label: "낮음", cls: "bg-line text-muted" } };
 
@@ -70,7 +71,7 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
   const act = (stage: AXAction["stage"]) => {
     setActionStage(a.id, stage, { qty: chosenQty, supplierId: chosenSup, reason });
     const msg: Record<string, string> = { reviewing: "검토를 시작했습니다", approved: isPo ? "승인 → 발주 요청이 생성되었습니다" : "승인 → 실행되었습니다", done: "완료 처리되었습니다", held: "보류했습니다", dismissed: "무시 처리했습니다", in_progress: "실행 중으로 전환했습니다" };
-    toast({ title: msg[stage] ?? "처리했습니다", body: "관련 데이터와 Evidence가 갱신되었습니다.", tone: stage === "dismissed" ? "info" : "success" });
+    toast({ title: msg[stage] ?? "처리했습니다", body: "관련 데이터와 성과 기록이 갱신되었습니다.", tone: stage === "dismissed" ? "info" : "success" });
     setHold(null);
   };
 
@@ -80,7 +81,7 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
     <Overlay open={!!action} onClose={onClose} variant="drawer" size="lg" title={a.title} subtitle={<span className="inline-flex items-center gap-2"><span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span><Badge tone="soft">{actionTypeLabel(a.type)}</Badge><StatusBadge status={a.stage} /><span>담당 {a.assignee} · 추천 {relTime(a.recommendedAt)} · 마감 {fmtDate(a.dueAt, "datetime")}</span></span>}
       footer={
         <div className="flex flex-wrap gap-2">
-          {!canAct && <div className="text-xs text-muted w-full">이 Action은 {ROLE_LABEL[a.owner]} 권한에서 처리합니다. (현재 {ROLE_LABEL[role]})</div>}
+          {!canAct && <div className="text-xs text-muted w-full">이 실행은 {ROLE_LABEL[a.owner]} 권한에서 처리합니다. (현재 {ROLE_LABEL[role]})</div>}
           {["recommended", "reviewing", "held"].includes(a.stage) && canAct && (
             <>
               {a.stage === "recommended" && <button className="btn-outline" onClick={() => act("reviewing")}>확인·검토중</button>}
@@ -96,14 +97,14 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
               {!isPo && a.type !== "priority_order" && <button className="btn-primary" onClick={() => act("done")}><CheckCircle2 size={16} />완료</button>}
             </>
           )}
-          {["done", "dismissed"].includes(a.stage) && <div className="text-sm text-muted inline-flex items-center gap-1"><FileCheck2 size={15} />{a.stage === "done" ? "완료된 Action입니다. 결과와 Evidence가 기록되었습니다." : `무시됨 — ${a.holdReason ?? "사유 미기록"}`}</div>}
+          {["done", "dismissed"].includes(a.stage) && <div className="text-sm text-muted inline-flex items-center gap-1"><FileCheck2 size={15} />{a.stage === "done" ? "완료된 실행입니다. 결과와 성과 기록이 기록되었습니다." : `무시됨 — ${a.holdReason ?? "사유 미기록"}`}</div>}
         </div>
       }>
       <div className="space-y-5">
         <div className="rounded-xl bg-mist p-4 text-[17px] leading-relaxed">{a.summary}</div>
 
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Trigger">{a.trigger}</Field>
+          <Field label="발생 조건">{a.trigger}</Field>
           <Field label="예상 영향">{a.expectedImpact}</Field>
         </div>
         <Reasons items={a.reasons} />
@@ -157,16 +158,16 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
         {a.holdReason && a.stage === "held" && <div className="rounded-xl bg-mist p-3 text-sm"><b>보류 사유</b> · {a.holdReason}</div>}
 
         <div>
-          <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Evidence {evidence.length}건</div>
-          {evidence.length ? <ul className="space-y-2">{evidence.map((e) => <li key={e.id} className="flex gap-2 text-sm"><Badge tone={e.type === "RESULT" ? "success" : e.type === "RISK" || e.type === "EXCEPTION" ? "danger" : "primary"}>{e.type}</Badge><div><div className="font-semibold">{e.title}</div><div className="text-muted">{e.detail}</div><div className="text-xs text-muted">{e.actor} · {fmtDate(e.createdAt, "datetime")} · {e.mode}</div></div></li>)}</ul> : <div className="text-sm text-muted">아직 Evidence가 없습니다. 검토·승인 시 자동 기록됩니다.</div>}
+          <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">성과 기록 {evidence.length}건</div>
+          {evidence.length ? <ul className="space-y-2">{evidence.map((e) => <li key={e.id} className="flex gap-2 text-sm"><Badge tone={e.type === "RESULT" ? "success" : e.type === "RISK" || e.type === "EXCEPTION" ? "danger" : "primary"}>{EVIDENCE_TYPE_LABEL[e.type] ?? e.type}</Badge><div><div className="font-semibold">{e.title}</div><div className="text-muted">{e.detail}</div><div className="text-xs text-muted">{e.actor} · {fmtDate(e.createdAt, "datetime")} · {e.mode}</div></div></li>)}</ul> : <div className="text-sm text-muted">아직 성과 기록이 없습니다. 검토·승인 시 자동 기록됩니다.</div>}
         </div>
 
-        <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="Action 추천 근거" now="규칙 + 통계 기반 계산 (예상 소진일, 리드타임, 추세)" method="RULE + STATISTICAL + OPTIMIZATION · L3 (사람 승인)" next="LLM이 근거를 자연어로 요약하고 담당자 질문에 답변" />추천은 규칙·통계 계산이며, 사람이 승인해야 실행됩니다.</div>
+        <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="실행 추천 근거" now="규칙 + 통계 기반 계산 (예상 소진일, 리드타임, 추세)" method="규칙 + 통계 + 최적화 · L3 (사람 승인)" next="LLM이 근거를 자연어로 요약하고 담당자 질문에 답변" />추천은 규칙·통계 계산이며, 사람이 승인해야 실행됩니다.</div>
       </div>
 
       <Overlay open={!!hold} onClose={() => setHold(null)} title={hold === "held" ? "보류 사유" : "무시 사유"} size="sm" footer={<div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setHold(null)}>취소</button><button className="btn-primary flex-1" onClick={() => act(hold!)}>{hold === "held" ? "보류" : "무시"}</button></div>}>
         <textarea className="input min-h-[100px] py-2" placeholder="선택 사항 — 예: 11월 1일 재평가, 시즌 프로모션 예정" value={reason} onChange={(e) => setReason(e.target.value)} />
-        <p className="text-xs text-muted mt-2">사유는 Evidence에 기록되어 나중에 '왜 안 했는지'를 남깁니다.</p>
+        <p className="text-xs text-muted mt-2">사유는 성과 기록에 기록되어 나중에 '왜 안 했는지'를 남깁니다.</p>
       </Overlay>
     </Overlay>
   );
@@ -175,7 +176,7 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
 function ReceiveButton({ poId }: { poId: string }) {
   const receive = useStore((s) => s.receiveInbound);
   const toast = useToast();
-  return <button className="btn-primary" onClick={() => { receive(poId); toast({ title: "입고 처리했습니다", body: "가용재고가 늘고 고객 상품 상세의 재고·배송예정이 갱신됩니다.", tone: "success" }); }}><Package size={16} />입고 완료 처리 (Demo)</button>;
+  return <button className="btn-primary" onClick={() => { receive(poId); toast({ title: "입고 처리했습니다", body: "가용재고가 늘고 고객 상품 상세의 재고·배송예정이 갱신됩니다.", tone: "success" }); }}><Package size={16} />입고 완료 처리 (시연)</button>;
 }
 
 // ---------- SKU Drawer ----------
@@ -206,7 +207,7 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
         <Stat label={<Term term="리드타임" desc={TERMS.leadTime}>공급 리드타임</Term>} value={`${ins.leadTimeDays}일`} sub={supplierById.get(ins.sku.primarySupplierId)?.name} />
         <Stat label="입고예정" value={ins.expectedInbound ? num(ins.expectedInbound.qty) : "0"} sub={ins.expectedInbound?.eta ?? "없음"} />
       </div>
-      <Tabs className="mt-4" value={tab} onChange={setTab} tabs={[{ key: "insight", label: "Demand Insight" }, { key: "supplier", label: "공급사·발주", count: pos.length }, { key: "orders", label: "주문·배송", count: recentOrders.length }, { key: "evidence", label: "Action·Evidence", count: actions.length + evidence.length }]} />
+      <Tabs className="mt-4" value={tab} onChange={setTab} tabs={[{ key: "insight", label: "수요 분석" }, { key: "supplier", label: "공급사·발주", count: pos.length }, { key: "orders", label: "주문·배송", count: recentOrders.length }, { key: "evidence", label: "실행·성과 기록", count: actions.length + evidence.length }]} />
       <div className="pt-4 space-y-4">
         {tab === "insight" && (
           <>
@@ -219,7 +220,7 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
                 {[["검색", d.search7d, d.searchPrev7d], ["조회", d.view7d, d.viewPrev7d], ["장바구니", d.cart7d, d.cartPrev7d], ["주문", d.order7d, d.orderPrev7d]].map(([l, c, pv]) => { const r = (pv as number) > 0 ? ((c as number) - (pv as number)) / (pv as number) : 0; return <div key={l as string} className="rounded-lg bg-mist px-2.5 py-2"><div className="text-[13px] text-muted">{l} 7일</div><div className="font-bold tabular-nums">{num(c as number)}</div><div className={`text-[13px] font-semibold ${r >= 0 ? "text-teal" : "text-danger"}`}>{r >= 0 ? "+" : ""}{Math.round(r * 100)}%</div></div>; })}
               </div>
             </div>
-            <Reasons items={ins.reasons} title="판단 근거 (Demand Signal)" />
+            <Reasons items={ins.reasons} title="판단 근거 (수요신호)" />
             <div className="grid sm:grid-cols-3 gap-2 text-sm">
               <Stat label={<Term term="안전재고" desc={TERMS.safetyStock}>안전재고</Term>} value={num(ins.safetyStock)} sub={ins.shortage > 0 ? `부족 ${ins.shortage}` : "충족"} />
               <Stat label="발주 우선순위" value={`${ins.priority}/100`} sub={<Meter value={ins.priority} max={100} color={ins.priority > 70 ? "#D93A3A" : "var(--t-primary)"} className="mt-1" />} />
@@ -227,12 +228,12 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
             </div>
             {showCost && <div className="grid grid-cols-3 gap-2 text-sm"><Stat label="판매가" value={won(ins.sku.salePrice)} /><Stat label="원가" value={won(ins.sku.cost)} /><Stat label={<Term term="마진율" desc={TERMS.grossMargin}>마진율</Term>} value={pct(ins.marginRate, 0)} sub={`재고금액 ${won(ins.stockValue)}`} /></div>}
             {!ins.hasOpenAction && (role === "owner" || role === "buyer") && ((ins.recommendedQty > 0 && ["urgent", "stockout", "low", "rising"].includes(ins.status)) || ["slow", "overstock"].includes(ins.status)) && (
-              <button className="btn-primary w-full" onClick={() => { const id = createActionFromSku(ins.sku.id); if (!id) { toast({ title: "이미 진행 중인 Action이 있습니다", tone: "info" }); return; } const a = useStore.getState().data.actions.find((x) => x.id === id); toast({ title: "Action을 생성했습니다", body: "근거·추천수량·공급사 대안이 담겼습니다.", tone: "success" }); if (a) onOpenAction?.(a); }}>
-                <Rocket size={16} />{["slow", "overstock"].includes(ins.status) ? "발주 보류 검토 Action 만들기" : `발주 검토 Action 만들기 (${ins.recommendedQty}개)`}
+              <button className="btn-primary w-full" onClick={() => { const id = createActionFromSku(ins.sku.id); if (!id) { toast({ title: "이미 진행 중인 실행이 있습니다", tone: "info" }); return; } const a = useStore.getState().data.actions.find((x) => x.id === id); toast({ title: "실행을 생성했습니다", body: "근거·추천수량·공급사 대안이 담겼습니다.", tone: "success" }); if (a) onOpenAction?.(a); }}>
+                <Rocket size={16} />{["slow", "overstock"].includes(ins.status) ? "발주 보류 검토 실행 만들기" : `발주 검토 실행 만들기 (${ins.recommendedQty}개)`}
               </button>
             )}
-            {ins.hasOpenAction && <div className="text-xs text-muted">이 SKU에 진행 중인 Action이 있습니다 — Action·Evidence 탭에서 확인</div>}
-            <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="Demand & Purchase Recommendation" now="판매속도·재고·검색·장바구니·리드타임 규칙 계산" method="RULE + STATISTICAL · L3" next="LLM이 시즌·프로모션 맥락을 반영한 설명 제공" />AI Ready</div>
+            {ins.hasOpenAction && <div className="text-xs text-muted">이 SKU에 진행 중인 실행이 있습니다 — 실행·성과 기록 탭에서 확인</div>}
+            <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="수요·발주 추천" now="판매속도·재고·검색·장바구니·리드타임 규칙 계산" method="규칙 + 통계 · L3" next="LLM이 시즌·프로모션 맥락을 반영한 설명 제공" />AI 연결 준비</div>
           </>
         )}
         {tab === "supplier" && (
@@ -246,12 +247,12 @@ export function SkuDrawer({ skuId, onClose, onOpenAction }: { skuId: string | nu
             {pos.length ? <div className="table-wrap"><table className="table"><thead><tr><th>PO</th><th>공급사</th><th>수량</th><th>예정</th><th>상태</th></tr></thead><tbody>{pos.map((po) => <tr key={po.id}><td className="font-semibold">{po.id}</td><td>{supplierById.get(po.supplierId)?.name}</td><td>{po.qty}</td><td>{po.expectedAt}</td><td><StatusBadge status={po.status} /></td></tr>)}</tbody></table></div> : <div className="text-sm text-muted">발주 이력이 없습니다.</div>}
           </>
         )}
-        {tab === "orders" && (recentOrders.length ? <div className="table-wrap"><table className="table"><thead><tr><th>주문</th><th>일시</th><th>수량</th><th>단계</th></tr></thead><tbody>{recentOrders.map((o) => <tr key={o.id}><td className="font-semibold">{o.id}</td><td className="text-muted">{fmtDate(o.createdAt, "datetime")}</td><td>{o.items.find((it) => it.skuId === ins.sku.id)?.qty}</td><td><StatusBadge status={o.stage} /></td></tr>)}</tbody></table></div> : <div className="text-sm text-muted">최근 7일 상세 주문에 포함되지 않았습니다. (집계 판매는 Demand Insight 참고)</div>)}
+        {tab === "orders" && (recentOrders.length ? <div className="table-wrap"><table className="table"><thead><tr><th>주문</th><th>일시</th><th>수량</th><th>단계</th></tr></thead><tbody>{recentOrders.map((o) => <tr key={o.id}><td className="font-semibold">{o.id}</td><td className="text-muted">{fmtDate(o.createdAt, "datetime")}</td><td>{o.items.find((it) => it.skuId === ins.sku.id)?.qty}</td><td><StatusBadge status={o.stage} /></td></tr>)}</tbody></table></div> : <div className="text-sm text-muted">최근 7일 상세 주문에 포함되지 않았습니다. (집계 판매는 수요 분석 참고)</div>)}
         {tab === "evidence" && (
           <div className="space-y-3">
             {actions.map((a) => <button key={a.id} onClick={() => onOpenAction?.(a)} className="w-full text-left rounded-xl border border-line p-3 hover:bg-mist flex items-center justify-between gap-2"><div><div className="flex items-center gap-2"><Badge tone="soft">{actionTypeLabel(a.type)}</Badge><StatusBadge status={a.stage} /></div><div className="font-semibold text-sm mt-1">{a.title}</div></div><ChevronRight size={16} className="text-muted shrink-0" /></button>)}
-            {evidence.map((e) => <div key={e.id} className="flex gap-2 text-sm"><Badge tone={e.type === "RESULT" ? "success" : e.type === "RISK" ? "danger" : "primary"}>{e.type}</Badge><div><div className="font-semibold">{e.title}</div><div className="text-muted">{e.detail}</div><div className="text-xs text-muted">{e.actor} · {fmtDate(e.createdAt, "datetime")}</div></div></div>)}
-            {!actions.length && !evidence.length && <div className="text-sm text-muted">Action·Evidence가 없습니다.</div>}
+            {evidence.map((e) => <div key={e.id} className="flex gap-2 text-sm"><Badge tone={e.type === "RESULT" ? "success" : e.type === "RISK" ? "danger" : "primary"}>{EVIDENCE_TYPE_LABEL[e.type] ?? e.type}</Badge><div><div className="font-semibold">{e.title}</div><div className="text-muted">{e.detail}</div><div className="text-xs text-muted">{e.actor} · {fmtDate(e.createdAt, "datetime")}</div></div></div>)}
+            {!actions.length && !evidence.length && <div className="text-sm text-muted">실행·성과 기록이 없습니다.</div>}
           </div>
         )}
       </div>
@@ -283,7 +284,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
     <Overlay open={!!orderId} onClose={onClose} variant="drawer" size="md" title={`주문 ${o.id}`} subtitle={<span className="inline-flex items-center gap-2 flex-wrap"><StatusBadge status={o.stage} />{risk && <Badge tone={risk.level === "high" ? "danger" : risk.level === "mid" ? "warn" : "neutral"}>지연위험 {risk.score}</Badge>}<span>{fmtDate(o.createdAt, "datetime")} · {warehouseById.get(o.warehouseId)?.name}</span></span>}
       footer={
         <div className="flex flex-wrap gap-2">
-          {next && canOps && !["cancelled", "return"].includes(o.stage) && <button className="btn-primary" data-autofocus onClick={() => { advance(o.id, next); toast({ title: `${ORDER_STAGE_LABEL[next]} 처리`, body: `고객 My Page에 '${CUSTOMER_STAGE_LABEL[next]}' 상태가 반영됩니다.`, tone: "success" }); }}><Play size={16} />다음 단계: {ORDER_STAGE_LABEL[next]}</button>}
+          {next && canOps && !["cancelled", "return"].includes(o.stage) && <button className="btn-primary" data-autofocus onClick={() => { advance(o.id, next); toast({ title: `${ORDER_STAGE_LABEL[next]} 처리`, body: `고객 마이페이지에 '${CUSTOMER_STAGE_LABEL[next]}' 상태가 반영됩니다.`, tone: "success" }); }}><Play size={16} />다음 단계: {ORDER_STAGE_LABEL[next]}</button>}
           {o.stage === "picking_wait" && canOps && <button className="btn-outline" onClick={() => { advance(o.id, "shipped"); toast({ title: "우선처리 → 출고완료", tone: "success" }); }}><Truck size={16} />우선처리 (바로 출고)</button>}
           {canCs && !o.customerNotified && !["delivered", "cancelled"].includes(o.stage) && <button className="btn-outline" onClick={() => { notify(o.id, "물류 사정으로 배송이 하루 지연될 수 있어 미리 안내드립니다."); toast({ title: "고객 사전안내를 발송했습니다", tone: "success" }); }}><Bell size={16} />지연 사전안내</button>}
           {o.customerNotified && <span className="text-sm text-muted inline-flex items-center gap-1"><Bell size={14} className="text-orange" />고객 안내 발송됨</span>}
@@ -304,12 +305,12 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
           <ul className="divide-y divide-line rounded-xl border border-line">{o.items.map((it) => { const p = productById.get(it.productId); const inv = data.inventory.find((i) => i.skuId === it.skuId); const av = inv ? inv.onHand - inv.reserved : 0; return <li key={it.skuId} className="px-3 py-2 flex items-center justify-between gap-2 text-sm"><div><b>{it.name}</b> · {it.skuName} × {it.qty}<div className="text-xs text-muted">{p?.categorySlug} · 가용재고 {av}{inv && inv.onHand < it.qty ? " (재고예외!)" : ""}</div></div><span className="tabular-nums">{won(it.unitPrice * it.qty)}</span></li>; })}</ul>
         </div>
         <div>
-          <div className="text-xs font-semibold text-muted uppercase mb-2">처리 History</div>
+          <div className="text-xs font-semibold text-muted uppercase mb-2">처리 이력</div>
           <ol className="border-l-2 border-line pl-4 space-y-2">{[...o.history].reverse().map((h, i) => <li key={i} className="relative text-sm"><span className={`absolute -left-[23px] top-1 w-3 h-3 rounded-full ${i === 0 ? "bg-primary" : "bg-line"}`} /><b>{ORDER_STAGE_LABEL[h.stage]}</b> <span className="text-muted">· {h.actor} · {fmtDate(h.at, "datetime")}{h.note ? ` · ${h.note}` : ""}</span></li>)}</ol>
         </div>
-        <div className="text-xs text-muted">고객 화면 표시: <b>{CUSTOMER_STAGE_LABEL[o.stage]}</b> — 여기서 단계를 바꾸면 고객 My Page가 함께 바뀝니다. <Link href={`/my/orders/${o.id}`} target="_blank" className="text-primary underline">고객 화면에서 보기</Link></div>
-        {evidence.length > 0 && <div><div className="text-xs font-semibold text-muted uppercase mb-2">Evidence</div><ul className="space-y-1.5 text-sm">{evidence.map((e) => <li key={e.id} className="flex gap-2"><Badge tone="primary">{e.type}</Badge><span>{e.title} <span className="text-muted">· {fmtDate(e.createdAt, "time")}</span></span></li>)}</ul></div>}
-        <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="Fulfillment Risk" now="마감·배송약속·구역 적체·재고예외 규칙 점수" method="RULE + STATISTICAL · L2 추천" next="처리량 예측으로 마감 초과 확률 산출" /><Sparkles size={12} />위험 점수는 규칙 기반입니다.</div>
+        <div className="text-xs text-muted">고객 플랫폼 표시: <b>{CUSTOMER_STAGE_LABEL[o.stage]}</b> — 여기서 단계를 바꾸면 고객 마이페이지가 함께 바뀝니다. <Link href={`/my/orders/${o.id}`} target="_blank" className="text-primary underline">고객 화면에서 보기</Link></div>
+        {evidence.length > 0 && <div><div className="text-xs font-semibold text-muted uppercase mb-2">성과 기록</div><ul className="space-y-1.5 text-sm">{evidence.map((e) => <li key={e.id} className="flex gap-2"><Badge tone="primary">{EVIDENCE_TYPE_LABEL[e.type] ?? e.type}</Badge><span>{e.title} <span className="text-muted">· {fmtDate(e.createdAt, "time")}</span></span></li>)}</ul></div>}
+        <div className="text-xs text-muted flex items-center gap-2"><AiReady compact title="배송 지연 위험" now="마감·배송약속·구역 적체·재고예외 규칙 점수" method="규칙 + 통계 · L2 추천" next="처리량 예측으로 마감 초과 확률 산출" /><Sparkles size={12} />위험 점수는 규칙 기반입니다.</div>
       </div>
     </Overlay>
   );

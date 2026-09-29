@@ -3,7 +3,7 @@ import AxShell from "@/components/ax/AxShell";
 import ClientGate from "@/components/shared/ClientGate";
 import DashboardView from "@/components/ax/DashboardView";
 
-export const metadata: Metadata = { title: "경영 대시보드 · Business AX", robots: { index: false } };
+export const metadata: Metadata = { title: "경영 대시보드 · AX 운영화면", robots: { index: false } };
 
 export default function AxHome() {
   return (

@@ -54,8 +54,8 @@ export const TERMS = {
   fillRate: "발주한 수량 중 실제로 입고된 비율입니다.",
   grossMargin: "매출에서 상품원가·할인·배송비를 뺀, 실제로 남는 돈입니다.",
   demandSignal: "검색·조회·장바구니·주문 데이터를 합쳐 '앞으로 얼마나 팔릴지'를 나타내는 신호입니다.",
-  rls: "Row Level Security. 로그인한 사람의 역할에 따라 볼 수 있는 데이터 행을 데이터베이스가 제한하는 방식입니다.",
-  ssot: "Single Source of Truth. 같은 정보를 여러 곳에 따로 두지 않고 기준이 되는 한 곳에서만 관리하는 원칙입니다.",
+  rls: "행 단위 보안(Row Level Security). 로그인한 사람의 역할에 따라 볼 수 있는 데이터 행을 데이터베이스가 제한하는 방식입니다.",
+  ssot: "단일 기준 데이터(Single Source of Truth). 같은 정보를 여러 곳에 따로 두지 않고 기준이 되는 한 곳에서만 관리하는 원칙입니다.",
 } as const;
 
 /** AI Ready marker — 규칙기반 Demo 상태를 정직하게 표시 */
@@ -63,8 +63,8 @@ export function AiReady({ title, now, next, method, compact = false }: { title: 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`inline-flex items-center gap-1.5 rounded-lg border border-dashed border-secondary/60 bg-secondary/8 text-secondary font-semibold ${compact ? "px-2 py-1 text-[13px]" : "px-2.5 py-1.5 text-xs"} hover:bg-secondary/15 transition-colors`}>
-        <Sparkles size={compact ? 12 : 14} /> AI READY
+      <button type="button" onClick={() => setOpen(true)} className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg border border-dashed border-secondary/60 bg-secondary/8 text-secondary font-semibold ${compact ? "px-2 py-1 text-[13px]" : "px-2.5 py-1.5 text-xs"} hover:bg-secondary/15 transition-colors`}>
+        <Sparkles size={compact ? 13 : 14} /> AI 연결 준비
       </button>
       <Overlay open={open} onClose={() => setOpen(false)} title={title} subtitle="AI 적용 상태 — 정직한 표시" size="sm">
         <dl className="space-y-3 text-[17px]">
@@ -72,13 +72,13 @@ export function AiReady({ title, now, next, method, compact = false }: { title: 
           <div><dt className="text-xs font-semibold text-muted uppercase">계산 방식</dt><dd className="mt-0.5">{method}</dd></div>
           <div><dt className="text-xs font-semibold text-muted uppercase">향후 (API 연결 시)</dt><dd className="mt-0.5">{next}</dd></div>
         </dl>
-        <p className="mt-4 text-xs text-muted">단순 합계·재고일수·정렬은 코드로 계산하며 AI라고 부르지 않습니다. 실제 LLM 연결은 READY 상태입니다.</p>
+        <p className="mt-4 text-xs text-muted">단순 합계·재고일수·정렬은 코드로 계산하며 AI라고 부르지 않습니다. 실제 LLM 연결은 연결 준비 상태입니다.</p>
       </Overlay>
     </>
   );
 }
 
-export function Freshness({ updatedAt, source = "Demo Repository" }: { updatedAt?: string; source?: string }) {
+export function Freshness({ updatedAt, source = "시연 데이터" }: { updatedAt?: string; source?: string }) {
   const t = updatedAt ? new Date(updatedAt) : null;
   const p = (n: number) => String(n).padStart(2, "0");
   return (
@@ -91,8 +91,8 @@ export function Freshness({ updatedAt, source = "Demo Repository" }: { updatedAt
 
 export function SectionHeader({ title, sub, right }: { title: ReactNode; sub?: ReactNode; right?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-3 mb-3">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 mb-3">
+      <div className="min-w-0 flex-1 basis-[14rem]">
         <h2 className="section-title">{title}</h2>
         {sub && <p className="text-sm text-muted mt-0.5">{sub}</p>}
       </div>

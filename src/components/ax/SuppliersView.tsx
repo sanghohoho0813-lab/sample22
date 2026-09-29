@@ -40,11 +40,11 @@ export default function SuppliersView() {
         <KpiCard label="고위험 공급사" value={data.suppliers.filter((s) => s.riskLevel === "high").length} tone="warn" sub="납기·불량 복합" />
       </div>
 
-      <Panel title={<span className="inline-flex items-center gap-2"><Factory size={18} className="text-accent" />Supplier Decision — 동일 상품 공급사 비교</span>} sub="가장 싼 공급사를 무조건 추천하지 않습니다. 긴급 품절위험은 납기, 과잉재고 위험은 최소주문수량이 더 중요합니다" right={<AiReady title="Supplier Decision" now="단가·납기·최소수량·정시납품·충족률·불량률 가중 점수 (L2/L3)" method="RULE + OPTIMIZATION" next="발주 결과 학습으로 공급사별 실제 납기·불량 예측" />}>
+      <Panel title={<span className="inline-flex items-center gap-2"><Factory size={18} className="text-accent" />공급사 비교 — 동일 상품 공급사 비교</span>} sub="가장 싼 공급사를 무조건 추천하지 않습니다. 긴급 품절위험은 납기, 과잉재고 위험은 최소주문수량이 더 중요합니다" right={<AiReady title="공급사 비교" now="단가·납기·최소수량·정시납품·충족률·불량률 가중 점수 (L2/L3)" method="규칙 + 최적화" next="발주 결과 학습으로 공급사별 실제 납기·불량 예측" />}>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <label className="text-sm text-muted">비교 상품</label>
           <select className="input !min-h-[38px] w-auto text-sm max-w-full" value={cmpSku} onChange={(e) => setCmpSku(e.target.value)}>{multi.map((i) => <option key={i.sku.id} value={i.sku.id}>{i.product.name} · {i.sku.name}</option>)}</select>
-          {cmpIns && <span className="inline-flex items-center gap-2 text-sm"><StatusBadge status={cmpIns.status} /><span className="text-muted">가용 {cmpIns.available} · 소진 {cmpIns.daysOfStock === Infinity ? "-" : cmpIns.daysOfStock.toFixed(1) + "일"} · 추천수량 {cmpIns.recommendedQty || "-"}</span><button className="text-primary font-semibold" onClick={() => setSkuId(cmpIns.sku.id)}>SKU Detail</button></span>}
+          {cmpIns && <span className="inline-flex items-center gap-2 text-sm"><StatusBadge status={cmpIns.status} /><span className="text-muted">가용 {cmpIns.available} · 소진 {cmpIns.daysOfStock === Infinity ? "-" : cmpIns.daysOfStock.toFixed(1) + "일"} · 추천수량 {cmpIns.recommendedQty || "-"}</span><button className="text-primary font-semibold" onClick={() => setSkuId(cmpIns.sku.id)}>SKU 상세</button></span>}
         </div>
         <div className="grid md:grid-cols-3 gap-3">
           {cmp.map((o) => (
@@ -74,7 +74,7 @@ export default function SuppliersView() {
       <Overlay open={!!sel} onClose={() => setSel(null)} variant="drawer" size="lg" title={sel?.name} subtitle={sel && <span className="inline-flex gap-2 items-center"><StatusBadge status={sel.contractStatus} /><Badge tone={sel.riskLevel === "high" ? "danger" : sel.riskLevel === "mid" ? "warn" : "success"}>위험 {{ high: "높음", mid: "보통", low: "낮음" }[sel.riskLevel]}</Badge><span>담당 {sel.contact}</span></span>}>
         {sel && (() => { const k = supplierKpis(data, sel.id); const pos = data.purchaseOrders.filter((p) => p.supplierId === sel.id); const skus = data.supplierProducts.filter((sp) => sp.supplierId === sel.id); const rets = data.returns.filter((r) => r.supplierId === sel.id); return (
           <>
-            {sel.riskLevel === "high" && <div className="rounded-xl bg-danger/5 border border-danger/30 p-3 text-sm flex gap-2 mb-3"><AlertTriangle size={16} className="text-danger mt-0.5 shrink-0" /><div><b>복합 위험</b> · 정시납품률 {pct(sel.onTimeRate, 0)}, 불량 반품 {rets.filter((r) => r.reason === "defect").length}건. 대체 공급사 비중 확대를 검토하세요 (Action Center).</div></div>}
+            {sel.riskLevel === "high" && <div className="rounded-xl bg-danger/5 border border-danger/30 p-3 text-sm flex gap-2 mb-3"><AlertTriangle size={16} className="text-danger mt-0.5 shrink-0" /><div><b>복합 위험</b> · 정시납품률 {pct(sel.onTimeRate, 0)}, 불량 반품 {rets.filter((r) => r.reason === "defect").length}건. 대체 공급사 비중 확대를 검토하세요 (실행 센터).</div></div>}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2"><Stat label="리드타임" value={`${sel.leadTimeDays}일`} /><Stat label="정시납품" value={pct(sel.onTimeRate, 0)} /><Stat label="충족률" value={pct(sel.fillRate, 0)} /><Stat label="불량률" value={`${(sel.defectRate * 100).toFixed(1)}%`} sub={`반품 ${rets.length}건`} /></div>
             <Tabs className="mt-4" value={tab} onChange={setTab} tabs={[{ key: "info", label: "취급상품", count: skus.length }, { key: "po", label: "발주·미입고", count: pos.length }, { key: "compare", label: "평가" }]} />
             <div className="pt-4">

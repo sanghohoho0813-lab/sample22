@@ -96,23 +96,24 @@ export function SidebarBridgeCTA({
   homeHref = MIRAE_LINKS.home,
 }: Omit<SampleBridgeCTAProps, "surface" | "className">) {
   return (
-    <div className="px-2.5 pb-2.5 pt-1">
+    <div className="px-2.5 pb-2.5 pt-1 [@media(max-height:860px)]:pb-2">
       <div className="rounded-xl border border-white/12 bg-white/[0.06] p-2">
-        <div className="px-1 pb-1.5 text-[11px] font-bold tracking-[0.12em] text-white/50">{BRIDGE_COPY.badge}</div>
+        {/* 세로가 짧은 노트북 화면에서는 라벨을 숨기고 버튼 높이를 줄여 메뉴 공간을 확보 (버튼 3개는 유지) */}
+        <div className="px-1 pb-1.5 text-[13px] font-bold tracking-[0.1em] text-white/55 [@media(max-height:860px)]:hidden">{BRIDGE_COPY.badge}</div>
         <a
           href={consultHref}
           target="_blank"
           rel="noreferrer"
-          className="cta-sweep relative flex min-h-[40px] items-center justify-between gap-1 overflow-hidden rounded-lg bg-white px-2.5 text-[14px] font-bold text-shell transition-transform duration-150 hover:-translate-y-px"
+          className="cta-sweep relative flex min-h-[44px] [@media(max-height:860px)]:min-h-[40px] items-center justify-between gap-1 overflow-hidden rounded-lg bg-white px-3 text-[15px] font-bold text-shell transition-transform duration-150 hover:-translate-y-px"
         >
           <span className="relative z-10 truncate">{BRIDGE_COPY.primary}</span>
           <ArrowRight size={15} className="relative z-10 shrink-0" />
         </a>
         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-          <a href={samplesHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[34px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[12px] font-semibold text-white/85 transition-colors hover:bg-white/20">
+          <a href={samplesHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[38px] [@media(max-height:860px)]:min-h-[32px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[14px] font-semibold text-white/85 transition-colors hover:bg-white/20">
             다른 샘플 <ArrowUpRight size={12} />
           </a>
-          <a href={homeHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[34px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[12px] font-semibold text-white/85 transition-colors hover:bg-white/20">
+          <a href={homeHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[38px] [@media(max-height:860px)]:min-h-[32px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[14px] font-semibold text-white/85 transition-colors hover:bg-white/20">
             홈페이지 <ArrowUpRight size={12} />
           </a>
         </div>

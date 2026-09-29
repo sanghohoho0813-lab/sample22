@@ -106,7 +106,7 @@ function RowGroup({ r, open, onToggle, onOpenSku, showCost, catName, brandName, 
           <td className="text-xs text-muted">검색 {i.searchTrend >= 0 ? "+" : ""}{Math.round(i.searchTrend * 100)}% · 담기 {i.cartTrend >= 0 ? "+" : ""}{Math.round(i.cartTrend * 100)}%</td>
           <td className={`text-right tabular-nums ${i.daysOfStock < i.leadTimeDays ? "text-danger font-semibold" : ""}`}>{i.daysOfStock === Infinity ? "-" : `${i.daysOfStock.toFixed(1)}일`}</td>
           {showCost && <td className="text-right tabular-nums">{pct(i.marginRate, 0)}</td>}
-          <td className="text-right text-xs text-primary font-semibold">Detail</td>
+          <td className="text-right text-xs text-primary font-semibold">상세</td>
         </tr>
       ))}
     </>

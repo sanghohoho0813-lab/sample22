@@ -50,11 +50,11 @@ export default function PromotionsView() {
               <div>① 실제로 남는 것이 있는가 → <b className={m < 0 ? "text-danger" : "text-teal"}>{m < 0 ? "아니오 (마진 마이너스)" : "예"}</b></div>
               <div>② 기존 구매를 할인으로 대체한 것은 아닌가 → 추정 대체율 <b>{Math.round(cannibal * 100)}%</b> {cannibal > 0.35 && <span className="text-[#B84F1A]">(높음)</span>}</div>
               <div>③ 재고위험 해소에 도움이 되었는가 → {sel.id === "promo-03" ? <b>일부 (재고일수 여전히 400일+)</b> : sel.id === "promo-02" ? <b className="text-teal">예 (배변패드 회전 개선)</b> : <b>해당 없음</b>}</div>
-              <div>④ 재구매로 이어졌는가 → {sel.segment.includes("재구매") || sel.segment.includes("반복") ? <b className="text-teal">재구매 세그먼트 대상</b> : <b>측정 준비 (Evidence 누적 필요)</b>}</div>
+              <div>④ 재구매로 이어졌는가 → {sel.segment.includes("재구매") || sel.segment.includes("반복") ? <b className="text-teal">재구매 세그먼트 대상</b> : <b>측정 준비 (성과 기록 누적 필요)</b>}</div>
             </div>
             <div><div className="text-xs font-semibold text-muted uppercase mb-1.5">대상 상품</div><ul className="space-y-1 text-sm">{sel.skuIds.map((id) => { const s = skuById.get(id); const p = s && productById.get(s.productId); return <li key={id} className="flex justify-between"><span>{p?.name} · {s?.name}</span><span className="text-muted tabular-nums">{s && won(s.salePrice)}</span></li>; })}</ul></div>
             <Field label="퍼널">노출 {num(sel.impressions)} → 클릭 {num(sel.clicks)} ({pct(safeDiv(sel.clicks, sel.impressions))}) → 담기 {num(sel.carts)} → 주문 {num(sel.orders)} ({pct(safeDiv(sel.orders, sel.carts), 0)})</Field>
-            {related.length > 0 && <div><div className="text-xs font-semibold text-muted uppercase mb-1.5">관련 Action</div>{related.map((a) => <button key={a.id} onClick={() => { setSel(null); setAction(a); }} className="w-full text-left rounded-xl border border-line p-3 hover:bg-mist text-sm"><div className="flex gap-2 mb-1"><Badge tone="soft">프로모션</Badge><StatusBadge status={a.stage} /></div><b>{a.title}</b></button>)}</div>}
+            {related.length > 0 && <div><div className="text-xs font-semibold text-muted uppercase mb-1.5">관련 실행</div>{related.map((a) => <button key={a.id} onClick={() => { setSel(null); setAction(a); }} className="w-full text-left rounded-xl border border-line p-3 hover:bg-mist text-sm"><div className="flex gap-2 mb-1"><Badge tone="soft">프로모션</Badge><StatusBadge status={a.stage} /></div><b>{a.title}</b></button>)}</div>}
           </div>
         ); })()}
       </Overlay>

@@ -133,7 +133,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
           <ul className="mt-5 space-y-2 text-sm text-muted">
             <li className="flex items-start gap-2"><Store size={15} className="mt-0.5 shrink-0" /><span>판매·공급: (주)넥스마트 직매입 · 공급사 {supplier?.name ?? "-"} (계약 공급사, 입고 검수)</span></li>
             <li className="flex items-start gap-2"><Undo2 size={15} className="mt-0.5 shrink-0" /><span>배송완료 후 7일 이내 교환·반품 가능 (식품·위생용품은 미개봉 시)</span></li>
-            <li className="flex items-start gap-2"><ShieldCheck size={15} className="mt-0.5 shrink-0" /><span>DEMO 주문: 실제 결제는 이루어지지 않습니다</span></li>
+            <li className="flex items-start gap-2"><ShieldCheck size={15} className="mt-0.5 shrink-0" /><span>시연 주문: 실제 결제는 이루어지지 않습니다</span></li>
           </ul>
         </div>
       </div>

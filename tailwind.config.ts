@@ -2,6 +2,8 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
+  // 터치 기기에서 탭 후 hover 스타일이 남는 현상 방지 — hover를 지원하는 기기에서만 hover: 적용
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {

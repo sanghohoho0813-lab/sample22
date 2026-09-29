@@ -48,7 +48,7 @@ export default function CheckoutView() {
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-5">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">주문·결제</h1>
-      <div className="mt-2 rounded-xl border border-orange/40 bg-orange/5 px-4 py-3 text-sm flex items-start gap-2"><Info size={16} className="text-orange mt-0.5 shrink-0" /><div><b>DEMO CHECKOUT</b> — 실제 결제는 연결되지 않으며, 주문·재고·배송 Data Loop를 보여주는 시연입니다.</div></div>
+      <div className="mt-2 rounded-xl border border-orange/40 bg-orange/5 px-4 py-3 text-sm flex items-start gap-2"><Info size={16} className="text-orange mt-0.5 shrink-0" /><div><b>시연용 주문서</b> — 실제 결제는 연결되지 않으며, 주문·재고·배송 데이터 순환를 보여주는 시연입니다.</div></div>
 
       <div className="mt-5 grid lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="space-y-4">
@@ -80,11 +80,11 @@ export default function CheckoutView() {
           </section>
 
           <section className="card p-5">
-            <h2 className="font-bold text-lg flex items-center gap-2"><CreditCard size={18} className="text-primary" />결제수단 <span className="badge bg-mist text-muted">Preview</span></h2>
+            <h2 className="font-bold text-lg flex items-center gap-2"><CreditCard size={18} className="text-primary" />결제수단 <span className="badge bg-mist text-muted">미리보기</span></h2>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {([["card", "신용·체크카드"], ["transfer", "계좌이체"], ["pay", "간편결제"]] as const).map(([k, l]) => <button key={k} onClick={() => setPay(k)} aria-pressed={pay === k} className={`rounded-xl border px-3 py-3 text-sm font-semibold ${pay === k ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}>{l}</button>)}
             </div>
-            <p className="text-xs text-muted mt-2 inline-flex items-center gap-1"><Lock size={12} />실제 PG 연동은 READY 단계입니다. 시연에서는 결제 없이 주문이 생성됩니다.</p>
+            <p className="text-xs text-muted mt-2 inline-flex items-center gap-1"><Lock size={12} />실제 PG 연동은 연결 준비 단계입니다. 시연에서는 결제 없이 주문이 생성됩니다.</p>
           </section>
 
           <section className="card p-5">
@@ -101,7 +101,7 @@ export default function CheckoutView() {
             <div className="flex justify-between border-t border-line pt-3"><dt className="font-semibold">최종 결제예정금액</dt><dd className="font-black text-xl tabular-nums">{won(subtotal + shipping)}</dd></div>
           </dl>
           <div className="mt-2 text-xs text-muted">예상 도착: {eta}</div>
-          <button onClick={submit} disabled={busy} className="btn-primary btn-lg w-full mt-4">{busy ? "주문 처리 중…" : `${won(subtotal + shipping)} DEMO 주문하기`}</button>
+          <button onClick={submit} disabled={busy} className="btn-primary btn-lg w-full mt-4">{busy ? "주문 처리 중…" : `${won(subtotal + shipping)} 시연 주문하기`}</button>
           <Link href="/cart" className="btn-ghost w-full mt-2">장바구니로 돌아가기</Link>
         </aside>
       </div>

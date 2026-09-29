@@ -3,14 +3,16 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
+/** 오버레이·드로어가 여러 개 겹쳐도 마지막 하나가 닫힐 때만 배경 스크롤을 푼다 */
 let lockCount = 0;
-function lockScroll() {
+export function lockScroll() {
   lockCount += 1;
+  document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
 }
-function unlockScroll() {
+export function unlockScroll() {
   lockCount = Math.max(0, lockCount - 1);
-  if (lockCount === 0) document.body.style.overflow = "";
+  if (lockCount === 0) { document.documentElement.style.overflow = ""; document.body.style.overflow = ""; }
 }
 
 export interface OverlayProps {

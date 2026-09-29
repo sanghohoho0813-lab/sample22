@@ -114,9 +114,9 @@ export default function ProductListView({ title, subtitle, base, lockCategory = 
           {activeCount > 0 && (
             <div className="flex items-center gap-2 flex-wrap mt-2 text-sm">
               <span className="text-muted">적용된 필터</span>
-              {f.delivery !== "all" && <span className="chip chip-on !min-h-[30px] text-xs">{{ fast: "빠른배송", standard: "일반배송", reserve: "예약배송" }[f.delivery!]}<X size={12} onClick={() => setF((s) => ({ ...s, delivery: "all" }))} /></span>}
-              {priceBand !== null && <span className="chip chip-on !min-h-[30px] text-xs">{PRICE_BANDS[priceBand].label}<X size={12} onClick={() => setBand(null)} /></span>}
-              {f.brandIds?.map((id) => <span key={id} className="chip chip-on !min-h-[30px] text-xs">{data.brands.find((b) => b.id === id)?.name}<X size={12} onClick={() => toggleBrand(id)} /></span>)}
+              {f.delivery !== "all" && <span className="chip chip-on !min-h-[34px] text-sm">{{ fast: "빠른배송", standard: "일반배송", reserve: "예약배송" }[f.delivery!]}<X size={12} onClick={() => setF((s) => ({ ...s, delivery: "all" }))} /></span>}
+              {priceBand !== null && <span className="chip chip-on !min-h-[34px] text-sm">{PRICE_BANDS[priceBand].label}<X size={12} onClick={() => setBand(null)} /></span>}
+              {f.brandIds?.map((id) => <span key={id} className="chip chip-on !min-h-[34px] text-sm">{data.brands.find((b) => b.id === id)?.name}<X size={12} onClick={() => toggleBrand(id)} /></span>)}
               <button onClick={reset} className="text-xs text-muted underline">전체 해제</button>
             </div>
           )}

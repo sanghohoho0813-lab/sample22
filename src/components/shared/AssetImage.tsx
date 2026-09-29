@@ -48,7 +48,8 @@ export default function AssetImage({ assetKey, category = "living", label, class
           ) : (
             <>
               <div className="absolute inset-0 pattern-dots" />
-              <span className="absolute left-3 top-3 rounded-md bg-white/70 px-2 py-0.5 text-[13px] font-semibold" style={{ color: `hsl(${hue} 35% 30%)` }}>사진 준비 중 · {assetKey ?? "photo"}</span>
+              {/* 사진 슬롯 키는 화면에 노출하지 않고 data 속성으로만 남긴다 (public/assets/README.md 참고) */}
+              <span data-asset-slot={assetKey ?? "photo"} className="relative rounded-md bg-white/70 px-2 py-0.5 text-[13px] font-semibold" style={{ color: `hsl(${hue} 35% 30%)` }}>사진 준비 중</span>
             </>
           )}
         </div>

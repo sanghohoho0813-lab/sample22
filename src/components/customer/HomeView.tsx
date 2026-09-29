@@ -18,7 +18,7 @@ function Section({ title, sub, href, children, id }: { title: string; sub?: stri
   return (
     <section id={id} className="mx-auto max-w-[1280px] px-4 mt-10 sm:mt-14">
       <div className="flex items-end justify-between gap-3 mb-4">
-        <div><h2 className="text-xl sm:text-2xl font-bold tracking-tight">{title}</h2>{sub && <p className="text-sm text-muted mt-0.5">{sub}</p>}</div>
+        <div className="min-w-0 flex-1"><h2 className="text-xl sm:text-2xl font-bold tracking-tight">{title}</h2>{sub && <p className="text-sm text-muted mt-0.5">{sub}</p>}</div>
         {href && <Link href={href} className="text-sm font-semibold text-primary inline-flex items-center gap-1 hover:underline shrink-0">전체보기 <ArrowRight size={14} /></Link>}
       </div>
       {children}
@@ -120,7 +120,7 @@ export default function HomeView() {
               })}
             </div>
             <Link href="/my/repeat" className="rounded-2xl bg-shell text-white p-5 flex flex-col justify-between hover:brightness-110 transition">
-              <div><div className="inline-flex items-center gap-1.5 text-highlight font-semibold text-sm"><RotateCcw size={16} />Repeat Basket</div><div className="mt-2 text-xl font-bold leading-snug">자주 사는 {repeat.length}개 상품,<br />한 번에 다시 담기</div><p className="text-white/70 text-sm mt-2">구매주기와 현재 재고를 확인해 수량을 추천합니다.</p></div>
+              <div><div className="inline-flex items-center gap-1.5 text-highlight font-semibold text-sm"><RotateCcw size={16} />다시 구매</div><div className="mt-2 text-xl font-bold leading-snug">자주 사는 {repeat.length}개 상품,<br />한 번에 다시 담기</div><p className="text-white/70 text-sm mt-2">구매주기와 현재 재고를 확인해 수량을 추천합니다.</p></div>
               <div className="mt-4 inline-flex items-center gap-1 font-semibold">바로 가기 <ArrowRight size={16} /></div>
             </Link>
           </div>
@@ -169,7 +169,7 @@ export default function HomeView() {
             <div key={x.t} className="card p-4 flex gap-3"><span className="w-10 h-10 rounded-xl bg-soft text-primary flex items-center justify-center shrink-0"><x.icon size={20} /></span><div><div className="font-semibold text-sm">{x.t}</div><div className="text-xs text-muted mt-0.5">{x.d}</div></div></div>
           ))}
         </div>
-        <p className="mt-3 text-xs text-muted inline-flex items-center gap-1"><Clock3 size={12} />본 사이트는 시연(DEMO)입니다. 실제 결제·배송은 연결되지 않으며, 주문·재고·배송 Data Loop를 보여주기 위한 가상 서비스입니다.</p>
+        <p className="mt-3 text-xs text-muted inline-flex items-center gap-1"><Clock3 size={12} />본 사이트는 시연(시연)입니다. 실제 결제·배송은 연결되지 않으며, 주문·재고·배송 데이터 순환를 보여주기 위한 가상 서비스입니다.</p>
       </section>
     </div>
   );

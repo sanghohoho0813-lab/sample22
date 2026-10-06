@@ -15,14 +15,22 @@ export default function ClientGate({ children, fallback }: { children: ReactNode
   if (pathname?.startsWith("/ax"))
     return (
       <div className="space-y-4" aria-busy="true" aria-label="불러오는 중">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-[104px] rounded-2xl" />)}</div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton h-[104px] rounded-2xl" />
+          ))}
+        </div>
         <div className="skeleton h-[320px] rounded-2xl" />
       </div>
     );
   return (
-    <div className="mx-auto max-w-[1280px] px-4 py-6 space-y-4" aria-busy="true" aria-label="불러오는 중">
+    <div className="mx-auto max-w-[1280px] space-y-4 px-4 py-6" aria-busy="true" aria-label="불러오는 중">
       <div className="skeleton h-9 w-1/2 max-w-xs rounded-xl" />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton aspect-[3/4] rounded-2xl" />)}</div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="skeleton aspect-[3/4] rounded-2xl" />
+        ))}
+      </div>
     </div>
   );
 }

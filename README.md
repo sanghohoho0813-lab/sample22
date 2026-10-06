@@ -32,6 +32,47 @@ src/app/        Customer 14 routes · /ax 14 routes
 public/assets/  사진 자산 슬롯 (README 참조 — 파일 추가만으로 반영)
 ```
 
+## 개발
+
+### 스크립트
+
+| 명령 | 내용 |
+|---|---|
+| `npm run dev` | 개발 서버 (사진 자산 색인 `assets` 자동 실행) |
+| `npm run check` | **커밋 전 한 번에**: 타입체크 → ESLint → Prettier 검사 → 단위 테스트 |
+| `npm test` / `npm run test:coverage` | Vitest 단위 테스트 (KST 고정) / `src/lib` 커버리지 |
+| `npm run build && npm run test:e2e` | Playwright E2E — 데스크톱(1280)·모바일(390) 두 프로젝트 |
+| `npm run lint` · `npm run format` | ESLint(next/core-web-vitals + TS) · Prettier(+ Tailwind 클래스 정렬) |
+
+CI(`.github/workflows/ci.yml`)는 push·PR마다 같은 순서로 돌고, E2E 실패 시 trace·리포트를 아티팩트로 남깁니다.
+
+### 데이터 흐름
+
+```
+seed.ts (결정적 시드 → DemoData)
+   └─▶ store.ts (Zustand + localStorage 영속, 버전 마이그레이션) ── 고객 화면과 AX 화면이 같은 저장소를 공유
+          ├─ 고객 행동(담기·주문·조회) ─▶ demand(수요신호)·inventory(예약)·evidence(증빙 로그) 갱신
+          └─▶ engines.ts (재고 레이더·공급사 비교·출고 위험·재구매·브리핑 — 전부 규칙/통계, LLM 없음)
+                 └─▶ kpi.ts ─▶ AX 화면
+```
+
+- 모든 계산 로직은 `src/lib`의 **순수 함수**(인자로 `data`, `now`)라 UI 없이 테스트됩니다.
+- 시연 데이터는 시드 고정이라 "시연 초기화"를 눌러도 같은 데이터가 나옵니다(테스트로 보장).
+
+### 테스트가 지키는 것
+
+| 층 | 위치 | 주요 검증 |
+|---|---|---|
+| 단위 (79) | `tests/unit` | 출고마감 15:00 경계·"1분 미만", KST 일자 키, 검색 필터/정렬/동의어, 시드 참조 무결성·재현성, 공급사 점수·출고 위험 등급, 장바구니·주문·취소·재고 예약, 9개 테마 글자색 명암비 |
+| E2E (116) | `tests/e2e` | 26개 화면 × 2기기: 렌더링·`h1`·가로 넘침 0·**axe WCAG 2.1 AA serious/critical 0건** / 검색→주문→마이페이지→AX 출고 반영 / 바로 주문 격리 / 결제 연타 1건 / 본문 바로가기·Esc 포커스 복귀 |
+
+### 규칙
+
+- **날짜 키는 `dateKey()`** — `toISOString().slice(0, 10)`은 UTC라 KST 00~09시에 전날이 된다.
+- **글자색은 잉크 토큰** — `text-primary`·`text-teal` 등은 `tailwind.config.ts`의 `textColor`가 명암비 4.5:1 이상인 진한 색으로 바꿔 렌더링합니다(테마 색은 `themes.ts`의 `inkFor()`가 계산). 어두운 배경 위 글자는 `text-*-bright`, 흰 글자를 올리는 채움은 `bg-*-strong`.
+- **화면 문구는 한국어 사전(`labels.ts`)에서**, 데이터 키는 영어 유지.
+- 시연 수치는 Live로 표시하지 않는다(`source: "demo"`, `mode: "Demo Evidence"` — 테스트로 확인).
+
 ## 프로젝트 메모리
 
 - `PROJECT_SPEC.md` — 전략·제품·Data Bridge·Visual Reference 잠금

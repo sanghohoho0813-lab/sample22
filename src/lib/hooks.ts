@@ -62,7 +62,11 @@ export function useLookups() {
 export function useIsInIframe() {
   const [inIframe, setInIframe] = useState(false);
   useEffect(() => {
-    try { setInIframe(window.self !== window.top); } catch { setInIframe(true); }
+    try {
+      setInIframe(window.self !== window.top);
+    } catch {
+      setInIframe(true);
+    }
   }, []);
   return inIframe;
 }

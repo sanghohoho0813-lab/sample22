@@ -5,7 +5,9 @@ import ClientGate from "@/components/shared/ClientGate";
 export default function HomePage() {
   return (
     <CustomerShell>
-      <ClientGate><HomeView /></ClientGate>
+      <ClientGate>
+        <HomeView />
+      </ClientGate>
     </CustomerShell>
   );
 }

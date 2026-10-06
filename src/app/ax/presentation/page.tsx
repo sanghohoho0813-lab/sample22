@@ -9,7 +9,11 @@ export const metadata: Metadata = { title: "시연 모드 · AX 운영화면", r
 export default function Page() {
   return (
     <AxShell title="시연 모드" subtitle="실제 앱 기능을 따라가는 3~5분 단계별 시연">
-      <ClientGate><Suspense fallback={null}><PresentationView /></Suspense></ClientGate>
+      <ClientGate>
+        <Suspense fallback={null}>
+          <PresentationView />
+        </Suspense>
+      </ClientGate>
     </AxShell>
   );
 }

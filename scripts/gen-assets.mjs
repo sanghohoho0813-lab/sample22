@@ -11,14 +11,21 @@ function walk(dir) {
   if (!existsSync(dir)) return;
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) { walk(p); continue; }
+    if (statSync(p).isDirectory()) {
+      walk(p);
+      continue;
+    }
     const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
     if (!exts.has(ext)) continue;
-    const key = relative(root, p).split(sep).join("/").replace(/\.[^.]+$/, "");
+    const key = relative(root, p)
+      .split(sep)
+      .join("/")
+      .replace(/\.[^.]+$/, "");
     keys.push({ key, ext });
   }
 }
 walk(root);
 mkdirSync(join(process.cwd(), "src", "lib"), { recursive: true });
 writeFileSync(out, JSON.stringify(Object.fromEntries(keys.map((k) => [k.key, k.ext])), null, 2) + "\n");
+// eslint-disable-next-line no-console -- 빌드 로그
 console.log(`[assets] ${keys.length} image(s) indexed → src/lib/assets.generated.json`);

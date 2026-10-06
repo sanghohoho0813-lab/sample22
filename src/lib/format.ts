@@ -37,6 +37,16 @@ export const relTime = (s: string, now = new Date()) => {
 
 export const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
+/**
+ * 로컬(브라우저) 기준 "YYYY-MM-DD".
+ * `toISOString().slice(0, 10)`은 UTC 기준이라 KST 00:00~08:59에는 전날 날짜가 나온다.
+ * 일자 키(매출 집계·입고 예정일·주문번호·파일명)는 모두 이 함수를 쓴다.
+ */
+export function dateKey(d: Date = new Date()) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 /** 빠른배송 출고마감(15:00) 기준 카운트다운 */
 export function shipCutdown(now: Date, cutoffHour = 15) {
   const cutoff = new Date(now);
@@ -67,7 +77,12 @@ export function todayLabel(now: Date, withTime = true) {
   return withTime ? `${date} ${p(now.getHours())}:${p(now.getMinutes())}` : date;
 }
 
-export function deliveryPromise(type: "fast" | "standard" | "reserve", available: number, inboundEta?: string, now = new Date()) {
+export function deliveryPromise(
+  type: "fast" | "standard" | "reserve",
+  available: number,
+  inboundEta?: string,
+  now = new Date(),
+) {
   const p = (n: number) => String(n).padStart(2, "0");
   const addD = (n: number) => new Date(now.getTime() + n * 86400000);
   const label = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]})`;
@@ -75,14 +90,27 @@ export function deliveryPromise(type: "fast" | "standard" | "reserve", available
     if (inboundEta) {
       const eta = new Date(inboundEta);
       const arrive = new Date(eta.getTime() + 2 * 86400000);
-      return { kind: "reserve" as const, text: `입고예정 · ${label(arrive)} 도착 예약`, short: "예약배송", eta: arrive };
+      return {
+        kind: "reserve" as const,
+        text: `입고예정 · ${label(arrive)} 도착 예약`,
+        short: "예약배송",
+        eta: arrive,
+      };
     }
     return { kind: "soldout" as const, text: "일시품절", short: "품절", eta: undefined };
   }
   if (type === "fast") {
     const beforeCutoff = now.getHours() < 15;
     const eta = addD(beforeCutoff ? 1 : 2);
-    return { kind: "fast" as const, text: `${beforeCutoff ? "내일" : "모레"} ${label(eta)} 도착 예정`, short: "빠른배송", eta, note: beforeCutoff ? `오늘 15:00 전 주문 시 (현재 ${p(now.getHours())}:${p(now.getMinutes())})` : undefined };
+    return {
+      kind: "fast" as const,
+      text: `${beforeCutoff ? "내일" : "모레"} ${label(eta)} 도착 예정`,
+      short: "빠른배송",
+      eta,
+      note: beforeCutoff
+        ? `오늘 15:00 전 주문 시 (현재 ${p(now.getHours())}:${p(now.getMinutes())})`
+        : undefined,
+    };
   }
   const eta = addD(3);
   return { kind: "standard" as const, text: `${label(eta)} 도착 예정`, short: "일반배송", eta };

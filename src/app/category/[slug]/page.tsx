@@ -6,7 +6,9 @@ import ProductListView from "@/components/customer/ProductListView";
 import { CATEGORIES } from "@/lib/seed";
 import type { CategorySlug } from "@/lib/types";
 
-export function generateStaticParams() { return CATEGORIES.map((c) => ({ slug: c.slug })); }
+export function generateStaticParams() {
+  return CATEGORIES.map((c) => ({ slug: c.slug }));
+}
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const c = CATEGORIES.find((x) => x.slug === slug);
@@ -19,7 +21,14 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   if (!c) notFound();
   return (
     <CustomerShell>
-      <ClientGate><ProductListView title={c.name} subtitle={c.description} base={{ category: c.slug as CategorySlug }} lockCategory /></ClientGate>
+      <ClientGate>
+        <ProductListView
+          title={c.name}
+          subtitle={c.description}
+          base={{ category: c.slug as CategorySlug }}
+          lockCategory
+        />
+      </ClientGate>
     </CustomerShell>
   );
 }

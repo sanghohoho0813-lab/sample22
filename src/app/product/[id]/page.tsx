@@ -14,7 +14,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   return (
     <CustomerShell hideBottomNav backHref="/">
-      <ClientGate><ProductDetailView productId={id} /></ClientGate>
+      <ClientGate>
+        <ProductDetailView productId={id} />
+      </ClientGate>
     </CustomerShell>
   );
 }

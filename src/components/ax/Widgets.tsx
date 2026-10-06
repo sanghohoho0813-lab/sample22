@@ -13,47 +13,146 @@ export function CountUp({ text, duration = 650 }: { text: string; duration?: num
   const started = useRef(false);
   useEffect(() => {
     if (!Number.isFinite(target)) return;
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setV(target); return; }
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setV(target);
+      return;
+    }
     started.current = true;
-    let raf = 0; const t0 = performance.now();
-    const tick = (t: number) => { const k = Math.min(1, (t - t0) / duration); const e = 1 - Math.pow(1 - k, 3); setV(target * e); if (k < 1) raf = requestAnimationFrame(tick); };
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / duration);
+      const e = 1 - Math.pow(1 - k, 3);
+      setV(target * e);
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target, duration]);
   if (!m || !Number.isFinite(target)) return <>{text}</>;
-  const shown = (decimals ? v.toFixed(decimals) : Math.round(v).toString()).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return <>{m[1]}{shown}{m[3]}</>;
+  const shown = (decimals ? v.toFixed(decimals) : Math.round(v).toString()).replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    ",",
+  );
+  return (
+    <>
+      {m[1]}
+      {shown}
+      {m[3]}
+    </>
+  );
 }
 
-export function KpiCard({ label, value, sub, delta, href, tone = "neutral", spark, icon, onClick, big = false }: { label: ReactNode; value: ReactNode; sub?: ReactNode; delta?: number; href?: string; tone?: "neutral" | "danger" | "warn" | "good" | "primary"; spark?: number[]; icon?: ReactNode; onClick?: () => void; big?: boolean }) {
-  const toneBar = { neutral: "bg-line", danger: "bg-danger", warn: "bg-orange", good: "bg-teal", primary: "bg-primary" }[tone];
+export function KpiCard({
+  label,
+  value,
+  sub,
+  delta,
+  href,
+  tone = "neutral",
+  spark,
+  icon,
+  onClick,
+  big = false,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  sub?: ReactNode;
+  delta?: number;
+  href?: string;
+  tone?: "neutral" | "danger" | "warn" | "good" | "primary";
+  spark?: number[];
+  icon?: ReactNode;
+  onClick?: () => void;
+  big?: boolean;
+}) {
+  const toneBar = {
+    neutral: "bg-line",
+    danger: "bg-danger",
+    warn: "bg-orange",
+    good: "bg-teal",
+    primary: "bg-primary",
+  }[tone];
   const inner = (
-    <div className={`card p-4 h-full flex flex-col relative overflow-hidden ${href || onClick ? "lift cursor-pointer" : ""}`}>
-      <span className={`absolute left-0 top-3 bottom-3 w-1 rounded-r grow-bar ${toneBar}`} />
+    <div
+      className={`card relative flex h-full flex-col overflow-hidden p-4 ${href || onClick ? "lift cursor-pointer" : ""}`}
+    >
+      <span className={`grow-bar absolute bottom-3 left-0 top-3 w-1 rounded-r ${toneBar}`} />
       <div className="flex items-start justify-between gap-2">
-        <div className="text-sm text-muted font-semibold flex items-center gap-1.5 min-w-0 leading-snug">{icon}<span className="min-w-0">{label}</span></div>
+        <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold leading-snug text-muted">
+          {icon}
+          <span className="min-w-0">{label}</span>
+        </div>
         {(href || onClick) && <ChevronRight size={16} className="text-muted" />}
       </div>
-      <div className={`mt-1.5 font-black tabular-nums tracking-tight whitespace-nowrap leading-tight ${big ? "text-[clamp(1.5rem,7vw,2.25rem)]" : "text-[clamp(1.375rem,6vw,1.875rem)]"}`}>{typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}</div>
-      <div className="mt-1 flex items-start gap-2 text-xs text-muted min-h-[18px]">
-        {delta !== undefined && <span className={`inline-flex items-center gap-0.5 font-semibold ${delta >= 0 ? "text-teal" : "text-danger"}`}>{delta >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(delta * 100).toFixed(1)}%</span>}
-        {sub && <span className="min-w-0 line-clamp-2 leading-snug">{sub}</span>}
+      <div
+        className={`mt-1.5 whitespace-nowrap font-black tabular-nums leading-tight tracking-tight ${big ? "text-[clamp(1.5rem,7vw,2.25rem)]" : "text-[clamp(1.375rem,6vw,1.875rem)]"}`}
+      >
+        {typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}
       </div>
-      {spark && <div className="mt-2 -mb-1"><Sparkline values={spark} width={160} height={30} /></div>}
+      <div className="mt-1 flex min-h-[18px] items-start gap-2 text-xs text-muted">
+        {delta !== undefined && (
+          <span
+            className={`inline-flex items-center gap-0.5 font-semibold ${delta >= 0 ? "text-teal" : "text-danger"}`}
+          >
+            {delta >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+            {Math.abs(delta * 100).toFixed(1)}%
+          </span>
+        )}
+        {sub && <span className="line-clamp-2 min-w-0 leading-snug">{sub}</span>}
+      </div>
+      {spark && (
+        <div className="-mb-1 mt-2">
+          <Sparkline values={spark} width={160} height={30} />
+        </div>
+      )}
     </div>
   );
-  if (href) return <Link href={href} className="block h-full">{inner}</Link>;
-  if (onClick) return <button onClick={onClick} className="block h-full w-full text-left">{inner}</button>;
+  if (href)
+    return (
+      <Link href={href} className="block h-full">
+        {inner}
+      </Link>
+    );
+  if (onClick)
+    return (
+      <button onClick={onClick} className="block h-full w-full text-left">
+        {inner}
+      </button>
+    );
   return inner;
 }
 
-export function Panel({ title, sub, right, children, className = "", id, tour }: { title?: ReactNode; sub?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; id?: string; tour?: string }) {
+export function Panel({
+  title,
+  sub,
+  right,
+  children,
+  className = "",
+  id,
+  tour,
+}: {
+  title?: ReactNode;
+  sub?: ReactNode;
+  right?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  id?: string;
+  tour?: string;
+}) {
   return (
     <section id={id} data-tour={tour} className={`card p-4 sm:p-5 ${className}`}>
       {(title || right) && (
-        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-3">
-          <div className="min-w-0 flex-1 basis-[15rem]">{title && <h2 className="font-bold text-lg leading-snug [&>span.inline-flex]:items-start [&>span.inline-flex>svg]:mt-[3px] [&>span.inline-flex>svg]:shrink-0">{title}</h2>}{sub && <p className="text-sm text-muted mt-0.5 leading-relaxed">{sub}</p>}</div>
-          {right && <div className="shrink-0 flex flex-wrap items-center gap-2">{right}</div>}
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1 basis-[15rem]">
+            {title && (
+              <h2 className="text-lg font-bold leading-snug [&>span.inline-flex>svg]:mt-[3px] [&>span.inline-flex>svg]:shrink-0 [&>span.inline-flex]:items-start">
+                {title}
+              </h2>
+            )}
+            {sub && <p className="mt-0.5 text-sm leading-relaxed text-muted">{sub}</p>}
+          </div>
+          {right && <div className="flex shrink-0 flex-wrap items-center gap-2">{right}</div>}
         </div>
       )}
       {children}
@@ -61,19 +160,55 @@ export function Panel({ title, sub, right, children, className = "", id, tour }:
   );
 }
 
-export function Stat({ label, value, sub, className = "" }: { label: ReactNode; value: ReactNode; sub?: ReactNode; className?: string }) {
-  return <div className={`rounded-xl bg-mist px-3 py-2.5 ${className}`}><div className="text-xs text-muted">{label}</div><div className="font-bold tabular-nums text-[19px] leading-tight mt-0.5 whitespace-nowrap">{value}</div>{sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}</div>;
+export function Stat({
+  label,
+  value,
+  sub,
+  className = "",
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  sub?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-xl bg-mist px-3 py-2.5 ${className}`}>
+      <div className="text-xs text-muted">{label}</div>
+      <div className="mt-0.5 whitespace-nowrap text-[19px] font-bold tabular-nums leading-tight">{value}</div>
+      {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
+    </div>
+  );
 }
 
 export function Reasons({ items, title = "판단근거" }: { items: string[]; title?: string }) {
   return (
     <div>
-      <div className="text-xs font-semibold text-muted uppercase tracking-wide">{title}</div>
-      <ul className="mt-1.5 space-y-1">{items.map((r, i) => <li key={i} className="flex items-start gap-2 text-[16px]"><span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-primary shrink-0" />{r}</li>)}</ul>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted">{title}</div>
+      <ul className="mt-1.5 space-y-1">
+        {items.map((r, i) => (
+          <li key={i} className="flex items-start gap-2 text-[16px]">
+            <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+            {r}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-export function Field({ label, children, className = "" }: { label: ReactNode; children: ReactNode; className?: string }) {
-  return <div className={className}><div className="text-xs text-muted">{label}</div><div className="font-semibold text-[17px] mt-0.5">{children}</div></div>;
+export function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div className="text-xs text-muted">{label}</div>
+      <div className="mt-0.5 text-[17px] font-semibold">{children}</div>
+    </div>
+  );
 }

@@ -9,15 +9,7 @@ export interface BaseRecord {
   source: Provenance;
 }
 
-export type CategorySlug =
-  | "food"
-  | "living"
-  | "kitchen"
-  | "home"
-  | "digital"
-  | "pet"
-  | "baby"
-  | "health";
+export type CategorySlug = "food" | "living" | "kitchen" | "home" | "digital" | "pet" | "baby" | "health";
 
 export interface Category {
   slug: CategorySlug;
@@ -105,13 +97,7 @@ export interface InventoryMovement extends BaseRecord {
   refId?: string;
 }
 
-export type POStatus =
-  | "draft"
-  | "requested"
-  | "confirmed"
-  | "in_transit"
-  | "received"
-  | "cancelled";
+export type POStatus = "draft" | "requested" | "confirmed" | "in_transit" | "received" | "cancelled";
 
 export interface PurchaseOrder extends BaseRecord {
   supplierId: string;
@@ -219,14 +205,7 @@ export interface ReturnRequest extends BaseRecord {
   orderId: string;
   skuId: string;
   reason:
-    | "defect"
-    | "damaged"
-    | "wrong_item"
-    | "delay"
-    | "info_mismatch"
-    | "missing"
-    | "change_mind"
-    | "other";
+    "defect" | "damaged" | "wrong_item" | "delay" | "info_mismatch" | "missing" | "change_mind" | "other";
   status: "requested" | "approved" | "received" | "refunded" | "rejected";
   supplierId?: string;
 }
@@ -260,14 +239,7 @@ export type ActionType =
   | "promo_adjust";
 
 export type ActionStage =
-  | "recommended"
-  | "reviewing"
-  | "approved"
-  | "requested"
-  | "in_progress"
-  | "done"
-  | "dismissed"
-  | "held";
+  "recommended" | "reviewing" | "approved" | "requested" | "in_progress" | "done" | "dismissed" | "held";
 
 export type Urgency = "critical" | "high" | "mid" | "low";
 

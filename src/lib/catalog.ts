@@ -33,12 +33,20 @@ export function summarize(data: DemoData, product: Product, now = new Date()): P
   const popularity = skus.reduce((a, s) => a + (demand.get(s.id)?.order7d ?? 0), 0);
   const prev = skus.reduce((a, s) => a + (demand.get(s.id)?.orderPrev7d ?? 0), 0);
   return {
-    product, skus, defaultSku,
+    product,
+    skus,
+    defaultSku,
     minPrice: Math.round(minPrice),
     listPrice: defaultSku.listPrice,
-    discountRate: defaultSku.listPrice > 0 ? Math.round((1 - defaultSku.salePrice / defaultSku.listPrice) * 100) : 0,
-    bestDiscount: Math.max(0, ...skus.map((s) => (s.listPrice > 0 ? Math.round((1 - s.salePrice / s.listPrice) * 100) : 0))),
-    available, totalAvailable, inboundEta,
+    discountRate:
+      defaultSku.listPrice > 0 ? Math.round((1 - defaultSku.salePrice / defaultSku.listPrice) * 100) : 0,
+    bestDiscount: Math.max(
+      0,
+      ...skus.map((s) => (s.listPrice > 0 ? Math.round((1 - s.salePrice / s.listPrice) * 100) : 0)),
+    ),
+    available,
+    totalAvailable,
+    inboundEta,
     soldOut: totalAvailable <= 0,
     promise: deliveryPromise(product.deliveryType, totalAvailable, inboundEta, now),
     popularity,
@@ -60,7 +68,14 @@ export interface SearchFilters {
 }
 
 const SYNONYMS: Record<string, string[]> = {
-  "물티슈": ["물티슈", "티슈", "wipes"], "세제": ["세제", "세탁", "주방세제"], "생수": ["생수", "물", "워터"], "패드": ["패드", "배변"], "기저귀": ["기저귀"], "커피": ["커피", "드립"], "가습기": ["가습기"], "마스크": ["마스크", "kf94"],
+  물티슈: ["물티슈", "티슈", "wipes"],
+  세제: ["세제", "세탁", "주방세제"],
+  생수: ["생수", "물", "워터"],
+  패드: ["패드", "배변"],
+  기저귀: ["기저귀"],
+  커피: ["커피", "드립"],
+  가습기: ["가습기"],
+  마스크: ["마스크", "kf94"],
 };
 
 export function searchProducts(data: DemoData, f: SearchFilters, now = new Date()): ProductSummary[] {
@@ -71,7 +86,8 @@ export function searchProducts(data: DemoData, f: SearchFilters, now = new Date(
   let list = data.products.filter((p) => p.status === "active").map((p) => summarize(data, p, now));
   if (terms.length) {
     list = list.filter(({ product: p }) => {
-      const hay = `${p.name} ${p.description} ${p.tags.join(" ")} ${brandName.get(p.brandId)} ${catName.get(p.categorySlug)}`.toLowerCase();
+      const hay =
+        `${p.name} ${p.description} ${p.tags.join(" ")} ${brandName.get(p.brandId)} ${catName.get(p.categorySlug)}`.toLowerCase();
       return terms.every((t) => hay.includes(t) || (SYNONYMS[t]?.some((s) => hay.includes(s)) ?? false));
     });
   }
@@ -81,14 +97,20 @@ export function searchProducts(data: DemoData, f: SearchFilters, now = new Date(
   if (f.brandIds?.length) list = list.filter((s) => f.brandIds!.includes(s.product.brandId));
   if (f.minRating) list = list.filter((s) => s.product.rating >= f.minRating!);
   if (f.discountOnly) list = list.filter((s) => s.bestDiscount > 0);
-  if (f.delivery && f.delivery !== "all") list = list.filter((s) => (f.delivery === "reserve" ? s.promise.kind === "reserve" : s.product.deliveryType === f.delivery && !s.soldOut));
+  if (f.delivery && f.delivery !== "all")
+    list = list.filter((s) =>
+      f.delivery === "reserve"
+        ? s.promise.kind === "reserve"
+        : s.product.deliveryType === f.delivery && !s.soldOut,
+    );
   if (f.stock === "in") list = list.filter((s) => !s.soldOut);
   if (f.stock === "reserve") list = list.filter((s) => s.promise.kind === "reserve");
   const sort = f.sort ?? "popular";
   list.sort((a, b) => {
     if (sort === "price_asc") return a.minPrice - b.minPrice;
     if (sort === "price_desc") return b.minPrice - a.minPrice;
-    if (sort === "rating") return b.product.rating - a.product.rating || b.product.reviewCount - a.product.reviewCount;
+    if (sort === "rating")
+      return b.product.rating - a.product.rating || b.product.reviewCount - a.product.reviewCount;
     if (sort === "new") return b.product.id < a.product.id ? -1 : 1;
     if (sort === "discount") return b.bestDiscount - a.bestDiscount;
     return b.popularity - a.popularity;
@@ -96,7 +118,16 @@ export function searchProducts(data: DemoData, f: SearchFilters, now = new Date(
   return list;
 }
 
-export const SUGGESTED_SEARCHES = ["물티슈", "세탁세제", "생수 2L", "배변패드", "기저귀", "즉석밥", "주방세제", "KF94"];
+export const SUGGESTED_SEARCHES = [
+  "물티슈",
+  "세탁세제",
+  "생수 2L",
+  "배변패드",
+  "기저귀",
+  "즉석밥",
+  "주방세제",
+  "KF94",
+];
 
 export function autocomplete(data: DemoData, q: string): string[] {
   const t = q.trim().toLowerCase();
@@ -104,5 +135,8 @@ export function autocomplete(data: DemoData, q: string): string[] {
   const names = data.products.map((p) => p.name);
   const cats = data.categories.map((c) => c.name);
   const brands = data.brands.map((b) => b.name);
-  return Array.from(new Set([...names, ...cats, ...brands].filter((n) => n.toLowerCase().includes(t)))).slice(0, 8);
+  return Array.from(new Set([...names, ...cats, ...brands].filter((n) => n.toLowerCase().includes(t)))).slice(
+    0,
+    8,
+  );
 }

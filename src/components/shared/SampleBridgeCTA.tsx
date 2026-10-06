@@ -33,28 +33,54 @@ export default function SampleBridgeCTA({
     <section
       aria-labelledby="mirae-bridge-title"
       className={`mx-auto w-full ${isAx ? "max-w-[1600px] px-0" : "max-w-[1280px] px-4"} ${className}`}
-      style={{ ["--cta-accent" as string]: accent, ["--cta-rgb" as string]: accentRgb, ["--cta-deep" as string]: deep }}
+      style={{
+        ["--cta-accent" as string]: accent,
+        ["--cta-rgb" as string]: accentRgb,
+        ["--cta-deep" as string]: deep,
+      }}
     >
       <div className="relative overflow-hidden rounded-3xl border border-line bg-white shadow-card">
         {/* 좌측 브랜드 레일 + 은은한 배경 그라데이션 */}
-        <span aria-hidden className="absolute inset-y-0 left-0 w-1.5" style={{ background: `linear-gradient(180deg, var(--cta-accent), var(--cta-deep))` }} />
-        <span aria-hidden className="absolute -right-24 -top-24 h-64 w-64 rounded-full opacity-[0.07]" style={{ background: `radial-gradient(circle, var(--cta-accent), transparent 68%)` }} />
+        <span
+          aria-hidden
+          className="absolute inset-y-0 left-0 w-1.5"
+          style={{ background: `linear-gradient(180deg, var(--cta-accent), var(--cta-deep))` }}
+        />
+        <span
+          aria-hidden
+          className="absolute -right-24 -top-24 h-64 w-64 rounded-full opacity-[0.07]"
+          style={{ background: `radial-gradient(circle, var(--cta-accent), transparent 68%)` }}
+        />
 
         <div className="relative grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-10 lg:p-10">
           {/* ── 1. 미래AI랩 소개 ── */}
           <div className="min-w-0">
-            <span className="cta-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[13px] font-bold tracking-[0.14em]" style={{ borderColor: "rgb(var(--cta-rgb) / 0.32)", color: "var(--cta-deep)", background: "rgb(var(--cta-rgb) / 0.07)" }}>
-              <span aria-hidden className="cta-dot h-1.5 w-1.5 rounded-full" style={{ background: "var(--cta-accent)" }} />
+            <span
+              className="cta-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[13px] font-bold tracking-[0.14em]"
+              style={{
+                borderColor: "rgb(var(--cta-rgb) / 0.32)",
+                color: "var(--cta-deep)",
+                background: "rgb(var(--cta-rgb) / 0.07)",
+              }}
+            >
+              <span
+                aria-hidden
+                className="cta-dot h-1.5 w-1.5 rounded-full"
+                style={{ background: "var(--cta-accent)" }}
+              />
               {BRIDGE_COPY.badge}
             </span>
 
-            <h2 id="mirae-bridge-title" className="mt-3 text-[22px] sm:text-[26px] lg:text-[28px] font-bold leading-snug tracking-tight text-balance" style={{ color: "var(--cta-deep)" }}>
+            <h2
+              id="mirae-bridge-title"
+              className="mt-3 text-balance text-[22px] font-bold leading-snug tracking-tight sm:text-[26px] lg:text-[28px]"
+              style={{ color: "var(--cta-deep)" }}
+            >
               {BRIDGE_COPY.headline}
             </h2>
 
-            <p className="mt-3 text-[17px] leading-relaxed text-ink/80 max-w-2xl">
-              <b className="font-bold text-ink">{BRIDGE_COPY.intro}</b>{" "}
-              {BRIDGE_COPY.description}
+            <p className="mt-3 max-w-2xl text-[17px] leading-relaxed text-ink/80">
+              <b className="font-bold text-ink">{BRIDGE_COPY.intro}</b> {BRIDGE_COPY.description}
             </p>
             <p className="mt-2 text-sm text-muted">{BRIDGE_COPY.note}</p>
           </div>
@@ -66,18 +92,35 @@ export default function SampleBridgeCTA({
               target="_blank"
               rel="noreferrer"
               className="cta-primary cta-sweep group relative inline-flex min-h-[58px] items-center justify-center gap-2 overflow-hidden rounded-2xl px-6 text-[18px] font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              style={{ backgroundColor: "var(--cta-deep)", backgroundImage: "linear-gradient(135deg, rgb(var(--cta-rgb) / 0) 30%, rgb(var(--cta-rgb) / 0.45) 100%)" }}
+              style={{
+                backgroundColor: "var(--cta-deep)",
+                backgroundImage:
+                  "linear-gradient(135deg, rgb(var(--cta-rgb) / 0) 30%, rgb(var(--cta-rgb) / 0.45) 100%)",
+              }}
             >
               <span className="relative z-10">{BRIDGE_COPY.primary}</span>
-              <ArrowRight size={19} className="relative z-10 transition-transform duration-150 group-hover:translate-x-0.5" />
+              <ArrowRight
+                size={19}
+                className="relative z-10 transition-transform duration-150 group-hover:translate-x-0.5"
+              />
             </a>
 
             <div className="grid grid-cols-2 gap-2">
-              <a href={samplesHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 text-[15px] font-semibold text-ink transition-colors duration-150 hover:bg-mist hover:border-muted/40">
+              <a
+                href={samplesHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 text-[15px] font-semibold text-ink transition-colors duration-150 hover:border-muted/40 hover:bg-mist"
+              >
                 <LayoutGrid size={16} style={{ color: "var(--cta-accent)" }} />
                 {BRIDGE_COPY.samples}
               </a>
-              <a href={homeHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 text-[15px] font-semibold text-ink transition-colors duration-150 hover:bg-mist hover:border-muted/40">
+              <a
+                href={homeHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 text-[15px] font-semibold text-ink transition-colors duration-150 hover:border-muted/40 hover:bg-mist"
+              >
                 <Globe size={16} style={{ color: "var(--cta-accent)" }} />
                 {BRIDGE_COPY.home}
               </a>
@@ -97,23 +140,35 @@ export function SidebarBridgeCTA({
 }: Omit<SampleBridgeCTAProps, "surface" | "className">) {
   return (
     <div className="px-2.5 pb-2.5 pt-1 [@media(max-height:860px)]:pb-2">
-      <div className="rounded-xl border border-white/12 bg-white/[0.06] p-2">
+      <div className="border-white/12 rounded-xl border bg-white/[0.06] p-2">
         {/* 세로가 짧은 노트북 화면에서는 라벨을 숨기고 버튼 높이를 줄여 메뉴 공간을 확보 (버튼 3개는 유지) */}
-        <div className="px-1 pb-1.5 text-[13px] font-bold tracking-[0.1em] text-white/55 [@media(max-height:860px)]:hidden">{BRIDGE_COPY.badge}</div>
+        <div className="px-1 pb-1.5 text-[13px] font-bold tracking-[0.1em] text-white/55 [@media(max-height:860px)]:hidden">
+          {BRIDGE_COPY.badge}
+        </div>
         <a
           href={consultHref}
           target="_blank"
           rel="noreferrer"
-          className="cta-sweep relative flex min-h-[44px] [@media(max-height:860px)]:min-h-[40px] items-center justify-between gap-1 overflow-hidden rounded-lg bg-white px-3 text-[15px] font-bold text-shell transition-transform duration-150 hover:-translate-y-px"
+          className="cta-sweep relative flex min-h-[44px] items-center justify-between gap-1 overflow-hidden rounded-lg bg-white px-3 text-[15px] font-bold text-shell transition-transform duration-150 hover:-translate-y-px [@media(max-height:860px)]:min-h-[40px]"
         >
           <span className="relative z-10 truncate">{BRIDGE_COPY.primary}</span>
           <ArrowRight size={15} className="relative z-10 shrink-0" />
         </a>
         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-          <a href={samplesHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[38px] [@media(max-height:860px)]:min-h-[32px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[14px] font-semibold text-white/85 transition-colors hover:bg-white/20">
+          <a
+            href={samplesHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-[38px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[14px] font-semibold text-white/85 transition-colors hover:bg-white/20 [@media(max-height:860px)]:min-h-[32px]"
+          >
             다른 샘플 <ArrowUpRight size={12} />
           </a>
-          <a href={homeHref} target="_blank" rel="noreferrer" className="inline-flex min-h-[38px] [@media(max-height:860px)]:min-h-[32px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[14px] font-semibold text-white/85 transition-colors hover:bg-white/20">
+          <a
+            href={homeHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-[38px] items-center justify-center gap-1 rounded-lg bg-white/10 px-1.5 text-[14px] font-semibold text-white/85 transition-colors hover:bg-white/20 [@media(max-height:860px)]:min-h-[32px]"
+          >
             홈페이지 <ArrowUpRight size={12} />
           </a>
         </div>

@@ -9,7 +9,11 @@ export const metadata: Metadata = { title: "공급사·구매 · AX 운영화면
 export default function Page() {
   return (
     <AxShell title="공급사·구매" subtitle="단가·납기·충족률·불량을 함께 비교하는 공급사 비교">
-      <ClientGate><Suspense fallback={null}><SuppliersView /></Suspense></ClientGate>
+      <ClientGate>
+        <Suspense fallback={null}>
+          <SuppliersView />
+        </Suspense>
+      </ClientGate>
     </AxShell>
   );
 }

@@ -3,33 +3,100 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { generateDemoData } from "./seed";
 import { assessOrderRisks, buildSkuInsights, compareSuppliers } from "./engines";
-import type { AXAction, ActionStage, CartItem, DemoData, EvidenceLog, EvidenceType, Order, OrderStage, RoleKey } from "./types";
+import type {
+  AXAction,
+  ActionStage,
+  CartItem,
+  DemoData,
+  EvidenceLog,
+  EvidenceType,
+  Order,
+  OrderStage,
+  RoleKey,
+} from "./types";
 import { DEFAULT_THEME } from "./themes";
 import { STAGE_LABEL } from "./labels";
+import { dateKey } from "./format";
 
 export type FontScale = "normal" | "large";
 export type DeviceMode = "desktop" | "mobile";
 
-export const ROLE_LABEL: Record<RoleKey, string> = { owner: "대표", buyer: "구매담당", ops: "운영담당", cs: "CS담당" };
-export const ROLE_PERSON: Record<RoleKey, string> = { owner: "대표 정유통", buyer: "구매담당 김구매", ops: "운영담당 박운영", cs: "CS담당 이CS" };
+export const ROLE_LABEL: Record<RoleKey, string> = {
+  owner: "대표",
+  buyer: "구매담당",
+  ops: "운영담당",
+  cs: "CS담당",
+};
+export const ROLE_PERSON: Record<RoleKey, string> = {
+  owner: "대표 정유통",
+  buyer: "구매담당 김구매",
+  ops: "운영담당 박운영",
+  cs: "CS담당 이CS",
+};
 
 export const ORDER_STAGE_LABEL: Record<OrderStage, string> = {
-  new: "신규주문", confirmed: "주문확인", picking_wait: "피킹대기", picking: "피킹중", packing_wait: "포장대기", ship_wait: "출고대기", shipped: "출고완료", in_transit: "배송중", delivered: "배송완료", cancelled: "취소", return: "반품·교환",
+  new: "신규주문",
+  confirmed: "주문확인",
+  picking_wait: "피킹대기",
+  picking: "피킹중",
+  packing_wait: "포장대기",
+  ship_wait: "출고대기",
+  shipped: "출고완료",
+  in_transit: "배송중",
+  delivered: "배송완료",
+  cancelled: "취소",
+  return: "반품·교환",
 };
 export const CUSTOMER_STAGE_LABEL: Record<OrderStage, string> = {
-  new: "주문접수", confirmed: "주문접수", picking_wait: "상품준비", picking: "상품준비", packing_wait: "상품준비", ship_wait: "상품준비", shipped: "출고완료", in_transit: "배송중", delivered: "배송완료", cancelled: "취소됨", return: "반품·교환",
+  new: "주문접수",
+  confirmed: "주문접수",
+  picking_wait: "상품준비",
+  picking: "상품준비",
+  packing_wait: "상품준비",
+  ship_wait: "상품준비",
+  shipped: "출고완료",
+  in_transit: "배송중",
+  delivered: "배송완료",
+  cancelled: "취소됨",
+  return: "반품·교환",
 };
 export const ACTION_STAGE_LABEL: Record<ActionStage, string> = {
-  recommended: "추천됨", reviewing: "검토중", approved: "승인", requested: "발주요청", in_progress: "실행중", done: "완료", dismissed: "보류해제", held: "보류",
+  recommended: "추천됨",
+  reviewing: "검토중",
+  approved: "승인",
+  requested: "발주요청",
+  in_progress: "실행중",
+  done: "완료",
+  dismissed: "보류해제",
+  held: "보류",
 };
 
 /** localStorage 래퍼 — 용량 초과·Private 모드 등에서 예외로 앱이 죽지 않도록 */
 let lastWritten: string | null = null;
 const memoryFallback = new Map<string, string>();
 const safeStorage = {
-  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return memoryFallback.get(k) ?? null; } },
-  setItem: (k: string, v: string) => { lastWritten = v; try { localStorage.setItem(k, v); } catch { memoryFallback.set(k, v); } },
-  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { memoryFallback.delete(k); } },
+  getItem: (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return memoryFallback.get(k) ?? null;
+    }
+  },
+  setItem: (k: string, v: string) => {
+    lastWritten = v;
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      memoryFallback.set(k, v);
+    }
+  },
+  removeItem: (k: string) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      memoryFallback.delete(k);
+    }
+  },
 };
 
 const uid = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -53,7 +120,11 @@ export interface UiState {
   pilot: PilotState;
 }
 
-export interface BaselineEntry { value?: number; measuredAt?: string; note?: string }
+export interface BaselineEntry {
+  value?: number;
+  measuredAt?: string;
+  note?: string;
+}
 export interface PilotState {
   owner?: string;
   ownerRole?: RoleKey;
@@ -63,18 +134,90 @@ export interface PilotState {
 }
 
 /** Baseline 측정지점 — 숫자는 회사가 실측해 입력한다 (DO NOT INVENT) */
-export const BASELINE_KPIS: { key: string; group: "COST" | "REVENUE" | "SCALE"; label: string; unit: string; point: string }[] = [
-  { key: "weekly_analysis_hours", group: "COST", label: "주간 재고·발주 분석 소요시간", unit: "시간/주", point: "구매담당이 판매·재고·공급사 자료를 대조해 발주안을 만드는 데 쓰는 주간 시간" },
-  { key: "supplier_compare_min", group: "COST", label: "공급사 비교 소요시간", unit: "분/건", point: "발주 1건당 단가·납기·최소수량을 확인하는 시간 (전화·카톡 포함)" },
-  { key: "urgent_po_ratio", group: "COST", label: "긴급발주 비중", unit: "%", point: "월 발주 건수 중 리드타임 미만 긴급발주 비율" },
-  { key: "order_status_min", group: "COST", label: "주문상태 확인·전달시간", unit: "분/건", point: "고객 문의 1건당 물류 확인 후 회신까지 시간" },
-  { key: "conversion_rate", group: "REVENUE", label: "구매 전환율", unit: "%", point: "상품상세 방문고객 대비 주문완료 고객" },
-  { key: "stockout_rate", group: "REVENUE", label: "품절률", unit: "%", point: "활성 SKU 중 가용재고 0인 SKU 비율 (주간 평균)" },
-  { key: "repeat_rate", group: "REVENUE", label: "재구매율", unit: "%", point: "전체 구매고객 중 2회 이상 구매 고객" },
-  { key: "promo_margin", group: "REVENUE", label: "프로모션 실질마진율", unit: "%", point: "(매출 − 원가 − 할인 − 배송비) ÷ 매출, 캠페인별" },
-  { key: "sku_per_buyer", group: "SCALE", label: "구매담당 1인당 관리 SKU", unit: "개", point: "활성 SKU ÷ 구매담당 인원" },
-  { key: "orders_per_ops", group: "SCALE", label: "운영직원 1인당 처리 주문", unit: "건/일", point: "일 출고 주문 ÷ 물류·운영 인원" },
-  { key: "self_service_ratio", group: "SCALE", label: "마이페이지 자체 조회 비율", unit: "%", point: "배송 문의 중 마이페이지에서 자체 확인한 비율" },
+export const BASELINE_KPIS: {
+  key: string;
+  group: "COST" | "REVENUE" | "SCALE";
+  label: string;
+  unit: string;
+  point: string;
+}[] = [
+  {
+    key: "weekly_analysis_hours",
+    group: "COST",
+    label: "주간 재고·발주 분석 소요시간",
+    unit: "시간/주",
+    point: "구매담당이 판매·재고·공급사 자료를 대조해 발주안을 만드는 데 쓰는 주간 시간",
+  },
+  {
+    key: "supplier_compare_min",
+    group: "COST",
+    label: "공급사 비교 소요시간",
+    unit: "분/건",
+    point: "발주 1건당 단가·납기·최소수량을 확인하는 시간 (전화·카톡 포함)",
+  },
+  {
+    key: "urgent_po_ratio",
+    group: "COST",
+    label: "긴급발주 비중",
+    unit: "%",
+    point: "월 발주 건수 중 리드타임 미만 긴급발주 비율",
+  },
+  {
+    key: "order_status_min",
+    group: "COST",
+    label: "주문상태 확인·전달시간",
+    unit: "분/건",
+    point: "고객 문의 1건당 물류 확인 후 회신까지 시간",
+  },
+  {
+    key: "conversion_rate",
+    group: "REVENUE",
+    label: "구매 전환율",
+    unit: "%",
+    point: "상품상세 방문고객 대비 주문완료 고객",
+  },
+  {
+    key: "stockout_rate",
+    group: "REVENUE",
+    label: "품절률",
+    unit: "%",
+    point: "활성 SKU 중 가용재고 0인 SKU 비율 (주간 평균)",
+  },
+  {
+    key: "repeat_rate",
+    group: "REVENUE",
+    label: "재구매율",
+    unit: "%",
+    point: "전체 구매고객 중 2회 이상 구매 고객",
+  },
+  {
+    key: "promo_margin",
+    group: "REVENUE",
+    label: "프로모션 실질마진율",
+    unit: "%",
+    point: "(매출 − 원가 − 할인 − 배송비) ÷ 매출, 캠페인별",
+  },
+  {
+    key: "sku_per_buyer",
+    group: "SCALE",
+    label: "구매담당 1인당 관리 SKU",
+    unit: "개",
+    point: "활성 SKU ÷ 구매담당 인원",
+  },
+  {
+    key: "orders_per_ops",
+    group: "SCALE",
+    label: "운영직원 1인당 처리 주문",
+    unit: "건/일",
+    point: "일 출고 주문 ÷ 물류·운영 인원",
+  },
+  {
+    key: "self_service_ratio",
+    group: "SCALE",
+    label: "마이페이지 자체 조회 비율",
+    unit: "%",
+    point: "배송 문의 중 마이페이지에서 자체 확인한 비율",
+  },
 ];
 
 export const PILOT_CHECKLIST: { key: string; label: string; auto?: boolean }[] = [
@@ -106,11 +249,19 @@ export interface StoreState {
   pushRecentSearch: (q: string) => void;
   clearRecentSearches: () => void;
   recordEvent: (name: string, skuId?: string) => void;
-  placeOrder: (opts: { addressNote?: string; isRepeat?: boolean; itemsOverride?: CartItem[] }) => Order | null;
+  placeOrder: (opts: {
+    addressNote?: string;
+    isRepeat?: boolean;
+    itemsOverride?: CartItem[];
+  }) => Order | null;
   requestReturn: (orderId: string, skuId: string, reason: string) => void;
   cancelOrder: (orderId: string) => void;
   // ax
-  setActionStage: (id: string, stage: ActionStage, opts?: { reason?: string; actor?: string; qty?: number; supplierId?: string }) => void;
+  setActionStage: (
+    id: string,
+    stage: ActionStage,
+    opts?: { reason?: string; actor?: string; qty?: number; supplierId?: string },
+  ) => void;
   advanceOrder: (orderId: string, stage: OrderStage, actor?: string) => void;
   notifyCustomer: (orderId: string, body: string) => void;
   receiveInbound: (poId: string) => void;
@@ -155,25 +306,64 @@ export const useStore = create<StoreState>()(
       addToCart: (skuId, qty = 1) =>
         set((s) => {
           const exists = s.ui.cart.find((c) => c.skuId === skuId);
-          const cart = exists ? s.ui.cart.map((c) => (c.skuId === skuId ? { ...c, qty: c.qty + qty, selected: true } : c)) : [...s.ui.cart, { skuId, qty, selected: true }];
+          const cart = exists
+            ? s.ui.cart.map((c) => (c.skuId === skuId ? { ...c, qty: c.qty + qty, selected: true } : c))
+            : [...s.ui.cart, { skuId, qty, selected: true }];
           const demand = s.data.demand.map((d) => (d.skuId === skuId ? { ...d, cart7d: d.cart7d + 1 } : d));
           return { ui: { ...s.ui, cart }, data: { ...s.data, demand } };
         }),
-      updateCartQty: (skuId, qty) => set((s) => ({ ui: { ...s.ui, cart: s.ui.cart.map((c) => (c.skuId === skuId ? { ...c, qty: Math.max(1, qty) } : c)) } })),
-      removeFromCart: (skuId) => set((s) => ({ ui: { ...s.ui, cart: s.ui.cart.filter((c) => c.skuId !== skuId) } })),
-      toggleCartSelect: (skuId, v) => set((s) => ({ ui: { ...s.ui, cart: s.ui.cart.map((c) => (c.skuId === skuId ? { ...c, selected: v ?? !c.selected } : c)) } })),
-      toggleWishlist: (productId) => set((s) => ({ ui: { ...s.ui, wishlist: s.ui.wishlist.includes(productId) ? s.ui.wishlist.filter((p) => p !== productId) : [productId, ...s.ui.wishlist] } })),
+      updateCartQty: (skuId, qty) =>
+        set((s) => ({
+          ui: {
+            ...s.ui,
+            cart: s.ui.cart.map((c) => (c.skuId === skuId ? { ...c, qty: Math.max(1, qty) } : c)),
+          },
+        })),
+      removeFromCart: (skuId) =>
+        set((s) => ({ ui: { ...s.ui, cart: s.ui.cart.filter((c) => c.skuId !== skuId) } })),
+      toggleCartSelect: (skuId, v) =>
+        set((s) => ({
+          ui: {
+            ...s.ui,
+            cart: s.ui.cart.map((c) => (c.skuId === skuId ? { ...c, selected: v ?? !c.selected } : c)),
+          },
+        })),
+      toggleWishlist: (productId) =>
+        set((s) => ({
+          ui: {
+            ...s.ui,
+            wishlist: s.ui.wishlist.includes(productId)
+              ? s.ui.wishlist.filter((p) => p !== productId)
+              : [productId, ...s.ui.wishlist],
+          },
+        })),
       pushRecentView: (productId) =>
         set((s) => {
           const skuIds = s.data.skus.filter((k) => k.productId === productId).map((k) => k.id);
-          const demand = s.data.demand.map((d) => (skuIds.includes(d.skuId) ? { ...d, view7d: d.view7d + 1 } : d));
-          return { ui: { ...s.ui, recentViews: [productId, ...s.ui.recentViews.filter((p) => p !== productId)].slice(0, 12) }, data: { ...s.data, demand } };
+          const demand = s.data.demand.map((d) =>
+            skuIds.includes(d.skuId) ? { ...d, view7d: d.view7d + 1 } : d,
+          );
+          return {
+            ui: {
+              ...s.ui,
+              recentViews: [productId, ...s.ui.recentViews.filter((p) => p !== productId)].slice(0, 12),
+            },
+            data: { ...s.data, demand },
+          };
         }),
-      pushRecentSearch: (q) => set((s) => ({ ui: { ...s.ui, recentSearches: [q, ...s.ui.recentSearches.filter((x) => x !== q)].slice(0, 8) } })),
+      pushRecentSearch: (q) =>
+        set((s) => ({
+          ui: { ...s.ui, recentSearches: [q, ...s.ui.recentSearches.filter((x) => x !== q)].slice(0, 8) },
+        })),
       clearRecentSearches: () => set((s) => ({ ui: { ...s.ui, recentSearches: [] } })),
       recordEvent: (name, skuId) => {
         if (name === "search_product" && skuId) {
-          set((s) => ({ data: { ...s.data, demand: s.data.demand.map((d) => (d.skuId === skuId ? { ...d, search7d: d.search7d + 1 } : d)) } }));
+          set((s) => ({
+            data: {
+              ...s.data,
+              demand: s.data.demand.map((d) => (d.skuId === skuId ? { ...d, search7d: d.search7d + 1 } : d)),
+            },
+          }));
         }
       },
 
@@ -187,24 +377,54 @@ export const useStore = create<StoreState>()(
         const items = cartItems.map((c) => {
           const sku = skuById.get(c.skuId)!;
           const p = prodById.get(sku.productId)!;
-          return { skuId: sku.id, productId: p.id, name: p.name, skuName: sku.name, qty: c.qty, unitPrice: sku.salePrice, unitCost: sku.cost };
+          return {
+            skuId: sku.id,
+            productId: p.id,
+            name: p.name,
+            skuName: sku.name,
+            qty: c.qty,
+            unitPrice: sku.salePrice,
+            unitCost: sku.cost,
+          };
         });
         const subtotal = items.reduce((a, it) => a + it.unitPrice * it.qty, 0);
         const shippingFee = subtotal >= 30000 ? 0 : 3000;
         const now = new Date();
-        const d = now.toISOString().slice(2, 10).replace(/-/g, "");
+        const d = dateKey(now).slice(2).replace(/-/g, "");
         const id = `NX${d}-${String(s.data.orders.length + 1).padStart(4, "0")}`;
-        const cutoff = new Date(now); cutoff.setHours(15, 0, 0, 0);
+        const cutoff = new Date(now);
+        cutoff.setHours(15, 0, 0, 0);
         if (now > cutoff) cutoff.setDate(cutoff.getDate() + 1);
         const anyStandard = items.some((it) => prodById.get(it.productId)!.deliveryType !== "fast");
         const promised = new Date(now.getTime() + (anyStandard ? 3 : now.getHours() < 15 ? 1 : 2) * 86400000);
         const firstCat = prodById.get(items[0].productId)!.categorySlug;
-        const whMap: Record<string, string> = { living: "wh-A", health: "wh-E", food: "wh-B", kitchen: "wh-C", home: "wh-C", digital: "wh-E", pet: "wh-D", baby: "wh-D" };
+        const whMap: Record<string, string> = {
+          living: "wh-A",
+          health: "wh-E",
+          food: "wh-B",
+          kitchen: "wh-C",
+          home: "wh-C",
+          digital: "wh-E",
+          pet: "wh-D",
+          baby: "wh-D",
+        };
         const order: Order = {
-          id, createdAt: now.toISOString(), updatedAt: now.toISOString(), source: "demo",
-          customerId: customer.id, items, subtotal, discount: 0, shippingFee, total: subtotal + shippingFee,
-          stage: "new", warehouseId: whMap[firstCat], promisedAt: promised.toISOString(), cutoffAt: cutoff.toISOString(),
-          history: [{ at: now.toISOString(), stage: "new", actor: "고객", note: addressNote }], isRepeatOrder: isRepeat,
+          id,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          source: "demo",
+          customerId: customer.id,
+          items,
+          subtotal,
+          discount: 0,
+          shippingFee,
+          total: subtotal + shippingFee,
+          stage: "new",
+          warehouseId: whMap[firstCat],
+          promisedAt: promised.toISOString(),
+          cutoffAt: cutoff.toISOString(),
+          history: [{ at: now.toISOString(), stage: "new", actor: "고객", note: addressNote }],
+          isRepeatOrder: isRepeat,
         };
         // reserve inventory + demand signal
         const inventory = s.data.inventory.map((inv) => {
@@ -218,16 +438,48 @@ export const useStore = create<StoreState>()(
           daily[daily.length - 1] += it.qty;
           return { ...dm, order7d: dm.order7d + it.qty, dailySales: daily };
         });
-        const todayKey = now.toISOString().slice(0, 10);
-        const dailySales = s.data.dailySales.map((p) => (p.date === todayKey ? { ...p, orders: p.orders + 1, revenue: p.revenue + order.total, grossMargin: p.grossMargin + items.reduce((a, it) => a + (it.unitPrice - it.unitCost) * it.qty, 0) - shippingFee } : p));
+        const todayKey = dateKey(now);
+        const dailySales = s.data.dailySales.map((p) =>
+          p.date === todayKey
+            ? {
+                ...p,
+                orders: p.orders + 1,
+                revenue: p.revenue + order.total,
+                grossMargin:
+                  p.grossMargin +
+                  items.reduce((a, it) => a + (it.unitPrice - it.unitCost) * it.qty, 0) -
+                  shippingFee,
+              }
+            : p,
+        );
         const ev: EvidenceLog = {
-          id: uid("ev"), createdAt: now.toISOString(), updatedAt: now.toISOString(), source: "demo",
-          type: "CUSTOMER", title: `${isRepeat ? "다시 구매 주문" : "고객 시연 주문"} ${id}`, detail: `${customer.name} · ${items.map((i) => `${i.name} ${i.skuName} ×${i.qty}`).join(", ")} · ${order.total.toLocaleString()}원. 재고 예약 및 수요신호 반영.`,
-          actor: customer.name, orderId: id, customerId: customer.id, dataSource: "고객 플랫폼 → 공유 저장소", mode: "Demo Evidence",
+          id: uid("ev"),
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          source: "demo",
+          type: "CUSTOMER",
+          title: `${isRepeat ? "다시 구매 주문" : "고객 시연 주문"} ${id}`,
+          detail: `${customer.name} · ${items.map((i) => `${i.name} ${i.skuName} ×${i.qty}`).join(", ")} · ${order.total.toLocaleString()}원. 재고 예약 및 수요신호 반영.`,
+          actor: customer.name,
+          orderId: id,
+          customerId: customer.id,
+          dataSource: "고객 플랫폼 → 공유 저장소",
+          mode: "Demo Evidence",
         };
         set({
-          data: { ...s.data, orders: [order, ...s.data.orders], inventory, demand, dailySales, evidence: [ev, ...s.data.evidence] },
-          ui: { ...s.ui, cart: itemsOverride ? s.ui.cart : s.ui.cart.filter((c) => !c.selected), lastOrderId: id },
+          data: {
+            ...s.data,
+            orders: [order, ...s.data.orders],
+            inventory,
+            demand,
+            dailySales,
+            evidence: [ev, ...s.data.evidence],
+          },
+          ui: {
+            ...s.ui,
+            cart: itemsOverride ? s.ui.cart : s.ui.cart.filter((c) => !c.selected),
+            lastOrderId: id,
+          },
         });
         return order;
       },
@@ -235,16 +487,61 @@ export const useStore = create<StoreState>()(
         set((s) => ({
           data: {
             ...s.data,
-            returns: [{ id: uid("RT"), createdAt: nowIso(), updatedAt: nowIso(), source: "demo", orderId, skuId, reason: reason as never, status: "requested" }, ...s.data.returns],
-            orders: s.data.orders.map((o) => (o.id === orderId ? { ...o, stage: "return" as OrderStage, updatedAt: nowIso(), history: [...o.history, { at: nowIso(), stage: "return" as OrderStage, actor: "고객", note: reason }] } : o)),
+            returns: [
+              {
+                id: uid("RT"),
+                createdAt: nowIso(),
+                updatedAt: nowIso(),
+                source: "demo",
+                orderId,
+                skuId,
+                reason: reason as never,
+                status: "requested",
+              },
+              ...s.data.returns,
+            ],
+            orders: s.data.orders.map((o) =>
+              o.id === orderId
+                ? {
+                    ...o,
+                    stage: "return" as OrderStage,
+                    updatedAt: nowIso(),
+                    history: [
+                      ...o.history,
+                      { at: nowIso(), stage: "return" as OrderStage, actor: "고객", note: reason },
+                    ],
+                  }
+                : o,
+            ),
           },
         })),
       cancelOrder: (orderId) =>
         set((s) => {
           const o = s.data.orders.find((x) => x.id === orderId);
           if (!o || !["new", "confirmed"].includes(o.stage)) return {};
-          const inventory = s.data.inventory.map((inv) => { const it = o.items.find((x) => x.skuId === inv.skuId); return it ? { ...inv, reserved: Math.max(0, inv.reserved - it.qty) } : inv; });
-          return { data: { ...s.data, inventory, orders: s.data.orders.map((x) => (x.id === orderId ? { ...x, stage: "cancelled" as OrderStage, updatedAt: nowIso(), history: [...x.history, { at: nowIso(), stage: "cancelled" as OrderStage, actor: "고객" }] } : x)) } };
+          const inventory = s.data.inventory.map((inv) => {
+            const it = o.items.find((x) => x.skuId === inv.skuId);
+            return it ? { ...inv, reserved: Math.max(0, inv.reserved - it.qty) } : inv;
+          });
+          return {
+            data: {
+              ...s.data,
+              inventory,
+              orders: s.data.orders.map((x) =>
+                x.id === orderId
+                  ? {
+                      ...x,
+                      stage: "cancelled" as OrderStage,
+                      updatedAt: nowIso(),
+                      history: [
+                        ...x.history,
+                        { at: nowIso(), stage: "cancelled" as OrderStage, actor: "고객" },
+                      ],
+                    }
+                  : x,
+              ),
+            },
+          };
         }),
 
       setActionStage: (id, stage, opts) => {
@@ -260,31 +557,88 @@ export const useStore = create<StoreState>()(
         let promotions = s.data.promotions;
         const newEvidence: EvidenceLog[] = [];
         const push = (type: EvidenceType, title: string, detail: string, extra: Partial<EvidenceLog> = {}) =>
-          newEvidence.push({ id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type, title, detail, actor, actionId: id, dataSource: "AX 실행", mode: "Demo Evidence", skuId: a.related.skuId, supplierId: a.related.supplierId, ...extra });
+          newEvidence.push({
+            id: uid("ev"),
+            createdAt: t,
+            updatedAt: t,
+            source: "demo",
+            type,
+            title,
+            detail,
+            actor,
+            actionId: id,
+            dataSource: "AX 실행",
+            mode: "Demo Evidence",
+            skuId: a.related.skuId,
+            supplierId: a.related.supplierId,
+            ...extra,
+          });
         const patch: Partial<AXAction> = { stage, updatedAt: t };
 
         if (stage === "approved" && (a.type === "urgent_po" || a.type === "alt_supplier")) {
           const qty = opts?.qty ?? a.proposal?.qty ?? 0;
           const supplierId = opts?.supplierId ?? a.proposal?.supplierId ?? a.related.supplierId!;
-          const sp = s.data.supplierProducts.find((x) => x.skuId === a.related.skuId && x.supplierId === supplierId);
+          const sp = s.data.supplierProducts.find(
+            (x) => x.skuId === a.related.skuId && x.supplierId === supplierId,
+          );
           const sup = s.data.suppliers.find((x) => x.id === supplierId)!;
           const lead = sp?.leadTimeDays ?? sup.leadTimeDays;
-          const eta = new Date(Date.now() + lead * 86400000).toISOString().slice(0, 10);
-          const poId = `PO-${new Date().toISOString().slice(2, 7).replace("-", "")}-${String(purchaseOrders.length + 19).padStart(3, "0")}`;
-          purchaseOrders = [{ id: poId, createdAt: t, updatedAt: t, source: "demo", supplierId, skuId: a.related.skuId!, qty, unitCost: sp?.unitCost ?? 0, status: "requested", expectedAt: eta, actionId: id, actor }, ...purchaseOrders];
-          inventory = inventory.map((inv) => (inv.skuId === a.related.skuId ? { ...inv, inboundExpected: inv.inboundExpected + qty, inboundEta: eta, updatedAt: t } : inv));
+          const eta = dateKey(new Date(Date.now() + lead * 86400000));
+          const poId = `PO-${dateKey().slice(2, 7).replace("-", "")}-${String(purchaseOrders.length + 19).padStart(3, "0")}`;
+          purchaseOrders = [
+            {
+              id: poId,
+              createdAt: t,
+              updatedAt: t,
+              source: "demo",
+              supplierId,
+              skuId: a.related.skuId!,
+              qty,
+              unitCost: sp?.unitCost ?? 0,
+              status: "requested",
+              expectedAt: eta,
+              actionId: id,
+              actor,
+            },
+            ...purchaseOrders,
+          ];
+          inventory = inventory.map((inv) =>
+            inv.skuId === a.related.skuId
+              ? { ...inv, inboundExpected: inv.inboundExpected + qty, inboundEta: eta, updatedAt: t }
+              : inv,
+          );
           patch.stage = "requested";
           patch.related = { ...a.related, poId };
           patch.proposal = { ...a.proposal, qty, supplierId };
           patch.result = `${sup.name}에 ${qty}개 발주 요청 (입고예정 ${eta})`;
-          push("ACTION", `${a.title} — 승인·발주요청`, `${sup.name} ${qty}개, 예상 입고 ${eta}. 상품 상세 배송예정에 입고일 반영.`, { kpiDelta: `입고예정 +${qty}` });
+          push(
+            "ACTION",
+            `${a.title} — 승인·발주요청`,
+            `${sup.name} ${qty}개, 예상 입고 ${eta}. 상품 상세 배송예정에 입고일 반영.`,
+            { kpiDelta: `입고예정 +${qty}` },
+          );
         } else if (stage === "approved" && a.type === "priority_order") {
           const ids = new Set(a.related.orderIds ?? []);
-          orders = orders.map((o) => (ids.has(o.id) && ["new", "confirmed", "picking_wait"].includes(o.stage) ? { ...o, stage: "picking" as OrderStage, assignee: "박운영", updatedAt: t, history: [...o.history, { at: t, stage: "picking" as OrderStage, actor, note: "우선처리" }] } : o));
+          orders = orders.map((o) =>
+            ids.has(o.id) && ["new", "confirmed", "picking_wait"].includes(o.stage)
+              ? {
+                  ...o,
+                  stage: "picking" as OrderStage,
+                  assignee: "박운영",
+                  updatedAt: t,
+                  history: [...o.history, { at: t, stage: "picking" as OrderStage, actor, note: "우선처리" }],
+                }
+              : o,
+          );
           warehouses = warehouses.map((w) => (w.id === "wh-C" ? { ...w, congestion: 0.48 } : w));
           patch.stage = "in_progress";
           patch.result = `${ids.size}건 우선 피킹 시작, C구역 인력 재배치`;
-          push("ACTION", `${a.title} — 우선처리 시작`, `${ids.size}건 피킹 단계로 전환. C구역 적체 82% → 48%.`, { kpiDelta: "C구역 적체 -34%p" });
+          push(
+            "ACTION",
+            `${a.title} — 우선처리 시작`,
+            `${ids.size}건 피킹 단계로 전환. C구역 적체 82% → 48%.`,
+            { kpiDelta: "C구역 적체 -34%p" },
+          );
         } else if (stage === "approved" && a.type === "delay_notice") {
           const ids = new Set(a.related.orderIds ?? []);
           orders = orders.map((o) => (ids.has(o.id) ? { ...o, customerNotified: true, updatedAt: t } : o));
@@ -294,12 +648,24 @@ export const useStore = create<StoreState>()(
         } else if (stage === "approved" && a.type === "repeat_expose") {
           patch.stage = "done";
           patch.result = "다시 구매 노출 시작 (고객 홈 '다시 구매할 때' 섹션)";
-          push("CUSTOMER", `${a.title} — 노출`, "재구매 주기 도래 고객에게 다시 구매 노출. 전환 결과는 주문 성과 기록으로 누적.");
+          push(
+            "CUSTOMER",
+            `${a.title} — 노출`,
+            "재구매 주기 도래 고객에게 다시 구매 노출. 전환 결과는 주문 성과 기록으로 누적.",
+          );
         } else if (stage === "approved" && a.type === "promo_adjust") {
-          promotions = promotions.map((p) => (p.id === a.related.promotionId ? { ...p, discountRate: Math.max(0.05, p.discountRate - 0.05), updatedAt: t } : p));
+          promotions = promotions.map((p) =>
+            p.id === a.related.promotionId
+              ? { ...p, discountRate: Math.max(0.05, p.discountRate - 0.05), updatedAt: t }
+              : p,
+          );
           patch.stage = "done";
           patch.result = "할인율 조정 적용";
-          push("REVENUE", `${a.title} — 적용`, "프로모션 할인율 5%p 하향. 실질마진 변화는 프로모션 화면에서 추적.");
+          push(
+            "REVENUE",
+            `${a.title} — 적용`,
+            "프로모션 할인율 5%p 하향. 실질마진 변화는 프로모션 화면에서 추적.",
+          );
         } else if (stage === "approved" && a.type === "stop_po") {
           patch.stage = "done";
           patch.result = "발주 보류 확정, 재평가 일정 기록";
@@ -307,21 +673,54 @@ export const useStore = create<StoreState>()(
         } else if (stage === "done") {
           if (a.type === "priority_order") {
             const ids = new Set(a.related.orderIds ?? []);
-            orders = orders.map((o) => (ids.has(o.id) && !["shipped", "in_transit", "delivered", "cancelled"].includes(o.stage) ? { ...o, stage: "shipped" as OrderStage, updatedAt: t, history: [...o.history, { at: t, stage: "shipped" as OrderStage, actor }] } : o));
+            orders = orders.map((o) =>
+              ids.has(o.id) && !["shipped", "in_transit", "delivered", "cancelled"].includes(o.stage)
+                ? {
+                    ...o,
+                    stage: "shipped" as OrderStage,
+                    updatedAt: t,
+                    history: [...o.history, { at: t, stage: "shipped" as OrderStage, actor }],
+                  }
+                : o,
+            );
             patch.result = `${ids.size}건 출고 완료. 고객 배송상태 반영.`;
-            push("RESULT", `${a.title} — 출고 완료`, `${ids.size}건 마감 전 출고. 고객 마이페이지 '출고완료' 반영.`, { kpiDelta: "정시출고 +12건" });
+            push(
+              "RESULT",
+              `${a.title} — 출고 완료`,
+              `${ids.size}건 마감 전 출고. 고객 마이페이지 '출고완료' 반영.`,
+              { kpiDelta: "정시출고 +12건" },
+            );
           } else {
             patch.result = a.result ?? "완료";
             push("RESULT", `${a.title} — 완료`, opts?.reason ?? "실행 완료 처리.");
           }
         } else if (stage === "held" || stage === "dismissed") {
           patch.holdReason = opts?.reason;
-          push("EXCEPTION", `${a.title} — ${stage === "held" ? "보류" : "무시"}`, opts?.reason ?? "사유 미기록");
+          push(
+            "EXCEPTION",
+            `${a.title} — ${stage === "held" ? "보류" : "무시"}`,
+            opts?.reason ?? "사유 미기록",
+          );
         } else if (stage === "reviewing") {
           push("ADOPTION", `${a.title} — 검토 시작`, `${actor} 확인.`);
         }
-        const actions = s.data.actions.map((x) => (x.id === id ? { ...x, ...patch, evidenceIds: [...x.evidenceIds, ...newEvidence.map((e) => e.id)] } : x));
-        set({ data: { ...s.data, actions, purchaseOrders, inventory, orders, warehouses, promotions, evidence: [...newEvidence, ...s.data.evidence] } });
+        const actions = s.data.actions.map((x) =>
+          x.id === id
+            ? { ...x, ...patch, evidenceIds: [...x.evidenceIds, ...newEvidence.map((e) => e.id)] }
+            : x,
+        );
+        set({
+          data: {
+            ...s.data,
+            actions,
+            purchaseOrders,
+            inventory,
+            orders,
+            warehouses,
+            promotions,
+            evidence: [...newEvidence, ...s.data.evidence],
+          },
+        });
       },
 
       advanceOrder: (orderId, stage, actor) => {
@@ -332,12 +731,61 @@ export const useStore = create<StoreState>()(
         const who = actor ?? ROLE_PERSON[s.ui.role];
         let inventory = s.data.inventory;
         if (stage === "shipped") {
-          inventory = inventory.map((inv) => { const it = o.items.find((x) => x.skuId === inv.skuId); return it ? { ...inv, onHand: Math.max(0, inv.onHand - it.qty), reserved: Math.max(0, inv.reserved - it.qty), updatedAt: t } : inv; });
+          inventory = inventory.map((inv) => {
+            const it = o.items.find((x) => x.skuId === inv.skuId);
+            return it
+              ? {
+                  ...inv,
+                  onHand: Math.max(0, inv.onHand - it.qty),
+                  reserved: Math.max(0, inv.reserved - it.qty),
+                  updatedAt: t,
+                }
+              : inv;
+          });
         }
-        const orders = s.data.orders.map((x) => (x.id === orderId ? { ...x, stage, updatedAt: t, assignee: x.assignee ?? who, history: [...x.history, { at: t, stage, actor: who }] } : x));
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: stage === "delivered" ? "RESULT" : "ACTION", title: `주문 ${orderId} ${ORDER_STAGE_LABEL[stage]}`, detail: `${who} 처리. 고객 마이페이지 상태 '${CUSTOMER_STAGE_LABEL[stage]}' 반영.${stage === "shipped" ? " 재고 차감." : ""}`, actor: who, orderId, dataSource: "주문·출고", mode: "Demo Evidence" };
+        const orders = s.data.orders.map((x) =>
+          x.id === orderId
+            ? {
+                ...x,
+                stage,
+                updatedAt: t,
+                assignee: x.assignee ?? who,
+                history: [...x.history, { at: t, stage, actor: who }],
+              }
+            : x,
+        );
+        const ev: EvidenceLog = {
+          id: uid("ev"),
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          type: stage === "delivered" ? "RESULT" : "ACTION",
+          title: `주문 ${orderId} ${ORDER_STAGE_LABEL[stage]}`,
+          detail: `${who} 처리. 고객 마이페이지 상태 '${CUSTOMER_STAGE_LABEL[stage]}' 반영.${stage === "shipped" ? " 재고 차감." : ""}`,
+          actor: who,
+          orderId,
+          dataSource: "주문·출고",
+          mode: "Demo Evidence",
+        };
         const notifications = ["shipped", "in_transit", "delivered"].includes(stage)
-          ? [{ id: uid("n"), createdAt: t, updatedAt: t, source: "demo" as const, customerId: o.customerId, title: `주문 ${orderId} ${CUSTOMER_STAGE_LABEL[stage]}`, body: stage === "shipped" ? "상품이 출고되었습니다." : stage === "in_transit" ? "배송이 시작되었습니다." : "배송이 완료되었습니다.", read: false }, ...s.data.notifications]
+          ? [
+              {
+                id: uid("n"),
+                createdAt: t,
+                updatedAt: t,
+                source: "demo" as const,
+                customerId: o.customerId,
+                title: `주문 ${orderId} ${CUSTOMER_STAGE_LABEL[stage]}`,
+                body:
+                  stage === "shipped"
+                    ? "상품이 출고되었습니다."
+                    : stage === "in_transit"
+                      ? "배송이 시작되었습니다."
+                      : "배송이 완료되었습니다.",
+                read: false,
+              },
+              ...s.data.notifications,
+            ]
           : s.data.notifications;
         set({ data: { ...s.data, orders, inventory, evidence: [ev, ...s.data.evidence], notifications } });
       },
@@ -346,28 +794,83 @@ export const useStore = create<StoreState>()(
           const o = s.data.orders.find((x) => x.id === orderId);
           if (!o) return {};
           const t = nowIso();
-          return { data: { ...s.data, orders: s.data.orders.map((x) => (x.id === orderId ? { ...x, customerNotified: true } : x)), notifications: [{ id: uid("n"), createdAt: t, updatedAt: t, source: "demo" as const, customerId: o.customerId, title: `주문 ${orderId} 안내`, body, read: false }, ...s.data.notifications] } };
+          return {
+            data: {
+              ...s.data,
+              orders: s.data.orders.map((x) => (x.id === orderId ? { ...x, customerNotified: true } : x)),
+              notifications: [
+                {
+                  id: uid("n"),
+                  createdAt: t,
+                  updatedAt: t,
+                  source: "demo" as const,
+                  customerId: o.customerId,
+                  title: `주문 ${orderId} 안내`,
+                  body,
+                  read: false,
+                },
+                ...s.data.notifications,
+              ],
+            },
+          };
         }),
       receiveInbound: (poId) => {
         const s = get();
         const po = s.data.purchaseOrders.find((p) => p.id === poId);
         if (!po || po.status === "received") return;
         const t = nowIso();
-        const inventory = s.data.inventory.map((inv) => (inv.skuId === po.skuId ? { ...inv, onHand: inv.onHand + po.qty, inboundExpected: Math.max(0, inv.inboundExpected - po.qty), inboundEta: undefined, updatedAt: t } : inv));
-        const purchaseOrders = s.data.purchaseOrders.map((p) => (p.id === poId ? { ...p, status: "received" as const, receivedAt: t.slice(0, 10), updatedAt: t } : p));
-        const actions = s.data.actions.map((a) => (a.related.poId === poId ? { ...a, stage: "done" as ActionStage, result: `${po.qty}개 입고 완료`, updatedAt: t } : a));
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RESULT", title: `${poId} 입고 완료`, detail: `${po.qty}개 입고. 가용재고 증가, 고객 상품 상세 재고상태 갱신.`, actor: ROLE_PERSON[s.ui.role], skuId: po.skuId, supplierId: po.supplierId, actionId: po.actionId, kpiDelta: `가용재고 +${po.qty}`, dataSource: "입고", mode: "Demo Evidence" };
+        const inventory = s.data.inventory.map((inv) =>
+          inv.skuId === po.skuId
+            ? {
+                ...inv,
+                onHand: inv.onHand + po.qty,
+                inboundExpected: Math.max(0, inv.inboundExpected - po.qty),
+                inboundEta: undefined,
+                updatedAt: t,
+              }
+            : inv,
+        );
+        const purchaseOrders = s.data.purchaseOrders.map((p) =>
+          p.id === poId ? { ...p, status: "received" as const, receivedAt: t.slice(0, 10), updatedAt: t } : p,
+        );
+        const actions = s.data.actions.map((a) =>
+          a.related.poId === poId
+            ? { ...a, stage: "done" as ActionStage, result: `${po.qty}개 입고 완료`, updatedAt: t }
+            : a,
+        );
+        const ev: EvidenceLog = {
+          id: uid("ev"),
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          type: "RESULT",
+          title: `${poId} 입고 완료`,
+          detail: `${po.qty}개 입고. 가용재고 증가, 고객 상품 상세 재고상태 갱신.`,
+          actor: ROLE_PERSON[s.ui.role],
+          skuId: po.skuId,
+          supplierId: po.supplierId,
+          actionId: po.actionId,
+          kpiDelta: `가용재고 +${po.qty}`,
+          dataSource: "입고",
+          mode: "Demo Evidence",
+        };
         set({ data: { ...s.data, inventory, purchaseOrders, actions, evidence: [ev, ...s.data.evidence] } });
       },
       addEvidence: (e) => {
         const id = uid("ev");
         const t = nowIso();
-        set((s) => ({ data: { ...s.data, evidence: [{ ...e, id, createdAt: t, updatedAt: t, source: "demo" }, ...s.data.evidence] } }));
+        set((s) => ({
+          data: {
+            ...s.data,
+            evidence: [{ ...e, id, createdAt: t, updatedAt: t, source: "demo" }, ...s.data.evidence],
+          },
+        }));
         return id;
       },
       createActionFromSku: (skuId) => {
         const s = get();
-        if (s.data.actions.some((a) => a.related.skuId === skuId && !["done", "dismissed"].includes(a.stage))) return null;
+        if (s.data.actions.some((a) => a.related.skuId === skuId && !["done", "dismissed"].includes(a.stage)))
+          return null;
         const ins = buildSkuInsights(s.data).find((i) => i.sku.id === skuId);
         if (!ins) return null;
         const t = nowIso();
@@ -382,87 +885,213 @@ export const useStore = create<StoreState>()(
         const days = ins.daysOfStock === Infinity ? "-" : ins.daysOfStock.toFixed(1);
         const action: AXAction = isLow
           ? {
-              id, createdAt: t, updatedAt: t, source: "demo", type: "urgent_po",
+              id,
+              createdAt: t,
+              updatedAt: t,
+              source: "demo",
+              type: "urgent_po",
               title: `${ins.product.name} ${ins.sku.name} ${urgent ? "긴급발주" : "발주"} 검토`,
               summary: `가용재고 ${ins.available}개, 예상 소진 ${days}일. 공급 리드타임 ${ins.leadTimeDays}일 기준 ${ins.recommendedQty}개 발주 검토가 필요합니다.`,
-              trigger: urgent ? `예상 소진일(${days}일) < 공급 리드타임(${ins.leadTimeDays}일)` : `안전재고 미달 또는 수요 증가`,
+              trigger: urgent
+                ? `예상 소진일(${days}일) < 공급 리드타임(${ins.leadTimeDays}일)`
+                : `안전재고 미달 또는 수요 증가`,
               reasons: ins.reasons.slice(0, 4),
               expectedImpact: `품절 방지 · 약 ${ins.leadTimeDays + 7}일치 재고 확보`,
-              caution: best && best.costDiffPct > 0 ? `추천 공급사 단가가 최저가 대비 +${best.costDiffPct}%입니다.` : undefined,
+              caution:
+                best && best.costDiffPct > 0
+                  ? `추천 공급사 단가가 최저가 대비 +${best.costDiffPct}%입니다.`
+                  : undefined,
               urgency: urgent ? "critical" : ins.status === "low" ? "high" : "mid",
-              owner: "buyer", assignee: "김구매", recommendedAt: t, dueAt: new Date(Date.now() + (urgent ? 6 : 48) * 3600000).toISOString(), stage: "recommended",
-              related: { productId: ins.product.id, skuId, supplierId: ins.sku.primarySupplierId, altSupplierId: best?.supplier.id },
-              proposal: { qty: ins.recommendedQty, supplierId: best?.supplier.id ?? ins.sku.primarySupplierId, note: `레이더 계산 · ${actor} 생성` },
+              owner: "buyer",
+              assignee: "김구매",
+              recommendedAt: t,
+              dueAt: new Date(Date.now() + (urgent ? 6 : 48) * 3600000).toISOString(),
+              stage: "recommended",
+              related: {
+                productId: ins.product.id,
+                skuId,
+                supplierId: ins.sku.primarySupplierId,
+                altSupplierId: best?.supplier.id,
+              },
+              proposal: {
+                qty: ins.recommendedQty,
+                supplierId: best?.supplier.id ?? ins.sku.primarySupplierId,
+                note: `레이더 계산 · ${actor} 생성`,
+              },
               evidenceIds: [],
             }
           : {
-              id, createdAt: t, updatedAt: t, source: "demo", type: "stop_po",
+              id,
+              createdAt: t,
+              updatedAt: t,
+              source: "demo",
+              type: "stop_po",
               title: `${ins.product.name} ${ins.sku.name} 저회전 발주 보류 검토`,
               summary: `재고일수 ${days}일, 재고금액 ${Math.round(ins.stockValue).toLocaleString()}원. 추가 발주를 보류하고 프로모션·묶음 구성을 검토합니다.`,
               trigger: `재고일수 > ${ins.status === "slow" ? 180 : 75}일`,
               reasons: ins.reasons.slice(0, 4),
               expectedImpact: `재고자금 약 ${Math.round(ins.stockValue / 10000).toLocaleString()}만원 보류`,
-              urgency: "low", owner: "buyer", assignee: "김구매", recommendedAt: t, dueAt: new Date(Date.now() + 120 * 3600000).toISOString(), stage: "recommended",
+              urgency: "low",
+              owner: "buyer",
+              assignee: "김구매",
+              recommendedAt: t,
+              dueAt: new Date(Date.now() + 120 * 3600000).toISOString(),
+              stage: "recommended",
               related: { productId: ins.product.id, skuId },
               proposal: { note: `레이더 계산 · ${actor} 생성` },
               evidenceIds: [],
             };
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "RISK", title: `${action.title} — 레이더에서 실행 생성`, detail: `${actor}가 재고·발주 레이더 계산 결과로 실행을 생성. 근거: ${ins.reasons[0]}`, actor, actionId: id, skuId, dataSource: "수요신호 + 재고", mode: "Demo Evidence" };
+        const ev: EvidenceLog = {
+          id: uid("ev"),
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          type: "RISK",
+          title: `${action.title} — 레이더에서 실행 생성`,
+          detail: `${actor}가 재고·발주 레이더 계산 결과로 실행을 생성. 근거: ${ins.reasons[0]}`,
+          actor,
+          actionId: id,
+          skuId,
+          dataSource: "수요신호 + 재고",
+          mode: "Demo Evidence",
+        };
         action.evidenceIds = [ev.id];
-        set({ data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] } });
+        set({
+          data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] },
+        });
         return id;
       },
       createPriorityAction: (orderIds) => {
         const s = get();
-        const covered = new Set(s.data.actions.filter((a) => a.type === "priority_order" && !["done", "dismissed"].includes(a.stage)).flatMap((a) => a.related.orderIds ?? []));
+        const covered = new Set(
+          s.data.actions
+            .filter((a) => a.type === "priority_order" && !["done", "dismissed"].includes(a.stage))
+            .flatMap((a) => a.related.orderIds ?? []),
+        );
         const ids = orderIds.filter((o) => !covered.has(o));
         if (!ids.length) return null;
         const risks = assessOrderRisks(s.data).filter((r) => ids.includes(r.order.id));
         const t = nowIso();
         const id = uid("act");
         const actor = ROLE_PERSON[s.ui.role];
-        const zones = Array.from(new Set(risks.map((r) => s.data.warehouses.find((w) => w.id === r.order.warehouseId)?.name.split(" ")[0]))).join("·");
+        const zones = Array.from(
+          new Set(
+            risks.map((r) => s.data.warehouses.find((w) => w.id === r.order.warehouseId)?.name.split(" ")[0]),
+          ),
+        ).join("·");
         const causes = Array.from(new Set(risks.flatMap((r) => r.causes))).slice(0, 4);
         const action: AXAction = {
-          id, createdAt: t, updatedAt: t, source: "demo", type: "priority_order",
+          id,
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          type: "priority_order",
           title: `${zones} 지연위험 주문 ${ids.length}건 우선처리`,
           summary: `배송약속·출고마감·구역 적체 기준으로 지연위험이 감지된 주문 ${ids.length}건을 마감 전 우선 피킹합니다.`,
           trigger: "배송 지연 위험 점수 ≥ 60",
           reasons: causes.length ? causes : ["지연위험 점수 상위 주문"],
           expectedImpact: "정시출고율 하락 방지, 배송지연 VOC 예방",
-          urgency: "critical", owner: "ops", assignee: "박운영", recommendedAt: t, dueAt: risks[0]?.order.cutoffAt ?? t, stage: "recommended",
+          urgency: "critical",
+          owner: "ops",
+          assignee: "박운영",
+          recommendedAt: t,
+          dueAt: risks[0]?.order.cutoffAt ?? t,
+          stage: "recommended",
           related: { orderIds: ids },
           proposal: { note: `출고 관제 계산 · ${actor} 생성` },
           evidenceIds: [],
         };
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "EXCEPTION", title: `${action.title} — 출고 관제에서 실행 생성`, detail: `${actor}가 지연위험 ${ids.length}건에 대해 우선처리 실행 생성. ${causes[0] ?? ""}`, actor, actionId: id, dataSource: "배송 지연 위험", mode: "Demo Evidence" };
+        const ev: EvidenceLog = {
+          id: uid("ev"),
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          type: "EXCEPTION",
+          title: `${action.title} — 출고 관제에서 실행 생성`,
+          detail: `${actor}가 지연위험 ${ids.length}건에 대해 우선처리 실행 생성. ${causes[0] ?? ""}`,
+          actor,
+          actionId: id,
+          dataSource: "배송 지연 위험",
+          mode: "Demo Evidence",
+        };
         action.evidenceIds = [ev.id];
-        set({ data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] } });
+        set({
+          data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] },
+        });
         return id;
       },
       setPilot: (patch) => set((s) => ({ ui: { ...s.ui, pilot: { ...s.ui.pilot, ...patch } } })),
-      setBaseline: (key, entry) => set((s) => ({ ui: { ...s.ui, pilot: { ...s.ui.pilot, baselines: { ...s.ui.pilot.baselines, [key]: { ...s.ui.pilot.baselines[key], ...entry } } } } })),
+      setBaseline: (key, entry) =>
+        set((s) => ({
+          ui: {
+            ...s.ui,
+            pilot: {
+              ...s.ui.pilot,
+              baselines: { ...s.ui.pilot.baselines, [key]: { ...s.ui.pilot.baselines[key], ...entry } },
+            },
+          },
+        })),
       setStage: (stage) => {
         const s = get();
         const t = nowIso();
-        const ev: EvidenceLog = { id: uid("ev"), createdAt: t, updatedAt: t, source: "demo", type: "BASELINE", title: `진행 단계 → ${STAGE_LABEL[stage]}`, detail: stage === "PILOT" ? `AX 책임자 ${s.ui.pilot.owner ?? "-"} · 기준값 ${Object.values(s.ui.pilot.baselines).filter((b) => b.value !== undefined).length}개 입력. 12주 실증 시작. 화면 데이터는 실데이터 연결 전까지 시연용 시뮬레이션.` : `진행 단계 변경 (${ROLE_PERSON[s.ui.role]})`, actor: ROLE_PERSON[s.ui.role], dataSource: "실증 준비", mode: "실증 준비" };
-        set({ ui: { ...s.ui, stage, pilot: { ...s.ui.pilot, startedAt: stage === "PILOT" ? t : s.ui.pilot.startedAt } }, data: { ...s.data, evidence: [ev, ...s.data.evidence] } });
+        const ev: EvidenceLog = {
+          id: uid("ev"),
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          type: "BASELINE",
+          title: `진행 단계 → ${STAGE_LABEL[stage]}`,
+          detail:
+            stage === "PILOT"
+              ? `AX 책임자 ${s.ui.pilot.owner ?? "-"} · 기준값 ${Object.values(s.ui.pilot.baselines).filter((b) => b.value !== undefined).length}개 입력. 12주 실증 시작. 화면 데이터는 실데이터 연결 전까지 시연용 시뮬레이션.`
+              : `진행 단계 변경 (${ROLE_PERSON[s.ui.role]})`,
+          actor: ROLE_PERSON[s.ui.role],
+          dataSource: "실증 준비",
+          mode: "실증 준비",
+        };
+        set({
+          ui: {
+            ...s.ui,
+            stage,
+            pilot: { ...s.ui.pilot, startedAt: stage === "PILOT" ? t : s.ui.pilot.startedAt },
+          },
+          data: { ...s.data, evidence: [ev, ...s.data.evidence] },
+        });
       },
-      resetDemo: () => set((s) => ({ data: generateDemoData(), ui: { ...initialUi(), theme: s.ui.theme, fontScale: s.ui.fontScale, tutorialDone: s.ui.tutorialDone, demoResetAt: nowIso() } })),
+      resetDemo: () =>
+        set((s) => ({
+          data: generateDemoData(),
+          ui: {
+            ...initialUi(),
+            theme: s.ui.theme,
+            fontScale: s.ui.fontScale,
+            tutorialDone: s.ui.tutorialDone,
+            demoResetAt: nowIso(),
+          },
+        })),
     }),
     {
       name: "nexmart-demo-v1",
       // v2: 화면 문구 한글화(시드 데이터 포함) — 이전 방문자의 저장 데이터는 새 시드로 교체하고 설정(테마·글자·역할)은 유지
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const p = (persisted ?? {}) as Partial<StoreState>;
-        return (version < 2 ? { ...p, data: generateDemoData() } : p) as StoreState;
+        // v3: 일자 키를 UTC → 로컬 기준으로 바꿨으므로 시연 데이터를 다시 만든다
+        return (version < 3 ? { ...p, data: generateDemoData() } : p) as StoreState;
       },
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ data: s.data, ui: s.ui }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<StoreState>;
-        return { ...current, ...p, ui: { ...initialUi(), ...(p.ui ?? {}), pilot: { baselines: {}, checklist: {}, ...(p.ui?.pilot ?? {}) } } };
+        return {
+          ...current,
+          ...p,
+          ui: {
+            ...initialUi(),
+            ...(p.ui ?? {}),
+            pilot: { baselines: {}, checklist: {}, ...(p.ui?.pilot ?? {}) },
+          },
+        };
       },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
@@ -479,6 +1108,12 @@ if (typeof window !== "undefined") {
   window.addEventListener("storage", (e) => {
     if (e.key !== "nexmart-demo-v1" || e.newValue == null || e.newValue === lastWritten) return;
     clearTimeout(timer);
-    timer = setTimeout(() => { try { useStore.persist.rehydrate(); } catch { /* ignore */ } }, 150);
+    timer = setTimeout(() => {
+      try {
+        useStore.persist.rehydrate();
+      } catch {
+        /* ignore */
+      }
+    }, 150);
   });
 }

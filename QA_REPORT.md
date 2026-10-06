@@ -184,10 +184,22 @@ Red Team R2: P1 1건(pilot 탭 grid overflow) 수정. P2 — Baseline 입력값 
 | 전체 Journey 회귀 · R6 기능 25항목 · 내비(링크 112개, 깨짐 0) · CTA | PASS · 콘솔 오류 0 |
 | Build / TypeScript | PASS / PASS |
 
+## R8 (2026-10-06) — 개발 완성도 · 자동화된 품질 게이트
+
+| 항목 | 결과 |
+|---|---|
+| `npm run check` (tsc · ESLint · Prettier · Vitest) | PASS · 린트 0 · 포맷 위반 0 |
+| 단위 테스트 (Vitest, KST 고정) | 79/79 PASS · `src/lib` 라인 82% (catalog 99 · seed 99.6 · engines 94 · kpi 91 · format 85 · themes 100) |
+| E2E (Playwright, 데스크톱 1280 + 모바일 390) | 113 PASS · 3 SKIP(기기 전용 시나리오) · 콘솔/페이지 오류 0 |
+| 접근성 axe WCAG 2.1 AA (26화면 × 2기기) | serious/critical **0** (수정 전 406곳 · 8개 규칙) |
+| 키보드 | 첫 Tab = 본문 바로가기 → Enter 시 본문 포커스 · 모바일 메뉴 Esc → 여는 버튼으로 포커스 복귀 |
+| 테마 9종 글자색 명암비 | 전부 ≥ 4.5:1 (soft 배경·흰 배경 모두) |
+| 회귀: 26라우트 × 8폭(360~1440, 640·768 포함) · 스트레스 · Journey · R6 25항목 · 엣지 · 내비(링크 112) · CTA | 전부 PASS / 0건 |
+| 이번에 자동 테스트가 찾은 버그 | 훅 조건부 호출 · UTC 일자 키 · 시드 재현성 · 재고 화면 가로 넘침 226px · 모바일 배송 띠 잘림 |
+
 ## Known Issues
 
 - 외부 폰트 CDN 차단 환경에서 시스템 폰트 폴백 (기능 무관)
-- `next lint` 미구성 (tsc + build로 대체)
 
 ## 실행
 

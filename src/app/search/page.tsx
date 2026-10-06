@@ -9,7 +9,11 @@ export const metadata: Metadata = { title: "검색" };
 export default function SearchPage() {
   return (
     <CustomerShell>
-      <ClientGate><Suspense fallback={null}><SearchView /></Suspense></ClientGate>
+      <ClientGate>
+        <Suspense fallback={null}>
+          <SearchView />
+        </Suspense>
+      </ClientGate>
     </CustomerShell>
   );
 }

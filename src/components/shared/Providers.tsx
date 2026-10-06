@@ -17,10 +17,19 @@ function ThemeApplier() {
   return null;
 }
 
+/** 하이드레이션 완료 표시 — E2E 테스트가 "버튼이 실제로 동작하는 시점"을 기다릴 때 사용 */
+function HydrationMarker() {
+  useEffect(() => {
+    document.documentElement.setAttribute("data-hydrated", "true");
+  }, []);
+  return null;
+}
+
 export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
       <ThemeApplier />
+      <HydrationMarker />
       {children}
     </ToastProvider>
   );

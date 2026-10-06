@@ -1,0 +1,8 @@
+.next
+out
+node_modules
+coverage
+public
+src/lib/assets.generated.json
+package-lock.json
+*.md

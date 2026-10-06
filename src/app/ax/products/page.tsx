@@ -9,7 +9,11 @@ export const metadata: Metadata = { title: "상품·SKU · AX 운영화면", rob
 export default function Page() {
   return (
     <AxShell title="상품·SKU" subtitle="상품 → SKU별 판매·재고 → 수요신호 → 공급사 → 발주이력 → 실행">
-      <ClientGate><Suspense fallback={null}><ProductsView /></Suspense></ClientGate>
+      <ClientGate>
+        <Suspense fallback={null}>
+          <ProductsView />
+        </Suspense>
+      </ClientGate>
     </AxShell>
   );
 }

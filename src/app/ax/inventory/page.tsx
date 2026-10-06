@@ -9,7 +9,11 @@ export const metadata: Metadata = { title: "재고·발주 · AX 운영화면", 
 export default function Page() {
   return (
     <AxShell title="재고·발주" subtitle="재고·발주 레이더 — 품절위험과 발주 우선순위">
-      <ClientGate><Suspense fallback={null}><InventoryView /></Suspense></ClientGate>
+      <ClientGate>
+        <Suspense fallback={null}>
+          <InventoryView />
+        </Suspense>
+      </ClientGate>
     </AxShell>
   );
 }

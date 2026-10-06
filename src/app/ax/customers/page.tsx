@@ -9,7 +9,11 @@ export const metadata: Metadata = { title: "고객·재구매 · AX 운영화면
 export default function Page() {
   return (
     <AxShell title="고객·재구매" subtitle="구매주기 도래 고객을 먼저 발견해 '다시 구매'로 연결">
-      <ClientGate><Suspense fallback={null}><CustomersView /></Suspense></ClientGate>
+      <ClientGate>
+        <Suspense fallback={null}>
+          <CustomersView />
+        </Suspense>
+      </ClientGate>
     </AxShell>
   );
 }

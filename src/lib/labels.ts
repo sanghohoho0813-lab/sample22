@@ -37,10 +37,20 @@ export const EVIDENCE_MODE_LABEL: Record<string, string> = {
   "실증 준비": "실증 준비",
 };
 
-export const BASELINE_GROUP_LABEL: Record<"COST" | "REVENUE" | "SCALE", string> = { COST: "비용", REVENUE: "매출", SCALE: "확장성" };
+export const BASELINE_GROUP_LABEL: Record<"COST" | "REVENUE" | "SCALE", string> = {
+  COST: "비용",
+  REVENUE: "매출",
+  SCALE: "확장성",
+};
 
 /** 서비스 상태 표기 — 프로젝트 전체에서 이 네 가지로 통일 */
-export const SERVICE_STATUS_LABEL: Record<string, string> = { LIVE: "작동 중", DEMO: "시연", READY: "연결 준비", NEXT: "예정", PILOT: "실증" };
+export const SERVICE_STATUS_LABEL: Record<string, string> = {
+  LIVE: "작동 중",
+  DEMO: "시연",
+  READY: "연결 준비",
+  NEXT: "예정",
+  PILOT: "실증",
+};
 
 /** AI·규칙 계산 방식 표기 */
 export const METHOD_LABEL: Record<string, string> = {
@@ -50,4 +60,9 @@ export const METHOD_LABEL: Record<string, string> = {
 };
 
 /** 오류비용 수준 */
-export const RISK_LEVEL_LABEL: Record<string, string> = { LOW: "낮음", "LOW~MID": "낮음~중간", MID: "중간", HIGH: "높음" };
+export const RISK_LEVEL_LABEL: Record<string, string> = {
+  LOW: "낮음",
+  "LOW~MID": "낮음~중간",
+  MID: "중간",
+  HIGH: "높음",
+};

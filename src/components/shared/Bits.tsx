@@ -3,15 +3,41 @@ import { useState, type ReactNode } from "react";
 import { HelpCircle, Inbox, Sparkles } from "lucide-react";
 import Overlay from "./Overlay";
 
-export function Tabs<T extends string>({ tabs, value, onChange, className = "" }: { tabs: { key: T; label: string; count?: number }[]; value: T; onChange: (k: T) => void; className?: string }) {
+export function Tabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  className = "",
+}: {
+  tabs: { key: T; label: string; count?: number }[];
+  value: T;
+  onChange: (k: T) => void;
+  className?: string;
+}) {
   return (
-    <div className={`flex gap-1 overflow-x-auto hide-scrollbar border-b border-line ${className}`} role="tablist">
+    <div
+      className={`hide-scrollbar flex gap-1 overflow-x-auto border-b border-line ${className}`}
+      role="tablist"
+    >
       {tabs.map((t) => {
         const on = t.key === value;
         return (
-          <button key={t.key} role="tab" aria-selected={on} onClick={() => onChange(t.key)} className={`relative px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors duration-150 min-h-[44px] ${on ? "text-primary" : "text-muted hover:text-ink"}`}>
-            {t.label}{t.count !== undefined && <span className={`ml-1.5 text-xs rounded-full px-1.5 py-0.5 ${on ? "bg-primary/12 text-primary" : "bg-mist"}`}>{t.count}</span>}
-            {on && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-primary rounded-full" />}
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.key)}
+            className={`relative min-h-[44px] whitespace-nowrap px-3.5 py-2.5 text-sm font-semibold transition-colors duration-150 ${on ? "text-primary" : "text-muted hover:text-ink"}`}
+          >
+            {t.label}
+            {t.count !== undefined && (
+              <span
+                className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${on ? "bg-primary/12 text-primary" : "bg-mist"}`}
+              >
+                {t.count}
+              </span>
+            )}
+            {on && <span className="absolute -bottom-px left-2 right-2 h-0.5 rounded-full bg-primary" />}
           </button>
         );
       })}
@@ -19,12 +45,24 @@ export function Tabs<T extends string>({ tabs, value, onChange, className = "" }
   );
 }
 
-export function EmptyState({ title, body, action, icon }: { title: string; body?: string; action?: ReactNode; icon?: ReactNode }) {
+export function EmptyState({
+  title,
+  body,
+  action,
+  icon,
+}: {
+  title: string;
+  body?: string;
+  action?: ReactNode;
+  icon?: ReactNode;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-12 px-4 gap-2">
-      <div className="w-12 h-12 rounded-2xl bg-mist flex items-center justify-center text-muted">{icon ?? <Inbox size={22} />}</div>
+    <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-mist text-muted">
+        {icon ?? <Inbox size={22} />}
+      </div>
       <div className="font-semibold">{title}</div>
-      {body && <p className="text-sm text-muted max-w-sm">{body}</p>}
+      {body && <p className="max-w-sm text-sm text-muted">{body}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -35,8 +73,13 @@ export function Term({ term, children, desc }: { term: string; children?: ReactN
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-0.5 underline decoration-dotted underline-offset-4 decoration-muted/60 hover:decoration-primary">
-        {children ?? term}<HelpCircle size={13} className="text-muted" />
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-0.5 underline decoration-muted/60 decoration-dotted underline-offset-4 hover:decoration-primary"
+      >
+        {children ?? term}
+        <HelpCircle size={13} className="text-muted" />
       </button>
       <Overlay open={open} onClose={() => setOpen(false)} title={term} size="sm">
         <p className="text-[17px] leading-relaxed">{desc}</p>
@@ -59,20 +102,54 @@ export const TERMS = {
 } as const;
 
 /** AI Ready marker — 규칙기반 Demo 상태를 정직하게 표시 */
-export function AiReady({ title, now, next, method, compact = false }: { title: string; now: string; next: string; method: string; compact?: boolean }) {
+export function AiReady({
+  title,
+  now,
+  next,
+  method,
+  compact = false,
+}: {
+  title: string;
+  now: string;
+  next: string;
+  method: string;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg border border-dashed border-secondary/60 bg-secondary/8 text-secondary font-semibold ${compact ? "px-2 py-1 text-[13px]" : "px-2.5 py-1.5 text-xs"} hover:bg-secondary/15 transition-colors`}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={`bg-secondary/8 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-dashed border-secondary/60 font-semibold text-secondary ${compact ? "px-2 py-1 text-[13px]" : "px-2.5 py-1.5 text-xs"} transition-colors hover:bg-secondary/15`}
+      >
         <Sparkles size={compact ? 13 : 14} /> AI 연결 준비
       </button>
-      <Overlay open={open} onClose={() => setOpen(false)} title={title} subtitle="AI 적용 상태 — 정직한 표시" size="sm">
+      <Overlay
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title}
+        subtitle="AI 적용 상태 — 정직한 표시"
+        size="sm"
+      >
         <dl className="space-y-3 text-[17px]">
-          <div><dt className="text-xs font-semibold text-muted uppercase">현재</dt><dd className="mt-0.5">{now}</dd></div>
-          <div><dt className="text-xs font-semibold text-muted uppercase">계산 방식</dt><dd className="mt-0.5">{method}</dd></div>
-          <div><dt className="text-xs font-semibold text-muted uppercase">향후 (API 연결 시)</dt><dd className="mt-0.5">{next}</dd></div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">현재</dt>
+            <dd className="mt-0.5">{now}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">계산 방식</dt>
+            <dd className="mt-0.5">{method}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">향후 (API 연결 시)</dt>
+            <dd className="mt-0.5">{next}</dd>
+          </div>
         </dl>
-        <p className="mt-4 text-xs text-muted">단순 합계·재고일수·정렬은 코드로 계산하며 AI라고 부르지 않습니다. 실제 LLM 연결은 연결 준비 상태입니다.</p>
+        <p className="mt-4 text-xs text-muted">
+          단순 합계·재고일수·정렬은 코드로 계산하며 AI라고 부르지 않습니다. 실제 LLM 연결은 연결 준비
+          상태입니다.
+        </p>
       </Overlay>
     </>
   );
@@ -83,18 +160,27 @@ export function Freshness({ updatedAt, source = "시연 데이터" }: { updatedA
   const p = (n: number) => String(n).padStart(2, "0");
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted">
-      <span className="w-1.5 h-1.5 rounded-full bg-teal" />
-      {source} · {t ? `${p(t.getMonth() + 1)}/${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())} 기준` : "실시간"}
+      <span className="h-1.5 w-1.5 rounded-full bg-teal" />
+      {source} ·{" "}
+      {t ? `${p(t.getMonth() + 1)}/${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())} 기준` : "실시간"}
     </span>
   );
 }
 
-export function SectionHeader({ title, sub, right }: { title: ReactNode; sub?: ReactNode; right?: ReactNode }) {
+export function SectionHeader({
+  title,
+  sub,
+  right,
+}: {
+  title: ReactNode;
+  sub?: ReactNode;
+  right?: ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 mb-3">
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
       <div className="min-w-0 flex-1 basis-[14rem]">
         <h2 className="section-title">{title}</h2>
-        {sub && <p className="text-sm text-muted mt-0.5">{sub}</p>}
+        {sub && <p className="mt-0.5 text-sm text-muted">{sub}</p>}
       </div>
       {right && <div className="shrink-0">{right}</div>}
     </div>

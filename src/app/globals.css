@@ -87,6 +87,9 @@ h1, h2, h3, h4, th, .badge, .chip, .btn { word-break: keep-all; }
   .table-wrap.stackable > .table > tbody > tr > td > svg { display: block; margin-left: auto; }
   /* 숫자 칸은 카드 안에서도 줄바꿈 금지 (1,568 → 1,5/68 방지) */
   .table-wrap.stackable > .table > tbody > tr > td.tabular-nums { white-space: nowrap; }
+  /* 데스크톱 표용 nowrap이 카드에서는 화면 밖으로 밀어내므로 글자 칸은 다시 줄바꿈 허용 */
+  .table-wrap.stackable > .table > tbody > tr > td:not(.tabular-nums), .table-wrap.stackable > .table > tbody > tr > td:not(.tabular-nums) *:not(.badge):not(.tabular-nums) { white-space: normal; }
+  .table-wrap.stackable > .table > tbody > tr > td[data-title] { overflow-wrap: anywhere; }
 }
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }

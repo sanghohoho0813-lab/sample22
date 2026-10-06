@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Heart, Minus, Plus, Star, Truck, Undo2, ShieldCheck, Zap, Store, PackageCheck } from "lucide-react";
 import { useData, useLookups } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
@@ -52,8 +52,18 @@ export default function ProductDetailView({ productId }: { productId: string }) 
   const discount = sku.listPrice > 0 ? Math.round((1 - sku.salePrice / sku.listPrice) * 100) : 0;
   const unit = sku.bundleQty > 1 ? `개당 ${won(Math.round(sku.salePrice / sku.bundleQty))}` : null;
 
-  const add = () => { addToCart(sku.id, qty); toast({ title: "장바구니에 담았습니다", body: `${product.name} · ${sku.name} ×${qty}`, tone: "success" }); };
-  const buyNow = () => { addToCart(sku.id, qty); router.push("/checkout"); };
+  const add = () => { addToCart(sku.id, qty); toast({ title: "장바구니에 담았습니다", body: `${product.name} · ${sku.name} ×${qty}`, tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); };
+  // 바로 주문: 이 상품만 주문서로 (장바구니의 다른 상품은 남겨두고 선택만 해제) · 연타 방지
+  const buying = useRef(false);
+  const buyNow = () => {
+    if (buying.current) return;
+    buying.current = true;
+    const st = useStore.getState();
+    // 이미 담겨 있던 상품이면 수량을 더하지 않고 지금 고른 수량으로 맞춘다
+    if (st.ui.cart.some((c) => c.skuId === sku.id)) st.updateCartQty(sku.id, qty); else addToCart(sku.id, qty);
+    useStore.getState().ui.cart.forEach((c) => st.toggleCartSelect(c.skuId, c.skuId === sku.id));
+    router.push("/checkout");
+  };
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-4 sm:py-6">

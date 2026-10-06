@@ -30,7 +30,7 @@ export function ActionCard({ a, onOpen, compact = false }: { a: AXAction; onOpen
         <span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span>
         <span className="text-[14px] font-semibold text-muted">{actionTypeLabel(a.type)}</span>
         {a.stage !== "recommended" && <StatusBadge status={a.stage} />}
-        <span className="ml-auto text-[13px] text-muted inline-flex items-center gap-1 whitespace-nowrap"><Clock3 size={13} />{open ? (due < 0 ? `마감 ${relTime(a.dueAt)}` : `마감 ${relTime(a.dueAt)}`) : `완료 ${relTime(a.updatedAt)}`}</span>
+        <span className="ml-auto text-[13px] text-muted inline-flex items-center gap-1 whitespace-nowrap"><Clock3 size={13} />{open ? (due < 0 ? <b className="text-danger font-semibold">기한 지남</b> : `마감 ${relTime(a.dueAt)}`) : `완료 ${relTime(a.updatedAt)}`}</span>
       </div>
       <div className="mt-2 font-bold text-[18px] leading-snug">{a.title}</div>
       {!compact && <p className="mt-1 text-[15px] text-ink/75 line-clamp-2 leading-relaxed">{a.summary}</p>}
@@ -77,13 +77,13 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
   const nextLabel = a.type === "priority_order" ? "우선처리 시작" : a.type === "delay_notice" ? "고객 안내 발송" : a.type === "repeat_expose" ? "노출 시작" : a.type === "promo_adjust" ? "할인율 조정 적용" : a.type === "stop_po" ? "발주 보류 확정" : "승인 · 발주 요청";
 
   return (
-    <Overlay open={!!action} onClose={onClose} variant="drawer" size="lg" title={a.title} subtitle={<span className="inline-flex items-center gap-2"><span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span><Badge tone="soft">{actionTypeLabel(a.type)}</Badge><StatusBadge status={a.stage} /><span>담당 {a.assignee} · 추천 {relTime(a.recommendedAt)} · 마감 {fmtDate(a.dueAt, "datetime")}</span></span>}
+    <Overlay open={!!action} onClose={onClose} variant="drawer" size="lg" title={a.title} subtitle={<span className="flex flex-wrap items-center gap-x-2 gap-y-1.5"><span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span><span className="text-[14px] font-semibold">{actionTypeLabel(a.type)}</span><StatusBadge status={a.stage} /><span className="basis-full text-[14px]">담당 {a.assignee} · 추천 {relTime(a.recommendedAt)} · {new Date(a.dueAt).getTime() < Date.now() && !["done", "dismissed"].includes(a.stage) ? <b className="text-danger">기한 지남</b> : <>마감 {fmtDate(a.dueAt, "datetime")}</>}</span></span>}
       footer={
         <div className="flex flex-wrap gap-2">
           {!canAct && <div className="text-xs text-muted w-full">이 실행은 {ROLE_LABEL[a.owner]} 권한에서 처리합니다. (현재 {ROLE_LABEL[role]})</div>}
           {["recommended", "reviewing", "held"].includes(a.stage) && canAct && (
             <>
-              {a.stage === "recommended" && <button className="btn-outline" onClick={() => act("reviewing")}>확인·검토중</button>}
+              {a.stage === "recommended" && <button className="btn-outline" onClick={() => act("reviewing")}>검토 시작</button>}
               <button className="btn-primary" onClick={() => act("approved")} data-autofocus><CheckCircle2 size={16} />{nextLabel}</button>
               <button className="btn-outline" onClick={() => setHold("held")}><PauseCircle size={16} />보류</button>
               <button className="btn-ghost text-muted" onClick={() => setHold("dismissed")}><XCircle size={16} />무시</button>

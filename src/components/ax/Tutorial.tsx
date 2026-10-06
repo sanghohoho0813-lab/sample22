@@ -3,21 +3,29 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "@/lib/store";
 
-const STEPS = [
-  { target: "sidebar", title: "7개 메뉴, 하나의 흐름", body: "경영 대시보드 → 실행 센터 → 상품·재고 → 주문·배송 → 고객·마케팅 → 경영분석. 비슷한 기능끼리 묶었고, 그룹을 누르면 세부 메뉴가 펼쳐집니다. 메뉴는 '무엇이 문제인가'에서 '무엇을 했고 결과가 무엇인가'까지 순서대로 배치되어 있습니다." },
-  { target: "brief", title: "오늘의 브리핑 — 오늘 무엇부터", body: "대표가 10초 안에 '어디서 돈이 새는지, 무엇을 먼저 발주할지, 어떤 주문을 먼저 처리할지'를 보는 곳입니다. 각 항목을 누르면 근거와 실행으로 이어집니다." },
-  { target: "kpi", title: "KPI는 클릭하면 상세로", body: "숫자만 보여주지 않습니다. 품절위험 SKU 16개를 누르면 위험 목록 → SKU 상세 → 추천 근거 → 발주 실행 → 공급사 선택까지 내려갑니다." },
-  { target: "actions", title: "실행 카드 — 추천에는 근거가 있다", body: "모든 추천에는 사용 데이터, 핵심 근거 2~4개, 주의사항, 대안이 붙습니다. 승인·실행하면 실제 데이터(발주·재고·주문상태·고객 알림)가 바뀌고 성과 기록이 남습니다." },
-  { target: "role", title: "역할 전환 — 권한이 다르다", body: "대표·구매담당·운영담당·CS 전환 시 메뉴, KPI, 테이블, 민감정보가 실제로 달라집니다. 실제 운영에서는 로그인 역할과 RLS로 강제됩니다." },
-  { target: "customer", title: "고객 플랫폼 ↔ AX 왕복", body: "고객이 주문하면 AX의 신규주문 대기열과 재고 예약이 바뀌고, AX에서 출고 처리하면 고객 마이페이지 상태가 바뀝니다. 한 저장소를 함께 씁니다." },
-  { target: "theme", title: "9개 테마 · 설정", body: "9개 테마 전부에서 사이드바·버튼·배지·차트·팝업이 일관되게 바뀝니다. 설정에서 글자 크기, 역할, 시연 데이터 초기화도 관리합니다." },
+/** 짧게, 화면에 실제 보이는 것만 말한다. target이 화면에 없으면(예: 휴대폰의 사이드바) fallback을 찾고, 그것도 없으면 그 단계는 건너뛴다 */
+const STEPS: { target: string; fallback?: string; title: string; body: string }[] = [
+  { target: "sidebar", fallback: "menu", title: "메뉴는 7개로 묶었습니다", body: "비슷한 기능끼리 묶여 있어요. 그룹을 누르면 세부 메뉴가 펼쳐집니다." },
+  { target: "brief", title: "오늘의 브리핑부터", body: "오늘 먼저 볼 일을 급한 순서로 보여줍니다. 누르면 해당 목록이 바로 열립니다." },
+  { target: "kpi", title: "숫자를 누르면 근거까지", body: "KPI를 누르면 위험 목록 → 상품 상세 → 추천 근거 → 발주 실행으로 이어집니다." },
+  { target: "actions", title: "추천에는 근거가 있습니다", body: "근거 2~4개와 대안이 함께 붙고, 사람이 승인해야 발주·출고가 실제로 바뀝니다." },
+  { target: "role", title: "역할마다 다르게 보입니다", body: "대표·구매·운영·CS로 바꾸면 메뉴와 숫자, 민감정보가 달라집니다." },
+  { target: "customer", title: "고객 화면과 연결돼 있습니다", body: "고객이 주문하면 여기 바로 들어오고, 여기서 출고하면 고객 화면이 바뀝니다." },
+  { target: "theme", title: "테마는 9가지", body: "색 테마와 글자 크기, 시연 데이터 초기화는 설정에서 바꿀 수 있습니다." },
 ];
+const visible = (el: Element | null) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+const findTarget = (st: (typeof STEPS)[number]) => {
+  const pick = (t?: string) => (t ? Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${t}"]`)).find(visible) ?? null : null);
+  return pick(st.target) ?? pick(st.fallback);
+};
 
 export default function Tutorial({ onClose }: { onClose: () => void }) {
   const setTutorialDone = useStore((s) => s.setTutorialDone);
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const step = STEPS[i];
+  // 지금 화면에 대상이 있는 단계만 (휴대폰에서는 테마 단계 등이 빠진다)
+  const [steps] = useState(() => STEPS.filter((st) => !!findTarget(st)));
+  const step = steps[Math.min(i, steps.length - 1)] ?? STEPS[0];
 
   useLayoutEffect(() => {
     // 스크롤은 단계가 바뀔 때 한 번만. 스크롤/리사이즈 리스너는 좌표만 갱신하고 절대 다시 스크롤하지 않는다 (피드백 루프 방지).
@@ -25,11 +33,11 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
     const measure = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+        const el = findTarget(step);
         setRect(el ? el.getBoundingClientRect() : null);
       });
     };
-    const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+    const el = findTarget(step);
     if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
     measure();
     const t1 = setTimeout(measure, 400);
@@ -37,10 +45,11 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, { capture: true, passive: true });
     return () => { clearTimeout(t1); clearTimeout(t2); cancelAnimationFrame(raf); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.target]);
 
   const finish = () => { setTutorialDone(true); onClose(); };
-  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") finish(); if (e.key === "ArrowRight") setI((x) => Math.min(STEPS.length - 1, x + 1)); if (e.key === "ArrowLeft") setI((x) => Math.max(0, x - 1)); }; window.addEventListener("keydown", onKey); document.body.style.overflow = "hidden"; return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; }; // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") finish(); if (e.key === "ArrowRight") setI((x) => Math.min(steps.length - 1, x + 1)); if (e.key === "ArrowLeft") setI((x) => Math.max(0, x - 1)); }; window.addEventListener("keydown", onKey); document.body.style.overflow = "hidden"; return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; }; // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pad = 8;
@@ -49,7 +58,7 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const cardBelow = r ? r.y + r.h + 240 < vh : true;
   const cardStyle: React.CSSProperties = r
-    ? { top: cardBelow ? r.y + r.h + 12 : Math.max(12, r.y - 232), left: Math.min(Math.max(12, r.x), vw - 372) }
+    ? { top: cardBelow ? r.y + r.h + 12 : Math.max(12, r.y - 232), left: Math.max(12, Math.min(r.x, vw - Math.min(360, vw - 24) - 12)) }
     : { top: "50%", left: "50%", transform: "translate(-50%,-50%)" };
 
   return createPortal(
@@ -60,14 +69,14 @@ export default function Tutorial({ onClose }: { onClose: () => void }) {
         {r && <rect x={r.x} y={r.y} width={r.w} height={r.h} rx={12} fill="none" stroke="var(--t-highlight)" strokeWidth={3} />}
       </svg>
       <div className="absolute card-raised p-5 w-[360px] max-w-[calc(100vw-24px)] fade-up" style={cardStyle}>
-        <div className="text-xs font-semibold text-muted">{i + 1} / {STEPS.length}</div>
+        <div className="text-[13px] font-semibold text-muted">{i + 1} / {steps.length}</div>
         <div className="text-lg font-bold mt-0.5">{step.title}</div>
         <p className="text-[17px] text-ink/85 mt-1.5 leading-relaxed">{step.body}</p>
         <div className="mt-4 flex items-center gap-2">
           <button className="btn-ghost btn-sm" onClick={finish}>건너뛰기</button>
           <div className="ml-auto flex gap-2">
             <button className="btn-outline btn-sm" disabled={i === 0} onClick={() => setI((x) => x - 1)}>이전</button>
-            {i < STEPS.length - 1 ? <button className="btn-primary btn-sm" onClick={() => setI((x) => x + 1)} data-autofocus>다음</button> : <button className="btn-primary btn-sm" onClick={finish} data-autofocus>시작하기</button>}
+            {i < steps.length - 1 ? <button className="btn-primary btn-sm" onClick={() => setI((x) => x + 1)} data-autofocus>다음</button> : <button className="btn-primary btn-sm" onClick={finish} data-autofocus>시작하기</button>}
           </div>
         </div>
       </div>

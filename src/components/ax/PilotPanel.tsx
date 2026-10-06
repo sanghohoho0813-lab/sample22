@@ -117,7 +117,7 @@ export default function PilotPanel() {
       <Overlay open={confirm} onClose={() => setConfirm(false)} title="실증 단계로 전환" size="sm" footer={<div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setConfirm(false)}>취소</button><button className="btn-primary flex-1" onClick={() => { setStage("PILOT"); setConfirm(false); toast({ title: "실증 단계로 전환했습니다", body: "기준값 성과 기록이 남았습니다.", tone: "success" }); }}>전환</button></div>}>
         <div className="space-y-2 text-[17px]">
           <p>AX 책임자 <b>{pilot.owner}</b> · 기준값 <b>{total}개</b> 입력 상태로 12주 실증을 시작합니다.</p>
-          <p className="text-sm text-muted">진행 단계 표시과 성과 기록만 바뀝니다. 화면의 상품·주문·재고 수치는 실데이터 연결(Supabase · CSV 가져오기, 연결 준비) 전까지 여전히 시연용 시뮬레이션이며, 실증 성과처럼 표시되지 않습니다.</p>
+          <p className="text-sm text-muted">진행 단계 표시와 성과 기록만 바뀝니다. 화면의 상품·주문·재고 수치는 실데이터 연결(Supabase · CSV 가져오기, 연결 준비) 전까지 여전히 시연용 시뮬레이션이며, 실증 성과처럼 표시되지 않습니다.</p>
         </div>
       </Overlay>
     </div>

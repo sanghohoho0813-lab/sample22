@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Search, ShoppingCart, User, Home, LayoutGrid, Zap, Tag, RotateCcw, PackageSearch, X, Clock3, ChevronRight, Bell, LayoutDashboard, Presentation, Truck, Headset, Menu, ArrowRight, ShieldCheck, Phone } from "lucide-react";
+import { Search, ShoppingCart, User, Home, LayoutGrid, Zap, Tag, RotateCcw, PackageSearch, X, Clock3, ChevronRight, ChevronLeft, Bell, LayoutDashboard, Presentation, Truck, Headset, Menu, ArrowRight, ShieldCheck, Phone } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useData, useHydrated, useIsInIframe, useNow } from "@/lib/hooks";
 import { autocomplete, SUGGESTED_SEARCHES } from "@/lib/catalog";
@@ -185,8 +185,9 @@ function DemoSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-export default function CustomerShell({ children, hideBottomNav = false, plain = false, stickyBar = false }: { children: ReactNode; hideBottomNav?: boolean; plain?: boolean; /** 화면 하단 고정 주문바가 있는 페이지 — 푸터가 가려지지 않게 여백 확보 */ stickyBar?: boolean }) {
+export default function CustomerShell({ children, hideBottomNav = false, plain = false, stickyBar = false, backHref }: { children: ReactNode; hideBottomNav?: boolean; plain?: boolean; /** 화면 하단 고정 주문바가 있는 페이지 — 푸터가 가려지지 않게 여백 확보 */ stickyBar?: boolean; /** 상세 화면: 모바일 헤더에 ← 뒤로 (기록이 없으면 이 주소로) */ backHref?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const hydrated = useHydrated();
   const cartCount = useStore((s) => s.ui.cart.reduce((a, c) => a + c.qty, 0));
   const data = useData();
@@ -209,7 +210,9 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-line">
         <div className="mx-auto max-w-[1280px] px-4">
           <div className="flex items-center gap-1.5 sm:gap-6 h-16">
-            {!plain && <button type="button" className="md:hidden w-11 h-11 -ml-2 rounded-xl inline-flex items-center justify-center text-ink hover:bg-mist shrink-0" onClick={() => setMenuOpen(true)} aria-label="메뉴 열기" aria-expanded={menuOpen}><Menu size={23} /></button>}
+            {backHref ? (
+              <button type="button" className="md:hidden w-11 h-11 -ml-2 rounded-xl inline-flex items-center justify-center text-ink hover:bg-mist shrink-0" aria-label="뒤로" onClick={() => { if (window.history.length > 1) router.back(); else router.push(backHref); }}><ChevronLeft size={26} /></button>
+            ) : !plain && <button type="button" className="md:hidden w-11 h-11 -ml-2 rounded-xl inline-flex items-center justify-center text-ink hover:bg-mist shrink-0" onClick={() => setMenuOpen(true)} aria-label="메뉴 열기" aria-expanded={menuOpen}><Menu size={23} /></button>}
             <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="NEXMART 홈">
               <span className="w-9 h-9 rounded-xl bg-navy text-white font-black text-lg flex items-center justify-center">N</span>
               <span className="font-black text-xl tracking-tight text-navy hidden xs:inline">NEXMART</span>

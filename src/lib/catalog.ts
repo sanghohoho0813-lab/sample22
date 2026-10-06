@@ -8,6 +8,8 @@ export interface ProductSummary {
   minPrice: number;
   listPrice: number;
   discountRate: number;
+  /** 구성(묶음 포함) 중 가장 큰 할인율 — 특가 목록 기준 */
+  bestDiscount: number;
   available: number; // default sku available
   totalAvailable: number;
   inboundEta?: string;
@@ -35,6 +37,7 @@ export function summarize(data: DemoData, product: Product, now = new Date()): P
     minPrice: Math.round(minPrice),
     listPrice: defaultSku.listPrice,
     discountRate: defaultSku.listPrice > 0 ? Math.round((1 - defaultSku.salePrice / defaultSku.listPrice) * 100) : 0,
+    bestDiscount: Math.max(0, ...skus.map((s) => (s.listPrice > 0 ? Math.round((1 - s.salePrice / s.listPrice) * 100) : 0))),
     available, totalAvailable, inboundEta,
     soldOut: totalAvailable <= 0,
     promise: deliveryPromise(product.deliveryType, totalAvailable, inboundEta, now),
@@ -77,7 +80,7 @@ export function searchProducts(data: DemoData, f: SearchFilters, now = new Date(
   if (f.priceMax !== undefined) list = list.filter((s) => s.minPrice <= f.priceMax!);
   if (f.brandIds?.length) list = list.filter((s) => f.brandIds!.includes(s.product.brandId));
   if (f.minRating) list = list.filter((s) => s.product.rating >= f.minRating!);
-  if (f.discountOnly) list = list.filter((s) => s.discountRate > 0);
+  if (f.discountOnly) list = list.filter((s) => s.bestDiscount > 0);
   if (f.delivery && f.delivery !== "all") list = list.filter((s) => (f.delivery === "reserve" ? s.promise.kind === "reserve" : s.product.deliveryType === f.delivery && !s.soldOut));
   if (f.stock === "in") list = list.filter((s) => !s.soldOut);
   if (f.stock === "reserve") list = list.filter((s) => s.promise.kind === "reserve");
@@ -87,7 +90,7 @@ export function searchProducts(data: DemoData, f: SearchFilters, now = new Date(
     if (sort === "price_desc") return b.minPrice - a.minPrice;
     if (sort === "rating") return b.product.rating - a.product.rating || b.product.reviewCount - a.product.reviewCount;
     if (sort === "new") return b.product.id < a.product.id ? -1 : 1;
-    if (sort === "discount") return b.discountRate - a.discountRate;
+    if (sort === "discount") return b.bestDiscount - a.bestDiscount;
     return b.popularity - a.popularity;
   });
   return list;

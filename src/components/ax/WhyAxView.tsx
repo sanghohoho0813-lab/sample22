@@ -34,7 +34,7 @@ export default function WhyAxView() {
           <div className="absolute inset-0 pattern-dots opacity-60" />
           <div className="relative">
             <div className="text-highlight font-semibold text-sm">기획 의도</div>
-            <h1 className="mt-2 text-3xl sm:text-4xl font-black leading-tight text-balance">고객의 검색·장바구니·주문이<br />상품별 수요 데이터가 되고,<br />그 데이터가 발주·출고·배송을 바꾼다</h1>
+            <h1 className="mt-2 text-[26px] sm:text-4xl font-black leading-snug sm:leading-tight text-balance">고객의 검색·장바구니·주문이<br />상품별 수요 데이터가 되고,<br />그 데이터가 발주·출고·배송을 바꾼다</h1>
             <p className="mt-4 text-white/80 max-w-2xl text-[18px] leading-relaxed">NEXMART는 쇼핑몰도, 재고 ERP도 아닙니다. 고객 행동 → 내부 판단 → 결과 → 고객 경험으로 돌아오는 <b className="text-white">닫힌 데이터 순환</b>을 실제로 작동시키는 종합유통 AX+플랫폼입니다.</p>
             <div className="mt-5 flex flex-wrap gap-2"><Link href="/ax/presentation" className="btn bg-white text-shell hover:bg-white/90">시연 모드로 보기</Link><Link href="/" className="btn bg-white/15 text-white hover:bg-white/25"><Store size={16} />고객 플랫폼</Link></div>
           </div>

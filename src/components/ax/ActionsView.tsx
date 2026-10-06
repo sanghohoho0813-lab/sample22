@@ -21,7 +21,7 @@ export default function ActionsView() {
   const [action, setAction] = useState<AXAction | null>(null);
   const [skuId, setSkuId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  useEffect(() => { const id = sp.get("id"); if (id) { const a = data.actions.find((x) => x.id === id); if (a) setAction(a); } // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const u = sp.get("urg"); if (u && ["critical", "high", "mid", "low"].includes(u)) setUrg(u as Urgency); const id = sp.get("id"); if (id) { const a = data.actions.find((x) => x.id === id); if (a) setAction(a); } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp]);
   useEffect(() => { setOwner(role === "owner" ? "all" : role); }, [role]);
 

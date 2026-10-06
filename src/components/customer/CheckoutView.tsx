@@ -105,7 +105,7 @@ export default function CheckoutView() {
           <section className="card p-5">
             <h2 className="font-bold text-lg flex items-center gap-2"><CreditCard size={18} className="text-primary" />결제수단 <span className="badge bg-mist text-muted">미리보기</span></h2>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              {([["card", "신용·체크카드"], ["transfer", "계좌이체"], ["pay", "간편결제"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => setPay(k)} aria-pressed={pay === k} className={`rounded-xl border px-2 py-3 min-h-[52px] text-[15px] font-semibold ${pay === k ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}>{l}</button>)}
+              {([["card", "카드"], ["transfer", "계좌이체"], ["pay", "간편결제"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => setPay(k)} aria-pressed={pay === k} className={`rounded-xl border px-2 py-3 min-h-[52px] text-[15px] font-semibold ${pay === k ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}>{l}</button>)}
             </div>
             <p className="text-[13px] text-muted mt-2 inline-flex items-center gap-1"><Lock size={13} />시연에서는 결제 없이 주문이 생성됩니다.</p>
           </section>

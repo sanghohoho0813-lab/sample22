@@ -44,22 +44,23 @@ export default function PresentationView() {
             {STEPS.map((s, k) => <li key={k}><button onClick={() => setI(k)} className={`w-full text-left rounded-lg px-2.5 py-2 text-sm flex items-center gap-2 ${k === i ? "bg-soft text-shell font-bold" : "hover:bg-mist text-muted"}`}><span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${k === i ? "bg-primary text-white" : k < i ? "bg-line text-ink" : "bg-mist"}`}>{k + 1}</span><span className="truncate">{s.title}</span><span className={`ml-auto text-[12px] font-semibold ${s.surface === "customer" ? "text-teal" : "text-secondary"}`}>{s.surface === "customer" ? "고객" : "AX"}</span></button></li>)}
           </ol>
         </Panel>
-        <div className={`flex flex-col gap-3 ${full ? "h-full min-h-0" : ""}`}>
+        {/* 휴대폰: 지금 단계와 "화면 열기"를 먼저, 18단계 목록은 아래로 */}
+        <div className={`flex flex-col gap-3 order-first lg:order-none ${full ? "h-full min-h-0" : ""}`}>
           <div className="card p-4 flex items-start gap-3">
             <span className="w-9 h-9 rounded-xl bg-primary text-white font-black flex items-center justify-center shrink-0">{i + 1}</span>
-            <div className="min-w-0 flex-1"><div className="font-bold text-lg leading-tight">{step.title}</div><p className="text-sm text-ink/80 mt-1">{step.body}</p></div>
-            <div className="flex gap-1.5 shrink-0"><button className="btn-outline btn-sm !px-2.5" disabled={i === 0} onClick={() => setI((x) => x - 1)} aria-label="이전"><ChevronLeft size={16} /></button><button className="btn-primary btn-sm !px-2.5" disabled={i === STEPS.length - 1} onClick={() => setI((x) => x + 1)} aria-label="다음"><ChevronRight size={16} /></button></div>
+            <div className="min-w-0 flex-1"><div className="font-bold text-lg leading-tight">{step.title}</div><p className="text-[15px] text-ink/80 mt-1 leading-relaxed">{step.body}</p></div>
+            <div className="flex gap-1.5 shrink-0"><button className="btn-outline btn-sm !px-2.5 !min-h-[40px]" disabled={i === 0} onClick={() => setI((x) => x - 1)} aria-label="이전 단계"><ChevronLeft size={18} /></button><button className="btn-primary btn-sm !px-2.5 !min-h-[40px]" disabled={i === STEPS.length - 1} onClick={() => setI((x) => x + 1)} aria-label="다음 단계"><ChevronRight size={18} /></button></div>
           </div>
           {/* 모바일: 앱 안에 앱을 띄우지 않고(메모리·터치 문제) 해당 단계 화면으로 바로 이동 */}
           <div className="md:hidden card p-4">
             <a href={step.src} className="btn-primary btn-lg w-full"><ExternalLink size={18} />이 단계 화면 열기</a>
-            <p className="text-sm text-muted mt-2">모바일에서는 각 단계를 실제 화면으로 이동해 진행합니다. 뒤로가기로 이 목록에 돌아옵니다.</p>
+            <p className="text-[14px] text-muted mt-2">실제 화면으로 이동합니다. 뒤로 가면 이 단계로 돌아옵니다.</p>
           </div>
           <div className={`hidden md:block card overflow-hidden relative ${full ? "flex-1 min-h-0" : "h-[62vh] min-h-[420px]"}`}>
             <div className="absolute top-2 right-2 z-10 flex gap-1"><a href={step.src} target="_blank" rel="noreferrer" className="btn-outline btn-sm bg-white/95"><ExternalLink size={14} />새 탭에서 열기</a></div>
             {isDesktop && <iframe key={step.src} title={step.title} src={step.src} className="w-full h-full border-0" />}
           </div>
-          <div className="hidden md:block text-xs text-muted">화면 안에서 직접 클릭·조작할 수 있습니다. 여기서 만든 주문·승인은 실제 시연 상태에 반영됩니다. 시연 데이터 초기화은 설정 또는 하단 링크에서.</div>
+          <div className="hidden md:block text-xs text-muted">화면 안에서 직접 클릭·조작할 수 있습니다. 여기서 만든 주문·승인은 실제 시연 상태에 반영됩니다. 시연 데이터 초기화는 설정 또는 하단 링크에서.</div>
         </div>
       </div>
     </div>

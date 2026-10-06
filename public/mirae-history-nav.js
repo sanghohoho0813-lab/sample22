@@ -193,7 +193,8 @@
     var bw = mobile ? 76 : 72
     var bh = mobile ? 38 : 36
     var side = mobile ? 12 : 24
-    var rows = mobile ? [16, 76, 140] : [24, 88]
+    // 하단 탭바 + 고정 주문바가 함께 있는 화면(장바구니 등)까지 비켜 갈 수 있게 위쪽 칸을 더 둔다
+    var rows = mobile ? [16, 76, 140, 204, 268] : [24, 88, 152]
     var cols = [
       ['right', w - side - bw],
       ['center', Math.round((w - bw) / 2)],
@@ -208,13 +209,9 @@
     return out
   }
 
-  function blocked(c) {
-    var pad = 6
-    var l = c.left - pad
-    var t = c.top - pad
-    var r = c.left + c.w + pad
-    var b = c.top + c.h + pad
-    // 1) 화면에 고정된 요소(사이드바·탭바·떠 있는 버튼)와 겹치는가
+  // 화면에 고정된 요소(사이드바·탭바·주문바·떠 있는 버튼)의 영역 — 자리 고를 때 한 번만 훑는다
+  function fixedRects() {
+    var out = []
     var all = document.body.getElementsByTagName('*')
     for (var i = 0; i < all.length; i++) {
       var el = all[i]
@@ -226,16 +223,46 @@
       if (rc.width < 2 || rc.height < 2) continue
       // 화면 전체를 덮는 투명 층(모달 배경 등)은 건너뛴다
       if (rc.width >= window.innerWidth - 1 && rc.height >= window.innerHeight - 1) continue
+      out.push(rc)
+    }
+    return out
+  }
+
+  function blocked(c, rects) {
+    var pad = 6
+    var l = c.left - pad
+    var t = c.top - pad
+    var r = c.left + c.w + pad
+    var b = c.top + c.h + pad
+    for (var i = 0; i < rects.length; i++) {
+      var rc = rects[i]
       if (rc.right > l && rc.left < r && rc.bottom > t && rc.top < b) return true
     }
     return false
   }
 
+  // 모달·튜토리얼·시트가 열려 있으면 그 안의 버튼을 가리지 않도록 잠시 숨긴다
+  function modalOpen() {
+    var d = document.querySelectorAll('[role="dialog"], [aria-modal="true"]')
+    for (var i = 0; i < d.length; i++) {
+      var r = d[i].getBoundingClientRect()
+      if (r.width > 0 && r.height > 0) return true
+    }
+    return false
+  }
+
   function place() {
+    if (modalOpen()) {
+      pill.hidden = true
+      placed = ''
+      return
+    }
+    pill.hidden = false
     var cs = candidates()
+    var rects = fixedRects()
     var pick = cs[0]
     for (var i = 0; i < cs.length; i++) {
-      if (!blocked(cs[i])) {
+      if (!blocked(cs[i], rects)) {
         pick = cs[i]
         break
       }
@@ -255,10 +282,10 @@
     var canFwd = pos < max
     var toHub = pos === 0 && !hasPrevPage()
     backBtn.disabled = false
+    observe()
     backBtn.title = toHub ? '미래AI랩 샘플 목록으로' : '뒤로 가기'
     backBtn.setAttribute('aria-label', toHub ? '미래AI랩 샘플 목록으로 돌아가기' : '뒤로 가기')
     fwdBtn.disabled = !canFwd
-    pill.hidden = false
     placed = ''
     place()
   }
@@ -267,6 +294,22 @@
   function schedule() {
     if (timer) clearTimeout(timer)
     timer = setTimeout(render, 450)
+  }
+
+  // 화면 안의 요소가 바뀌면(고정 주문바·튜토리얼·시트가 새로 나타남) 자리를 다시 고른다.
+  // 속성 변경은 보지 않으므로 버튼 자신의 위치 변경으로 다시 불리는 반복은 없다
+  var mo = null
+  var moTimer = 0
+  function observe() {
+    if (mo || !window.MutationObserver) return
+    mo = new MutationObserver(function () {
+      if (moTimer) return
+      moTimer = setTimeout(function () {
+        moTimer = 0
+        if (pill) { placed = ''; place() }
+      }, 250)
+    })
+    mo.observe(document.body, { childList: true, subtree: true })
   }
 
   window.addEventListener('resize', schedule)

@@ -40,7 +40,7 @@ export default function SuppliersView() {
         <KpiCard label="고위험 공급사" value={data.suppliers.filter((s) => s.riskLevel === "high").length} tone="warn" sub="납기·불량 복합" />
       </div>
 
-      <Panel title={<span className="inline-flex items-center gap-2"><Factory size={18} className="text-accent" />공급사 비교 — 동일 상품 공급사 비교</span>} sub="가장 싼 공급사를 무조건 추천하지 않습니다. 긴급 품절위험은 납기, 과잉재고 위험은 최소주문수량이 더 중요합니다" right={<AiReady title="공급사 비교" now="단가·납기·최소수량·정시납품·충족률·불량률 가중 점수 (L2/L3)" method="규칙 + 최적화" next="발주 결과 학습으로 공급사별 실제 납기·불량 예측" />}>
+      <Panel title={<span className="inline-flex items-center gap-2"><Factory size={18} className="text-accent" />같은 상품, 공급사 비교</span>} sub="가장 싼 공급사를 무조건 추천하지 않습니다. 긴급 품절위험은 납기, 과잉재고 위험은 최소주문수량이 더 중요합니다" right={<AiReady title="공급사 비교" now="단가·납기·최소수량·정시납품·충족률·불량률 가중 점수 (L2/L3)" method="규칙 + 최적화" next="발주 결과 학습으로 공급사별 실제 납기·불량 예측" />}>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <label className="text-sm text-muted">비교 상품</label>
           <select className="input !min-h-[38px] w-auto text-sm max-w-full" value={cmpSku} onChange={(e) => setCmpSku(e.target.value)}>{multi.map((i) => <option key={i.sku.id} value={i.sku.id}>{i.product.name} · {i.sku.name}</option>)}</select>

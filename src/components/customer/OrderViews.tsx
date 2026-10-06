@@ -77,20 +77,23 @@ export function OrderCompleteView({ orderId }: { orderId: string }) {
         <OrderProgress order={order} />
         <ul className="mt-5 divide-y divide-line">
           {order.items.map((it) => { const p = productById.get(it.productId)!; return (
-            <li key={it.skuId} className="py-3 flex items-center gap-3"><AssetImage assetKey={`product/${p.id}`} category={p.categorySlug} label={p.name} className="w-14 h-14 rounded-lg shrink-0" ratio="" /><div className="flex-1 min-w-0"><div className="font-semibold text-sm line-clamp-1">{it.name}</div><div className="text-xs text-muted">{it.skuName} × {it.qty}</div></div><div className="font-bold text-sm tabular-nums">{won(it.unitPrice * it.qty)}</div></li>
+            <li key={it.skuId} className="py-3 flex items-center gap-3"><AssetImage assetKey={`product/${p.id}`} category={p.categorySlug} label={p.name} className="w-14 h-14 rounded-lg shrink-0" ratio="" /><div className="flex-1 min-w-0"><div className="font-semibold text-[15px] line-clamp-1">{it.name}</div><div className="text-[13px] text-muted">{it.skuName} × {it.qty}</div></div><div className="font-bold text-[15px] tabular-nums">{won(it.unitPrice * it.qty)}</div></li>
           ); })}
         </ul>
         <div className="mt-3 flex justify-between text-sm border-t border-line pt-3"><span className="text-muted">결제 예정금액 (배송비 {order.shippingFee ? won(order.shippingFee) : "무료"})</span><b className="text-lg tabular-nums">{won(order.total)}</b></div>
       </div>
       <div className="mt-5 grid sm:grid-cols-2 gap-3">
-        <Link href={`/my/orders/${order.id}`} className="btn-primary btn-lg">배송조회 <ArrowRight size={16} /></Link>
+        <Link href={`/my/orders/${order.id}`} className="btn-primary btn-lg">주문 상세·배송조회 <ArrowRight size={16} /></Link>
         <Link href="/" className="btn-outline btn-lg">쇼핑 계속하기</Link>
       </div>
-      <div className="mt-6 card p-4 text-sm">
-        <div className="font-semibold flex items-center gap-2"><LayoutDashboard size={16} className="text-primary" />이 주문은 지금 내부 시스템에 반영되었습니다</div>
-        <p className="text-muted mt-1">재고 예약 → 신규주문 대기열 → 수요신호 갱신. AX 운영화면의 <b>주문·출고</b>와 <b>재고·발주</b> 화면에서 이 주문({order.id})을 확인할 수 있습니다.</p>
-        {!inIframe && <Link href={`/ax/fulfillment?order=${order.id}`} className="inline-flex items-center gap-1 text-primary font-semibold mt-2 hover:underline">AX 운영화면에서 확인 (관리자 시연) <ChevronRight size={14} /></Link>}
-      </div>
+      {/* 시연용 연결 — 방금 주문이 운영 화면에 바로 들어간 것을 보여준다 */}
+      {!inIframe && (
+        <Link href={`/ax/fulfillment?order=${order.id}`} className="mt-5 flex items-center gap-3 rounded-2xl bg-mist px-4 py-3.5 hover:brightness-[0.98]">
+          <LayoutDashboard size={20} className="text-primary shrink-0" />
+          <span className="min-w-0 flex-1"><span className="block font-semibold text-[15px]">운영 화면에도 방금 들어왔어요</span><span className="block text-[14px] text-muted">AX 운영화면의 주문·출고에서 이 주문 확인 (시연)</span></span>
+          <ChevronRight size={18} className="text-muted shrink-0" />
+        </Link>
+      )}
     </div>
   );
 }
@@ -171,7 +174,7 @@ export function MyPageView() {
 function RebuyButton({ order }: { order: Order }) {
   const addToCart = useStore((s) => s.addToCart);
   const toast = useToast();
-  return <button className="btn-primary btn-sm whitespace-nowrap" onClick={() => { order.items.forEach((it) => addToCart(it.skuId, it.qty)); toast({ title: "장바구니에 다시 담았습니다", body: `${order.items.length}개 상품`, tone: "success" }); }}>다시 담기</button>;
+  return <button className="btn-primary btn-sm whitespace-nowrap" onClick={() => { order.items.forEach((it) => addToCart(it.skuId, it.qty)); toast({ title: "장바구니에 다시 담았습니다", body: `${order.items.length}개 상품`, tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); }}>다시 담기</button>;
 }
 
 export function OrderDetailView({ orderId }: { orderId: string }) {
@@ -255,9 +258,12 @@ export function RepeatBasketView() {
   const total = active.reduce((a, r) => a + r.useSku.salePrice * r.q, 0);
   const shipping = total >= 30000 || total === 0 ? 0 : 3000;
 
+  const [ordering, setOrdering] = useState(false);
   const orderAll = () => {
+    if (ordering || !active.length) return; // 연타로 두 번 주문되지 않게
+    setOrdering(true);
     const order = placeOrder({ isRepeat: true, itemsOverride: active.map((r) => ({ skuId: r.useSku.id, qty: r.q, selected: true })) });
-    if (order) { setDone(order); toast({ title: "재구매 주문이 접수되었습니다", body: `${order.id} · 다음 구매주기가 갱신됩니다.`, tone: "success" }); }
+    if (order) { setDone(order); toast({ title: "재구매 주문이 접수되었습니다", body: `${order.id} · 다음 구매주기가 갱신됩니다.`, tone: "success" }); } else setOrdering(false);
   };
 
   return (
@@ -298,7 +304,7 @@ export function RepeatBasketView() {
                     <div className="text-[13px] text-muted mt-0.5">{fmtDate(r.lastOrderedAt, "md")} 구매 · 평균 {r.avgCycleDays}일마다</div>
                     <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
                       <div className="inline-flex items-center border border-line rounded-lg"><button className="w-10 h-10 flex items-center justify-center hover:bg-mist disabled:opacity-40" aria-label="수량 감소" disabled={ex || r.q <= 1} onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.max(1, r.q - 1) }))}>−</button><span className="w-8 text-center text-[16px] font-bold tabular-nums">{r.q}</span><button className="w-10 h-10 flex items-center justify-center hover:bg-mist disabled:opacity-40" aria-label="수량 증가" disabled={ex || r.q >= 99} onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.min(99, r.q + 1) }))}>+</button></div>
-                      <div className="flex items-center gap-2"><span className="font-bold text-[17px] tabular-nums">{won(r.useSku.salePrice * r.q)}</span><button className="btn-outline btn-sm" disabled={ex} onClick={() => { addToCart(r.useSku.id, r.q); toast({ title: "장바구니에 담았습니다", body: `${r.product.name} ×${r.q}`, tone: "success" }); }}>담기</button></div>
+                      <div className="flex items-center gap-2"><span className="font-bold text-[17px] tabular-nums">{won(r.useSku.salePrice * r.q)}</span><button className="btn-outline btn-sm" disabled={ex} onClick={() => { addToCart(r.useSku.id, r.q); toast({ title: "장바구니에 담았습니다", body: `${r.product.name} ×${r.q}`, tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); }}>담기</button></div>
                     </div>
                   </div>
                 </div>
@@ -312,14 +318,14 @@ export function RepeatBasketView() {
               <div className="flex justify-between"><dt className="text-muted">배송비</dt><dd>{shipping ? won(shipping) : "무료"}</dd></div>
               <div className="flex justify-between border-t border-line pt-3"><dt className="font-semibold">결제 예정</dt><dd className="font-black text-xl tabular-nums">{won(total + shipping)}</dd></div>
             </dl>
-            <button className="btn-primary btn-lg w-full mt-4" disabled={!active.length} onClick={orderAll}>한 번에 다시 주문 (시연)</button>
-            <button className="btn-outline w-full mt-2" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success" }); }}>장바구니에 모두 담기</button>
+            <button className="btn-primary btn-lg w-full mt-4" disabled={!active.length || ordering} onClick={orderAll}>{ordering ? "주문 처리 중…" : "한 번에 다시 주문 (시연)"}</button>
+            <button className="btn-outline w-full mt-2" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); }}>장바구니에 모두 담기</button>
             <p className="text-[13px] text-muted mt-3">정기배송(자동 반복주문)은 예정 기능입니다.</p>
           </aside>
           {/* 모바일: 주요 행동(한 번에 주문)을 항상 화면 아래에 */}
           <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/97 backdrop-blur border-t border-line px-4 pt-2.5 pb-3 safe-bottom shadow-[0_-6px_20px_rgba(16,36,62,0.06)]">
-            <div className="flex items-center justify-between text-[14px] text-muted"><span>{active.length}종 · 배송비 {shipping ? won(shipping) : "무료"}</span><button className="font-semibold text-primary min-h-[32px]" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success" }); }}>장바구니에 모두 담기</button></div>
-            <button className="btn-primary w-full !min-h-[52px] mt-1.5 text-[17px]" disabled={!active.length} onClick={orderAll}>{active.length ? `${won(total + shipping)} 한 번에 주문` : "주문할 상품을 포함해 주세요"}</button>
+            <div className="flex items-center justify-between text-[14px] text-muted"><span>{active.length}종 · 배송비 {shipping ? won(shipping) : "무료"}</span><button className="font-semibold text-primary min-h-[32px]" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); }}>장바구니에 모두 담기</button></div>
+            <button className="btn-primary w-full !min-h-[52px] mt-1.5 text-[17px]" disabled={!active.length || ordering} onClick={orderAll}>{active.length ? `${won(total + shipping)} 한 번에 주문` : "주문할 상품을 포함해 주세요"}</button>
           </div>
           <div className="lg:hidden h-24" />
         </div>

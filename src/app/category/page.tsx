@@ -14,9 +14,9 @@ export default function CategoryIndex() {
         <p className="text-muted mt-1">생활 필수품 8개 카테고리</p>
         <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
           {CATEGORIES.map((c) => (
-            <Link key={c.slug} href={`/category/${c.slug}`} className="card p-5 hover:shadow-raised transition-shadow flex items-center gap-4">
-              <span className="w-14 h-14 rounded-2xl bg-soft flex items-center justify-center text-3xl" aria-hidden>{CAT_ICON[c.slug]}</span>
-              <div><div className="font-bold text-lg">{c.name}</div><div className="text-sm text-muted">{c.description}</div></div>
+            <Link key={c.slug} href={`/category/${c.slug}`} className="card p-4 sm:p-5 lift flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <span className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-soft flex items-center justify-center text-2xl sm:text-3xl shrink-0" aria-hidden>{CAT_ICON[c.slug]}</span>
+              <div className="min-w-0"><div className="font-bold text-lg">{c.name}</div><div className="text-[14px] text-muted leading-snug line-clamp-2">{c.description}</div></div>
             </Link>
           ))}
         </div>

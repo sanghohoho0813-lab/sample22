@@ -52,7 +52,8 @@ export function shipCutdown(now: Date, cutoffHour = 15) {
     hours: h,
     minutes: m,
     /** "3시간 12분" */
-    remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`,
+    // 마감 직전에는 "0분" 대신 "1분 미만"
+    remain: h > 0 ? `${h}시간 ${m}분` : m > 0 ? `${m}분` : "1분 미만",
     /** "9/9(수)" */
     arriveLabel: `${arrive.getMonth() + 1}/${arrive.getDate()}(${DOW[arrive.getDay()]})`,
     arrive,

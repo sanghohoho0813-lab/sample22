@@ -56,12 +56,12 @@ export default function ProductCard({ s, size = "md", rank }: { s: ProductSummar
           <span className="font-bold text-[19px] tabular-nums">{won(s.defaultSku.salePrice)}</span>
           {s.discountRate > 0 && <span className="text-xs text-muted line-through tabular-nums">{won(s.listPrice)}</span>}
         </div>
-        {s.skus.length > 1 && <div className="text-[13px] text-muted mt-0.5">구성 {s.skus.length}종</div>}
+        {s.skus.length > 1 && <div className="text-[13px] text-muted mt-0.5">구성 {s.skus.length}종{s.discountRate === 0 && s.bestDiscount > 0 && <> · <span className="text-orange font-semibold">묶음 최대 {s.bestDiscount}%↓</span></>}</div>}
         <div className="mt-1.5 min-w-0 flex"><DeliveryBadge promise={s.promise} compact /></div>
         <div className="mt-auto pt-2 flex items-center justify-between">
           <span className="inline-flex items-center gap-1 text-[13px] text-muted"><Star size={13} className="fill-highlight text-highlight" />{p.rating} <span>({p.reviewCount.toLocaleString()})</span></span>
           {!s.soldOut && (
-            <button type="button" onClick={() => { addToCart(s.defaultSku.id, 1); toast({ title: "장바구니에 담았습니다", body: `${p.name} · ${s.defaultSku.name}`, tone: "success" }); }} aria-label="장바구니 담기" className="w-10 h-10 rounded-full border border-line bg-white hover:bg-soft hover:border-primary text-ink flex items-center justify-center transition-colors">
+            <button type="button" onClick={() => { addToCart(s.defaultSku.id, 1); toast({ title: "장바구니에 담았습니다", body: `${p.name} · ${s.defaultSku.name}`, tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); }} aria-label="장바구니 담기" className="w-10 h-10 rounded-full border border-line bg-white hover:bg-soft hover:border-primary text-ink flex items-center justify-center transition-colors">
               <Plus size={18} />
             </button>
           )}

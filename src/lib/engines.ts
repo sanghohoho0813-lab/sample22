@@ -222,7 +222,7 @@ export function assessOrderRisks(data: DemoData, now = new Date()): OrderRisk[] 
       const causes: string[] = [];
       let score = 0;
       if (hoursToPromise < 30) { score += 35; causes.push(`배송약속까지 ${Math.max(0, Math.round(hoursToPromise))}시간`); }
-      if (hoursToCutoff < 4 && hoursToCutoff > -1) { score += 25; causes.push(`출고마감까지 ${Math.max(0, hoursToCutoff).toFixed(1)}시간`); }
+      if (hoursToCutoff < 4 && hoursToCutoff > -1) { score += 25; causes.push(hoursToCutoff <= 0 ? "출고 마감 시각 지남" : hoursToCutoff < 1 ? `출고마감까지 ${Math.max(1, Math.round(hoursToCutoff * 60))}분` : `출고마감까지 ${hoursToCutoff.toFixed(1)}시간`); }
       if (hoursToCutoff <= -1) { score += 15; causes.push("오늘 마감 경과"); }
       if (wh.congestion > 0.7) { score += 25; causes.push(`${wh.name} 피킹 적체 ${Math.round(wh.congestion * 100)}%`); }
       if (["new", "confirmed", "picking_wait"].includes(order.stage)) { score += 10; causes.push("아직 피킹 시작 전"); }
@@ -336,9 +336,9 @@ export function buildBriefing(data: DemoData, insights: SkuInsight[], risks: Ord
   const slowValue = slow.reduce((a, i) => a + i.stockValue, 0);
   const delayedPo = data.purchaseOrders.filter((po) => ["confirmed", "in_transit"].includes(po.status) && new Date(po.expectedAt).getTime() > now.getTime() + 7 * 86400000);
 
-  if (openCritical.length) items.push({ rank: 0, title: `긴급 실행 ${openCritical.length}건이 승인 대기 중입니다`, why: openCritical.map((a) => a.title).slice(0, 2).join(" · "), href: "/ax/actions", tone: "danger" });
+  if (openCritical.length) items.push({ rank: 0, title: `긴급 실행 ${openCritical.length}건이 승인 대기 중입니다`, why: openCritical.map((a) => a.title).slice(0, 2).join(" · "), href: "/ax/actions?urg=critical", tone: "danger" });
   if (stockoutRisk.length) items.push({ rank: 0, title: `품절위험 SKU ${stockoutRisk.length}개 — 발주 판단이 오늘 필요합니다`, why: `${stockoutRisk[0].product.name} 등, 예상 소진일이 공급 리드타임보다 짧습니다`, href: "/ax/inventory", tone: "danger" });
-  if (highRisk.length) items.push({ rank: 0, title: `배송지연 위험 주문 ${highRisk.length}건 — 마감 전 우선처리`, why: highRisk[0].causes.slice(0, 2).join(", "), href: "/ax/fulfillment", tone: "warn" });
+  if (highRisk.length) items.push({ rank: 0, title: `배송지연 위험 주문 ${highRisk.length}건 — 마감 전 우선처리`, why: highRisk[0].causes.slice(0, 2).join(", "), href: "/ax/fulfillment?tab=risk", tone: "warn" });
   if (delayedPo.length) items.push({ rank: 0, title: `공급사 입고지연 ${delayedPo.length}건 — 대체구매 검토`, why: "입고 예정일이 재고 소진일보다 늦습니다", href: "/ax/suppliers", tone: "warn" });
   if (slowValue > 0) items.push({ rank: 0, title: `저회전·과잉재고 ${slow.length}개 SKU, 재고금액 ${Math.round(slowValue / 10000).toLocaleString()}만원`, why: "추가 발주 보류와 프로모션 조정을 검토하세요", href: "/ax/inventory?status=slow", tone: "info" });
   items.push({ rank: 0, title: "재구매 주기 도래 고객 42명에게 다시 구매 노출 가능", why: "지난달 다시 구매 전환율 31% (시연 집계)", href: "/ax/customers", tone: "good" });

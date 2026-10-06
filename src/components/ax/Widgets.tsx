@@ -52,7 +52,7 @@ export function Panel({ title, sub, right, children, className = "", id, tour }:
     <section id={id} data-tour={tour} className={`card p-4 sm:p-5 ${className}`}>
       {(title || right) && (
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-3">
-          <div className="min-w-0 flex-1 basis-[15rem]">{title && <h2 className="font-bold text-lg leading-snug">{title}</h2>}{sub && <p className="text-sm text-muted mt-0.5 leading-relaxed">{sub}</p>}</div>
+          <div className="min-w-0 flex-1 basis-[15rem]">{title && <h2 className="font-bold text-lg leading-snug [&>span.inline-flex]:items-start [&>span.inline-flex>svg]:mt-[3px] [&>span.inline-flex>svg]:shrink-0">{title}</h2>}{sub && <p className="text-sm text-muted mt-0.5 leading-relaxed">{sub}</p>}</div>
           {right && <div className="shrink-0 flex flex-wrap items-center gap-2">{right}</div>}
         </div>
       )}

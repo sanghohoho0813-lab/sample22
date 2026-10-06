@@ -113,7 +113,7 @@ export default function HomeView() {
                       <div className="text-[13px] text-muted mt-0.5 line-clamp-1">{sku.name} · <span className={r.dueInDays <= 0 ? "text-orange font-semibold" : ""}>{due}</span>{r.altSku && <span className="text-[#B84F1A]"> · 대체구성</span>}</div>
                       <div className="font-bold mt-0.5 tabular-nums">{won(sku.salePrice)}</div>
                     </div>
-                    <button className="btn-outline btn-sm" onClick={() => { addToCart(sku.id, r.suggestedQty); toast({ title: "다시 담았습니다", body: `${r.product.name} ×${r.suggestedQty}`, tone: "success" }); }}>다시 담기</button>
+                    <button className="btn-outline btn-sm" onClick={() => { addToCart(sku.id, r.suggestedQty); toast({ title: "다시 담았습니다", body: `${r.product.name} ×${r.suggestedQty}`, tone: "success", action: { label: "장바구니 보기", href: "/cart" } }); }}>다시 담기</button>
                   </div>
                 );
               })}

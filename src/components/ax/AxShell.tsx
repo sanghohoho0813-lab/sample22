@@ -298,7 +298,7 @@ export default function AxShell({ children, title, subtitle, actions }: { childr
         {/* ② 메인 헤더 — 메뉴 · 화면 제목 · 역할 · 알림 */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
           <div className="flex items-center gap-2 px-2 sm:px-5 h-14 sm:h-16">
-            <button className="lg:hidden w-11 h-11 -ml-0.5 rounded-xl inline-flex items-center justify-center text-ink hover:bg-mist shrink-0" onClick={() => setMenu(true)} aria-label="메뉴 열기" aria-expanded={menu}><Menu size={23} /></button>
+            <button data-tour="menu" className="lg:hidden w-11 h-11 -ml-0.5 rounded-xl inline-flex items-center justify-center text-ink hover:bg-mist shrink-0" onClick={() => setMenu(true)} aria-label="메뉴 열기" aria-expanded={menu}><Menu size={23} /></button>
             <div className="min-w-0 flex-1 flex items-center gap-2">
               <h1 className="text-[19px] sm:text-xl font-bold truncate">{title}</h1>
               {stage !== "DEMO" && <span className="badge bg-secondary/12 text-secondary hidden sm:inline-flex">{STAGE_LABEL[stage]} 단계</span>}

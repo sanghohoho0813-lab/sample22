@@ -171,6 +171,36 @@ export function DevicePreview({ src, onClose, title }: { src: string; onClose: (
   );
 }
 
+
+/**
+ * 모바일 표 → 카드 변환용: 표의 열 제목을 각 칸의 data-label로 복사한다.
+ * 화면·드로어에서 표가 새로 그려질 때마다(행 추가·필터 변경) 다시 붙인다. 속성 변경은 감시하지 않으므로 무한 반복 없음.
+ */
+function useStackedTables() {
+  useEffect(() => {
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      document.querySelectorAll<HTMLTableElement>(".table-wrap > table").forEach((t) => {
+        const heads = Array.from(t.querySelectorAll("thead th")).map((th) => (th.textContent ?? "").trim());
+        const titleIdx = heads.findIndex((h) => h);
+        t.querySelectorAll(":scope > tbody > tr").forEach((tr) => {
+          Array.from(tr.children).forEach((td, i) => {
+            const l = heads[i] ?? "";
+            if (td.getAttribute("data-label") !== l) td.setAttribute("data-label", l);
+            if (i === titleIdx) { if (!td.hasAttribute("data-title")) td.setAttribute("data-title", ""); } else if (td.hasAttribute("data-title")) td.removeAttribute("data-title");
+          });
+        });
+        t.parentElement?.classList.add("stackable");
+      });
+    };
+    apply();
+    const mo = new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(apply); });
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => { mo.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
+}
+
 export default function AxShell({ children, title, subtitle, actions }: { children: ReactNode; title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; tour?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -196,6 +226,7 @@ export default function AxShell({ children, title, subtitle, actions }: { childr
   const [resetOpen, setResetOpen] = useState(false);
   const openActions = data.actions.filter((a) => !["done", "dismissed"].includes(a.stage) && (role === "owner" || a.owner === role)).length;
   const closeMenu = useCallback(() => setMenu(false), []);
+  useStackedTables();
 
   useEffect(() => { setMenu(false); }, [pathname]);
   useEffect(() => { if (hydrated && !tutorialDone && pathname === "/ax" && !inIframe) { const t = setTimeout(() => setTutorial(true), 800); return () => clearTimeout(t); } }, [hydrated, tutorialDone, pathname, inIframe]);

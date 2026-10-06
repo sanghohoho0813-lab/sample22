@@ -70,6 +70,24 @@ h1, h2, h3, h4, th, .badge, .chip, .btn { word-break: keep-all; }
 .table tbody tr { @apply transition-colors duration-150; }
 .table tbody tr.row-clickable:hover { @apply bg-mist cursor-pointer; }
 .table tbody tr.row-selected { background: var(--t-soft); }
+/* 모바일(640px 미만)에서 AX 표는 '행 = 카드'로 쌓는다.
+   열 이름은 AxShell의 useStackedTables가 각 칸에 data-label로 붙인다 → 가로 스크롤로 숨던 핵심 열이 한눈에 보인다 */
+@media (max-width: 639px) {
+  .table-wrap.stackable { @apply overflow-x-visible border-0 bg-transparent rounded-none; }
+  .table-wrap.stackable > .table, .table-wrap.stackable > .table > tbody { display: block; width: 100%; }
+  .table-wrap.stackable > .table > thead { display: none; }
+  .table-wrap.stackable > .table > tbody > tr { @apply block bg-white border border-line rounded-2xl px-4 py-2.5 mb-2.5; }
+  .table-wrap.stackable > .table > tbody > tr.row-selected { background: var(--t-soft); }
+  .table-wrap.stackable > .table > tbody > tr > td { display: flow-root; width: 100%; text-align: right; white-space: normal; border: 0; padding: 0.3rem 0; font-size: 0.9375rem; }
+  .table-wrap.stackable > .table > tbody > tr > td::before { content: attr(data-label); float: left; margin-right: 0.75rem; text-align: left; @apply text-muted text-sm; }
+  .table-wrap.stackable > .table > tbody > tr > td[data-label=""]::before { content: none; }
+  .table-wrap.stackable > .table > tbody > tr > td[data-label=""]:not(:has(*)):empty { display: none; }
+  .table-wrap.stackable > .table > tbody > tr > td[data-title] { text-align: left; font-size: 1.0625rem; padding-bottom: 0.5rem; margin-bottom: 0.25rem; @apply border-b border-line; }
+  .table-wrap.stackable > .table > tbody > tr > td[data-title]::before { content: none; }
+  .table-wrap.stackable > .table > tbody > tr > td > svg { display: block; margin-left: auto; }
+  /* 숫자 칸은 카드 안에서도 줄바꿈 금지 (1,568 → 1,5/68 방지) */
+  .table-wrap.stackable > .table > tbody > tr > td.tabular-nums { white-space: nowrap; }
+}
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .text-balance { text-wrap: balance; }

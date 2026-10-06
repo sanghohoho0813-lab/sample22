@@ -25,21 +25,20 @@ export function ActionCard({ a, onOpen, compact = false }: { a: AXAction; onOpen
   const due = new Date(a.dueAt).getTime() - Date.now();
   return (
     <button onClick={() => onOpen(a)} className={`w-full text-left card p-4 lift ${!open ? "opacity-80" : ""}`}>
+      {/* 배지는 긴급도 하나만 — 유형은 글자로, 상태는 '추천됨'이 아닐 때만 */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span>
-        <Badge tone="soft">{actionTypeLabel(a.type)}</Badge>
-        <StatusBadge status={a.stage} />
-        {a.scenario && <span className="text-[13px] text-muted">시나리오 {a.scenario}</span>}
-        <span className="ml-auto text-xs text-muted inline-flex items-center gap-1"><Clock3 size={12} />{open ? (due < 0 ? `마감 ${relTime(a.dueAt)}` : `마감 ${relTime(a.dueAt)}`) : `완료 ${relTime(a.updatedAt)}`}</span>
+        <span className="text-[14px] font-semibold text-muted">{actionTypeLabel(a.type)}</span>
+        {a.stage !== "recommended" && <StatusBadge status={a.stage} />}
+        <span className="ml-auto text-[13px] text-muted inline-flex items-center gap-1 whitespace-nowrap"><Clock3 size={13} />{open ? (due < 0 ? `마감 ${relTime(a.dueAt)}` : `마감 ${relTime(a.dueAt)}`) : `완료 ${relTime(a.updatedAt)}`}</span>
       </div>
       <div className="mt-2 font-bold text-[18px] leading-snug">{a.title}</div>
-      {!compact && <p className="mt-1 text-sm text-ink/80 line-clamp-2">{a.summary}</p>}
-      <div className="mt-2 flex items-center gap-3 text-xs text-muted flex-wrap">
-        {p && <span className="inline-flex items-center gap-1"><Package size={12} />{p.name}</span>}
-        {sup && <span className="inline-flex items-center gap-1"><Factory size={12} />{sup.name}</span>}
-        {a.related.orderIds?.length ? <span className="inline-flex items-center gap-1"><Truck size={12} />주문 {a.related.orderIds.length}건</span> : null}
-        {a.related.customerIds?.length ? <span className="inline-flex items-center gap-1"><User size={12} />고객 {a.related.customerIds.length}+명</span> : null}
-        <span className="inline-flex items-center gap-1 ml-auto"><User size={12} />{a.assignee} · {ROLE_LABEL[a.owner]}</span>
+      {!compact && <p className="mt-1 text-[15px] text-ink/75 line-clamp-2 leading-relaxed">{a.summary}</p>}
+      <div className="mt-2.5 flex items-center gap-3 text-[13px] text-muted min-w-0">
+        <span className="min-w-0 truncate inline-flex items-center gap-1">
+          {p ? <><Package size={13} className="shrink-0" /><span className="truncate">{p.name}</span></> : sup ? <><Factory size={13} className="shrink-0" /><span className="truncate">{sup.name}</span></> : a.related.orderIds?.length ? <><Truck size={13} className="shrink-0" />주문 {a.related.orderIds.length}건</> : a.related.customerIds?.length ? <><User size={13} className="shrink-0" />고객 {a.related.customerIds.length}+명</> : null}
+        </span>
+        <span className="inline-flex items-center gap-1 ml-auto shrink-0 whitespace-nowrap"><User size={13} />{a.assignee}</span>
       </div>
     </button>
   );
@@ -130,7 +129,7 @@ export function ActionDrawer({ action, onClose, onOpenSku, onOpenOrder }: { acti
               })}
             </div>
             <div className="mt-3 flex items-center gap-3 flex-wrap">
-              <label className="text-sm">발주수량 <input type="number" className="input !min-h-[40px] w-28 inline-block ml-1" value={chosenQty} min={1} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))} /></label>
+              <label className="text-sm">발주수량 <input type="number" className="input !min-h-[40px] w-28 inline-block ml-1" value={chosenQty} min={1} inputMode="numeric" max={99999} onChange={(e) => { const n = Math.floor(Number(e.target.value)); /* 빈칸·문자·음수는 1로, 비정상적으로 큰 수는 상한 */ setQty(Number.isFinite(n) ? Math.min(99999, Math.max(1, n)) : 1); }} /></label>
               <span className="text-sm text-muted">예상 발주금액 <b className="text-ink tabular-nums">{won(chosenQty * (options.find((o) => o.supplier.id === chosenSup)?.sp.unitCost ?? sku.cost))}</b></span>
               {a.proposal?.note && <span className="text-xs text-muted">· {a.proposal.note}</span>}
             </div>

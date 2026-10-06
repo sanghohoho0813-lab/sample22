@@ -7,9 +7,8 @@ import { useData, useLookups } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { searchProducts, summarize } from "@/lib/catalog";
 import { deliveryPromise, won } from "@/lib/format";
-import AssetImage from "@/components/shared/AssetImage";
-import ProductCard from "./ProductCard";
-import { DeliveryBadge } from "./ProductCard";
+import AssetImage, { hasAsset } from "@/components/shared/AssetImage";
+import ProductCard, { ProductRail } from "./ProductCard";
 import { Tabs, EmptyState } from "@/components/shared/Bits";
 import { useToast } from "@/components/shared/Toast";
 
@@ -63,8 +62,8 @@ export default function ProductDetailView({ productId }: { productId: string }) 
       <div className="grid lg:grid-cols-[1fr_1fr] gap-6 lg:gap-10">
         {/* gallery */}
         <div>
-          <AssetImage assetKey={`product/${product.id}`} category={product.categorySlug} label={product.name} seed={parseInt(product.id.slice(2), 10)} className="rounded-3xl" />
-          <div className="grid grid-cols-4 gap-2 mt-2">{[0, 1, 2, 3].map((i) => <AssetImage key={i} category={product.categorySlug} label={product.name} seed={i + 3} className="rounded-xl border border-line" />)}</div>
+          <AssetImage assetKey={`product/${product.id}`} category={product.categorySlug} label={product.name} seed={parseInt(product.id.slice(2), 10)} className="rounded-3xl" ratio="aspect-[4/3] sm:aspect-square" />
+          {hasAsset(`product/${product.id}`) && <div className="grid grid-cols-4 gap-2 mt-2">{[0, 1, 2, 3].map((i) => <AssetImage key={i} assetKey={`product/${product.id}`} category={product.categorySlug} label={product.name} seed={i + 3} className="rounded-xl border border-line" />)}</div>}
         </div>
 
         {/* buy box */}
@@ -146,10 +145,9 @@ export default function ProductDetailView({ productId }: { productId: string }) 
             <div className="space-y-4 text-[18px] leading-relaxed">
               <p>{product.description}</p>
               <div className="grid sm:grid-cols-3 gap-3">
-                {[["구성", summary.skus.map((s) => s.name).join(" / ")], ["배송유형", product.deliveryType === "fast" ? "빠른배송 (15시 전 주문 시 익일)" : "일반배송"], ["반복구매", product.isRepeatable ? `평균 ${product.avgRepeatCycleDays}일 주기` : "-"]].map(([k, v]) => <div key={k} className="card p-3"><div className="text-xs text-muted">{k}</div><div className="font-semibold text-sm mt-0.5">{v}</div></div>)}
+                {[["구성", summary.skus.map((s) => s.name).join(" / ")], ["배송유형", product.deliveryType === "fast" ? "빠른배송 (15시 전 주문 시 익일)" : "일반배송"], ["반복구매", product.isRepeatable ? `평균 ${product.avgRepeatCycleDays}일 주기` : "-"]].map(([k, v]) => <div key={k} className="rounded-xl bg-mist p-3"><div className="text-[13px] text-muted">{k}</div><div className="font-semibold text-[15px] mt-0.5">{v}</div></div>)}
               </div>
-              <AssetImage category={product.categorySlug} label={product.name} variant="photo" ratio="aspect-[16/7]" seed={9} className="rounded-2xl" />
-              <p className="text-muted text-sm">상품 이미지와 상세 사진은 추후 실제 자산으로 교체됩니다. (자산 슬롯: product/{product.id})</p>
+              {hasAsset(`detail/${product.id}`) && <AssetImage assetKey={`detail/${product.id}`} category={product.categorySlug} label={product.name} variant="photo" ratio="aspect-[16/7]" seed={9} className="rounded-2xl" />}
             </div>
           )}
           {tab === "review" && (
@@ -168,17 +166,16 @@ export default function ProductDetailView({ productId }: { productId: string }) 
         </div>
       </div>
 
-      <section className="mt-6"><h2 className="section-title mb-3">관련상품</h2><div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{related.map((s) => <ProductCard key={s.product.id} s={s} />)}</div></section>
-      <section className="mt-10"><h2 className="section-title mb-3">함께 구매한 상품</h2><div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">{together.map((s) => <ProductCard key={s.product.id} s={s} />)}</div></section>
+      <section className="mt-4"><h2 className="section-title mb-3">같은 카테고리 인기상품</h2><ProductRail>{related.map((s) => <ProductCard key={s.product.id} s={s} />)}</ProductRail></section>
+      <section className="mt-9"><h2 className="section-title mb-3">함께 구매한 상품</h2><ProductRail>{together.map((s) => <ProductCard key={s.product.id} s={s} />)}</ProductRail></section>
 
       {/* mobile sticky CTA */}
-      <div className="lg:hidden fixed bottom-16 inset-x-0 z-40 bg-white border-t border-line px-3 py-2 grid grid-cols-[48px_1fr_1fr] gap-2 safe-bottom">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/97 backdrop-blur border-t border-line px-3 pt-2 pb-2 grid grid-cols-[48px_1fr_1fr] gap-2 safe-bottom shadow-[0_-6px_20px_rgba(16,36,62,0.06)]">
         <button onClick={() => toggleWishlist(product.id)} aria-label="찜" className={`btn-outline !min-h-[48px] !px-0 ${liked ? "text-danger" : ""}`}><Heart size={20} className={liked ? "fill-danger" : ""} /></button>
         <button onClick={add} disabled={soldOut && !reserveOk} className="btn-outline !min-h-[48px] border-primary text-primary">{reserveOk ? "예약 담기" : "장바구니"}</button>
         <button onClick={buyNow} disabled={soldOut && !reserveOk} className="btn-primary !min-h-[48px]">{reserveOk ? "예약 주문" : "바로 주문"}</button>
       </div>
-      <div className="lg:hidden h-14" />
-      <div className="lg:hidden text-center text-xs text-muted -mt-8 mb-4"><DeliveryBadge promise={promise} compact /></div>
+      <div className="lg:hidden h-16" />
     </div>
   );
 }

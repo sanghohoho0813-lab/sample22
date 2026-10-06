@@ -71,12 +71,12 @@ export default function InventoryView() {
         <KpiCard label={showCost ? "총 재고금액" : "총 SKU"} value={showCost ? wonShort(totalValue) : insights.length} sub={`활성 SKU ${insights.length}개`} tone="good" />
       </div>
 
-      <Panel title={<span className="inline-flex items-center gap-2"><Radar size={18} className="text-accent" />재고·발주 레이더</span>} sub="판매량뿐 아니라 검색·조회·장바구니·현재고·공급기간을 함께 보고 발주 우선순위를 정합니다" right={<AiReady title="수요·발주 추천" now="규칙 기반: 가용재고 ÷ 일판매량, 추세 가중, 리드타임 비교" method="규칙 + 통계 + 최적화 · L3 (사람 승인)" next="시즌·프로모션·날씨 변수를 반영한 수요예측" />}>
+      <Panel title={<span className="inline-flex items-center gap-2"><Radar size={18} className="text-accent" />재고·발주 레이더</span>} sub="판매·검색·장바구니·재고·공급기간을 함께 보고 발주 순서를 정합니다" right={<AiReady title="수요·발주 추천" now="규칙 기반: 가용재고 ÷ 일판매량, 추세 가중, 리드타임 비교" method="규칙 + 통계 + 최적화 · L3 (사람 승인)" next="시즌·프로모션·날씨 변수를 반영한 수요예측" />}>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1 overflow-x-auto hide-scrollbar">{GROUPS.map((g) => <button key={g.key} onClick={() => setGroup(g.key)} className={`chip !min-h-[34px] text-xs whitespace-nowrap ${group === g.key ? "chip-on" : ""}`}>{g.label}{g.statuses.length ? <span className="text-muted">{counts(g.statuses)}</span> : null}</button>)}</div>
-          <div className="relative ml-auto min-w-[200px]"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className="input !min-h-[38px] pl-9 text-sm" placeholder="상품·SKU 검색" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-          <select className="input !min-h-[38px] w-auto text-sm" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="카테고리"><option value="all">전체 카테고리</option>{data.categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select>
-          <select className="input !min-h-[38px] w-auto text-sm" value={sort} onChange={(e) => setSort(e.target.value as never)} aria-label="정렬"><option value="priority">우선순위순</option><option value="days">예상 소진일 빠른순</option><option value="trend">수요 증가순</option>{showCost && <option value="value">재고금액순</option>}</select>
+          <div className="flex gap-1.5 overflow-x-auto hide-scrollbar w-full lg:w-auto -mx-1 px-1">{GROUPS.map((g) => <button key={g.key} onClick={() => setGroup(g.key)} className={`chip !min-h-[38px] text-sm whitespace-nowrap ${group === g.key ? "chip-on" : ""}`}>{g.label}{g.statuses.length ? <span className="text-muted">{counts(g.statuses)}</span> : null}</button>)}</div>
+          <div className="relative lg:ml-auto flex-1 lg:flex-none min-w-[180px] lg:w-56"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className="input !min-h-[40px] pl-9 text-[15px]" placeholder="상품·SKU 검색" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <select className="input !min-h-[40px] w-auto text-[15px]" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="카테고리"><option value="all">전체 카테고리</option>{data.categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select>
+          <select className="input !min-h-[40px] w-auto text-[15px]" value={sort} onChange={(e) => setSort(e.target.value as never)} aria-label="정렬"><option value="priority">우선순위순</option><option value="days">예상 소진일 빠른순</option><option value="trend">수요 증가순</option>{showCost && <option value="value">재고금액순</option>}</select>
         </div>
 
         {list.length ? (
@@ -89,16 +89,15 @@ export default function InventoryView() {
             </table>
           </div>
         ) : <EmptyState title="조건에 맞는 SKU가 없습니다" />}
-        <div className="mt-2 text-xs text-muted flex flex-wrap gap-x-3">{(Object.keys(STOCK_STATUS_LABEL) as StockStatus[]).map((s) => <span key={s} className="inline-flex items-center gap-1"><StatusBadge status={s} /></span>)}</div>
       </Panel>
 
-      <Panel title={<span className="inline-flex items-center gap-2"><PackagePlus size={18} />발주서 · 입고예정</span>} sub="승인된 실행은 여기 발주서로 생성되며, 입고 처리 시 가용재고와 고객 배송예정이 갱신됩니다">
+      <Panel title={<span className="inline-flex items-center gap-2"><PackagePlus size={18} />발주서 · 입고예정</span>} sub="승인한 발주가 여기 쌓이고, 입고 처리하면 재고와 고객 도착일이 바로 바뀝니다">
         <div className="table-wrap"><table className="table"><thead><tr><th>PO</th><th>상품</th><th>공급사</th><th className="text-right">수량</th>{showCost && <th className="text-right">금액</th>}<th>입고예정</th><th>상태</th><th>담당</th><th></th></tr></thead><tbody>
           {data.purchaseOrders.map((po) => { const ins = insights.find((i) => i.sku.id === po.skuId); return (
             <tr key={po.id} className="row-clickable" onClick={() => setSkuId(po.skuId)}><td className="font-semibold whitespace-nowrap">{po.id}</td><td>{ins?.product.name} <span className="text-muted">· {ins?.sku.name}</span></td><td className="whitespace-nowrap">{supplierById.get(po.supplierId)?.name}</td><td className="text-right tabular-nums">{num(po.qty)}</td>{showCost && <td className="text-right tabular-nums">{won(po.qty * po.unitCost)}</td>}<td className="whitespace-nowrap">{po.expectedAt}</td><td><StatusBadge status={po.status} /></td><td className="text-muted whitespace-nowrap">{po.actor}</td><td>{po.status !== "received" && po.status !== "cancelled" && (role === "owner" || role === "buyer" || role === "ops") && <button className="btn-outline btn-sm whitespace-nowrap" onClick={(e) => { e.stopPropagation(); receive(po.id); toast({ title: `${po.id} 입고 처리`, body: "가용재고 증가 · 고객 상품 재고상태 갱신", tone: "success" }); }}>입고 처리</button>}</td></tr>
           ); })}
         </tbody></table></div>
-        <p className="text-xs text-muted mt-2">레이더에서 "실행" 버튼을 누르면 계산 근거가 담긴 발주 검토 실행이 생성되고, 승인 시 발주서가 만들어집니다. 자동발주(L4)는 구현하지 않습니다. 모든 발주는 사람이 검토·승인하는 L3 이하로 동작합니다.</p>
+        <p className="text-[13px] text-muted mt-2">자동발주는 하지 않습니다 — 모든 발주는 사람이 검토·승인합니다.</p>
       </Panel>
 
       <SkuDrawer skuId={skuId} onClose={() => setSkuId(null)} onOpenAction={(a) => { setSkuId(null); setAction(a); }} />

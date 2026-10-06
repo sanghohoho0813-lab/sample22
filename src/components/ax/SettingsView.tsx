@@ -39,19 +39,19 @@ export default function SettingsView() {
       <Tabs value={tab} onChange={setTab} tabs={[{ key: "theme", label: "테마 (9)" }, { key: "display", label: "표시" }, { key: "role", label: "역할·권한" }, { key: "data", label: "데이터·연결" }, { key: "ai", label: "AI 상태" }, { key: "tech", label: "기술·사업화 자산" }, { key: "demo", label: "시연 데이터" }]} />
 
       {tab === "theme" && (
-        <Panel title={<span className="inline-flex items-center gap-2"><Palette size={18} />공식 테마 9종</span>} sub="사이드바·헤더·버튼·메뉴·KPI·차트·배지·표·팝업·모바일·미리보기에 일관 적용됩니다. 본문·표·입력칸의 기본 회색은 테마와 분리됩니다">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Panel title={<span className="inline-flex items-center gap-2"><Palette size={18} />공식 테마 9종</span>} sub="메뉴·버튼·차트·배지 색이 함께 바뀝니다. 본문 글자색은 그대로 유지됩니다">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
             {THEMES.map((t) => { const on = t.key === theme; return (
               <button key={t.key} onClick={() => { setTheme(t.key); toast({ title: `${t.no} ${t.name} 적용`, tone: "info" }); }} aria-pressed={on} className={`text-left rounded-2xl border-2 overflow-hidden transition-all ${on ? "border-primary shadow-raised" : "border-line hover:border-muted"}`}>
-                <div className="p-3 flex gap-2" style={{ background: t.shell }}>
-                  <div className="w-14 rounded-lg bg-white/10 p-1.5 space-y-1"><div className="h-1.5 rounded bg-white/80 w-3/4" /><div className="h-1.5 rounded w-full" style={{ background: t.primary }} /><div className="h-1.5 rounded bg-white/30 w-2/3" /></div>
+                <div className="p-2.5 sm:p-3 flex gap-2" style={{ background: t.shell }}>
+                  <div className="w-10 sm:w-14 rounded-lg bg-white/10 p-1.5 space-y-1"><div className="h-1.5 rounded bg-white/80 w-3/4" /><div className="h-1.5 rounded w-full" style={{ background: t.primary }} /><div className="h-1.5 rounded bg-white/30 w-2/3" /></div>
                   <div className="flex-1 rounded-lg bg-white p-2 space-y-1.5"><div className="flex gap-1"><div className="h-2 flex-1 rounded" style={{ background: t.soft }} /><div className="h-2 w-6 rounded" style={{ background: t.primary }} /></div><div className="flex gap-1"><div className="h-4 flex-1 rounded" style={{ background: t.soft }} /><div className="h-4 flex-1 rounded" style={{ background: t.highlight }} /></div><div className="h-2 w-1/2 rounded" style={{ background: t.accent }} /></div>
                 </div>
-                <div className="px-3 py-2 flex items-center justify-between"><div><div className="font-bold text-sm">{t.no} {t.name}</div><div className="flex gap-1 mt-1">{[t.shell, t.primary, t.secondary, t.accent, t.highlight, t.soft].map((c) => <i key={c} className="w-4 h-4 rounded-full border border-line" style={{ background: c }} />)}</div></div>{on && <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center"><Check size={14} /></span>}</div>
+                <div className="px-2.5 sm:px-3 py-2 flex items-center justify-between gap-1"><div className="min-w-0"><div className="font-bold text-[14px] sm:text-sm truncate">{t.no} {t.name}</div><div className="hidden sm:flex gap-1 mt-1">{[t.shell, t.primary, t.secondary, t.accent, t.highlight, t.soft].map((c) => <i key={c} className="w-4 h-4 rounded-full border border-line" style={{ background: c }} />)}</div></div>{on && <span className="w-6 h-6 shrink-0 rounded-full bg-primary text-white flex items-center justify-center"><Check size={14} /></span>}</div>
               </button>
             ); })}
           </div>
-          <p className="text-xs text-muted mt-3">기본값: 05 Deep Teal. 고객 공개 화면에는 테마 선택을 노출하지 않으며, 관리자 미리보기에서는 고객 화면 색상에도 함께 적용됩니다. 오류 빨강은 오류·위험 의미로만 사용합니다.</p>
+          <p className="text-[13px] text-muted mt-3">기본값: 05 Deep Teal · 고객 플랫폼에는 테마 선택이 보이지 않습니다.</p>
         </Panel>
       )}
 

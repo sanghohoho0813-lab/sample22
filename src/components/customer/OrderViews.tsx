@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, PackageSearch, ArrowRight, ChevronRight, Truck, Undo2, Bell, Heart, Clock3, MapPin, User, RotateCcw, ChevronLeft, LayoutDashboard } from "lucide-react";
 import { useData, useLookups, useIsInIframe } from "@/lib/hooks";
 import { CUSTOMER_STAGE_LABEL, useStore } from "@/lib/store";
@@ -105,6 +105,7 @@ export function MyPageView() {
   const orders = data.orders.filter((o) => o.customerId === customerId);
   const notes = data.notifications.filter((n) => n.customerId === customerId);
   const [tab, setTab] = useState<"orders" | "wish" | "recent" | "noti" | "inquiry">("orders");
+  useEffect(() => { const t = new URLSearchParams(window.location.search).get("tab"); if (t && ["orders", "wish", "recent", "noti", "inquiry"].includes(t)) setTab(t as typeof tab); }, []);
   const repeat = useMemo(() => repeatItemsForCustomer(data, customerId), [data, customerId]);
   const due = repeat.filter((r) => r.dueInDays <= 3).length;
   const active = orders.filter((o) => !["delivered", "cancelled", "return"].includes(o.stage)).length;
@@ -114,17 +115,12 @@ export function MyPageView() {
       <div className="card p-5 flex items-center gap-4 flex-wrap">
         <div className="w-14 h-14 rounded-full bg-soft text-primary flex items-center justify-center"><User size={26} /></div>
         <div className="flex-1 min-w-0"><div className="text-xl font-bold">{me.name}님</div><div className="text-sm text-muted inline-flex items-center gap-1"><MapPin size={13} />{me.address.line1} {me.address.line2}</div></div>
-        <div className="grid grid-cols-3 gap-2 text-center text-sm w-full sm:w-auto">
-          <div className="rounded-xl bg-mist px-3 py-2"><div className="font-bold text-lg">{active}</div><div className="text-xs text-muted">배송중·준비</div></div>
-          <div className="rounded-xl bg-mist px-3 py-2"><div className="font-bold text-lg">{orders.length}</div><div className="text-xs text-muted">전체 주문</div></div>
-          <Link href="/my/repeat" className="rounded-xl bg-soft px-3 py-2 hover:brightness-95"><div className="font-bold text-lg text-primary">{due}</div><div className="text-xs text-muted">다시 살 때</div></Link>
+        {/* 숫자 3개가 곧 바로가기 — 같은 기능의 버튼을 따로 두지 않는다 */}
+        <div className="grid grid-cols-3 gap-2 text-center w-full sm:w-auto">
+          <Link href="/track" className="rounded-xl bg-mist px-3 py-2.5 hover:brightness-95 min-w-[92px]"><div className="font-bold text-xl tabular-nums">{active}</div><div className="text-[13px] text-muted">배송 진행</div></Link>
+          <button type="button" onClick={() => setTab("noti")} className="rounded-xl bg-mist px-3 py-2.5 hover:brightness-95 min-w-[92px]"><div className="font-bold text-xl tabular-nums">{notes.filter((n) => !n.read).length}</div><div className="text-[13px] text-muted">새 알림</div></button>
+          <Link href="/my/repeat" className="rounded-xl bg-soft px-3 py-2.5 hover:brightness-95 min-w-[92px]"><div className="font-bold text-xl text-primary tabular-nums">{due}</div><div className="text-[13px] text-muted">다시 살 때</div></Link>
         </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {[{ href: "/my/repeat", icon: RotateCcw, l: "다시 구매" }, { href: "/track", icon: PackageSearch, l: "배송조회" }, { href: "/my?tab=inquiry", icon: Undo2, l: "취소·반품" }, { href: "/my?tab=noti", icon: Bell, l: `알림 ${notes.filter((n) => !n.read).length}` }].map((x) => (
-          <Link key={x.l} href={x.href} onClick={() => { if (x.href.includes("tab=")) setTab(x.href.split("tab=")[1] as never); }} className="card px-3 py-3 flex items-center gap-2 text-sm font-semibold hover:bg-mist"><x.icon size={16} className="text-primary" />{x.l}</Link>
-        ))}
       </div>
 
       <Tabs className="mt-5" value={tab} onChange={setTab} tabs={[{ key: "orders", label: "주문내역", count: orders.length }, { key: "wish", label: "찜", count: wishlist.length }, { key: "recent", label: "최근 본 상품", count: recentViews.length }, { key: "noti", label: "알림", count: notes.length }, { key: "inquiry", label: "문의·반품" }]} />
@@ -134,13 +130,17 @@ export function MyPageView() {
           <ul className="space-y-3">
             {orders.map((o) => (
               <li key={o.id} className="card p-4">
-                <div className="flex items-center justify-between gap-2 flex-wrap text-sm">
-                  <div><span className="font-bold">{CUSTOMER_STAGE_LABEL[o.stage]}</span><span className="text-muted"> · {fmtDate(o.createdAt, "datetime")} · {o.id}</span>{o.isRepeatOrder && <span className="ml-2 badge bg-soft text-shell">다시 구매</span>}{o.customerNotified && <span className="ml-2 badge bg-orange/15 text-[#B84F1A]">배송 안내 발송</span>}</div>
-                  <Link href={`/my/orders/${o.id}`} className="text-primary font-semibold inline-flex items-center gap-1 hover:underline">주문상세 <ChevronRight size={14} /></Link>
-                </div>
+                <Link href={`/my/orders/${o.id}`} className="flex items-center justify-between gap-2 -m-1 p-1 rounded-lg hover:bg-mist/60" aria-label={`${o.id} 주문상세`}>
+                  <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                    <span className={`font-bold text-[17px] ${["delivered", "cancelled"].includes(o.stage) ? "text-ink" : "text-primary"}`}>{CUSTOMER_STAGE_LABEL[o.stage]}</span>
+                    <span className="text-[15px] text-muted tabular-nums">{fmtDate(o.createdAt, "md")} 주문</span>
+                    {o.customerNotified && <span className="badge bg-orange/15 text-[#B84F1A]">배송 안내</span>}
+                  </div>
+                  <span className="shrink-0 text-[15px] text-muted inline-flex items-center gap-0.5">상세<ChevronRight size={16} /></span>
+                </Link>
                 <div className="mt-3 flex gap-3 items-center">
                   <div className="flex -space-x-2">{o.items.slice(0, 3).map((it) => { const p = productById.get(it.productId)!; return <AssetImage key={it.skuId} assetKey={`product/${p.id}`} category={p.categorySlug} label={p.name} className="w-14 h-14 rounded-lg ring-2 ring-white" ratio="" />; })}</div>
-                  <div className="min-w-0 flex-1"><div className="font-semibold text-sm line-clamp-1">{o.items[0].name}{o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}</div><div className="text-xs text-muted">{won(o.total)} · {deliveryNote(o)}</div></div>
+                  <div className="min-w-0 flex-1"><div className="font-semibold text-[16px] line-clamp-1">{o.items[0].name}{o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}</div><div className="text-[14px] text-muted"><b className="text-ink font-semibold tabular-nums">{won(o.total)}</b> · {deliveryNote(o)}</div><div className="text-[13px] text-muted/80 tabular-nums">주문번호 {o.id}</div></div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Link href={`/my/orders/${o.id}`} className="btn-outline btn-sm">배송조회</Link>
@@ -171,7 +171,7 @@ export function MyPageView() {
 function RebuyButton({ order }: { order: Order }) {
   const addToCart = useStore((s) => s.addToCart);
   const toast = useToast();
-  return <button className="btn-primary btn-sm" onClick={() => { order.items.forEach((it) => addToCart(it.skuId, it.qty)); toast({ title: "장바구니에 다시 담았습니다", body: `${order.items.length}개 상품`, tone: "success" }); }}>같은 상품 다시 담기</button>;
+  return <button className="btn-primary btn-sm whitespace-nowrap" onClick={() => { order.items.forEach((it) => addToCart(it.skuId, it.qty)); toast({ title: "장바구니에 다시 담았습니다", body: `${order.items.length}개 상품`, tone: "success" }); }}>다시 담기</button>;
 }
 
 export function OrderDetailView({ orderId }: { orderId: string }) {
@@ -263,8 +263,7 @@ export function RepeatBasketView() {
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-5">
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div><h1 className="text-2xl sm:text-3xl font-bold tracking-tight inline-flex items-center gap-2"><RotateCcw className="text-primary" />다시 구매</h1><p className="text-muted mt-1">구매주기와 현재 재고를 확인해 수량을 추천합니다. 한 번에 다시 담아 주문하세요.</p></div>
-        <span className="badge bg-mist text-muted">정기배송 <b className="ml-1">예정</b></span>
+        <div><h1 className="text-2xl sm:text-3xl font-bold tracking-tight inline-flex items-center gap-2"><RotateCcw className="text-primary" />다시 구매</h1><p className="text-muted mt-1">구매주기에 맞춰 수량을 추천했어요. 확인하고 한 번에 주문하세요.</p></div>
       </div>
 
       {done ? (
@@ -281,31 +280,32 @@ export function RepeatBasketView() {
           <div className="card divide-y divide-line">
             {rows.map((r) => {
               const ex = excluded.has(r.product.id);
-              const dueText = r.dueInDays <= 0 ? `지금 주문할 때 (${-r.dueInDays}일 지남)` : `${r.dueInDays}일 후 필요`;
+              const dueText = r.dueInDays <= 0 ? (r.dueInDays < 0 ? `지금 필요 · ${-r.dueInDays}일 지남` : "지금 필요") : `${r.dueInDays}일 후 필요`;
               return (
                 <div key={r.product.id} className={`p-4 flex gap-3 ${ex ? "opacity-50" : ""}`}>
-                  <Link href={`/product/${r.product.id}`} className="shrink-0"><AssetImage assetKey={`product/${r.product.id}`} category={r.product.categorySlug} label={r.product.name} className="w-20 h-20 rounded-xl" ratio="" /></Link>
+                  <Link href={`/product/${r.product.id}`} className="shrink-0"><AssetImage assetKey={`product/${r.product.id}`} category={r.product.categorySlug} label={r.product.name} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl" ratio="" /></Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <div><Link href={`/product/${r.product.id}`} className="font-semibold leading-snug">{r.product.name}</Link><div className="text-xs text-muted mt-0.5">{r.useSku.name}{r.altSku && <span className="text-[#B84F1A] font-semibold"> · 대체구성 (원래 {r.sku.name} 재고 부족)</span>}</div></div>
-                      <button className="text-xs text-muted hover:text-ink whitespace-nowrap" onClick={() => setExcluded((s) => { const n = new Set(s); if (n.has(r.product.id)) n.delete(r.product.id); else n.add(r.product.id); return n; })}>{ex ? "다시 포함" : "제외"}</button>
+                      <div className="min-w-0"><Link href={`/product/${r.product.id}`} className="font-semibold text-[17px] leading-snug">{r.product.name}</Link><div className="text-[14px] text-muted mt-0.5">{r.useSku.name}{r.altSku && <span className="text-[#B84F1A] font-semibold"> · 대체구성 (원래 {r.sku.name} 재고 부족)</span>}</div></div>
+                      <button className="text-[14px] text-muted hover:text-ink whitespace-nowrap min-h-[32px] px-1" onClick={() => setExcluded((s) => { const n = new Set(s); if (n.has(r.product.id)) n.delete(r.product.id); else n.add(r.product.id); return n; })}>{ex ? "다시 포함" : "제외"}</button>
                     </div>
-                    <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-xs">
-                      <div><span className="text-muted">마지막 구매</span><div className="font-semibold">{fmtDate(r.lastOrderedAt, "md")}</div></div>
-                      <div><span className="text-muted">평균 주기</span><div className="font-semibold">{r.avgCycleDays}일</div></div>
-                      <div><span className="text-muted">필요 시점</span><div className={`font-semibold ${r.dueInDays <= 0 ? "text-orange" : ""}`}>{dueText}</div></div>
-                      <div><span className="text-muted">재고·배송</span><div className="font-semibold"><DeliveryBadge promise={deliveryPromise(r.product.deliveryType, r.available)} compact /></div></div>
+                    {/* 판단에 필요한 것만 한 줄로: 언제 필요한가 · 언제 오는가 (구매일·주기는 보조 정보) */}
+                    <div className="mt-1.5 flex items-center gap-x-2 gap-y-1 flex-wrap text-[14px]">
+                      <span className={`font-semibold ${r.dueInDays <= 0 ? "text-[#C2501A]" : "text-ink"}`}>{dueText}</span>
+                      <span className="text-line">|</span>
+                      <DeliveryBadge promise={deliveryPromise(r.product.deliveryType, r.available)} compact />
                     </div>
+                    <div className="text-[13px] text-muted mt-0.5">{fmtDate(r.lastOrderedAt, "md")} 구매 · 평균 {r.avgCycleDays}일마다</div>
                     <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                      <div className="inline-flex items-center border border-line rounded-lg"><button className="w-9 h-9 flex items-center justify-center hover:bg-mist" aria-label="수량 감소" onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.max(1, r.q - 1) }))}>−</button><span className="w-9 text-center text-sm font-bold">{r.q}</span><button className="w-9 h-9 flex items-center justify-center hover:bg-mist" aria-label="수량 증가" onClick={() => setQty((q) => ({ ...q, [r.product.id]: r.q + 1 }))}>+</button><span className="text-[13px] text-muted pr-2">추천 {r.suggestedQty}</span></div>
-                      <div className="flex items-center gap-2"><span className="font-bold tabular-nums">{won(r.useSku.salePrice * r.q)}</span><button className="btn-outline btn-sm" onClick={() => { addToCart(r.useSku.id, r.q); toast({ title: "다시 담았습니다", tone: "success" }); }}>다시 담기</button></div>
+                      <div className="inline-flex items-center border border-line rounded-lg"><button className="w-10 h-10 flex items-center justify-center hover:bg-mist disabled:opacity-40" aria-label="수량 감소" disabled={ex || r.q <= 1} onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.max(1, r.q - 1) }))}>−</button><span className="w-8 text-center text-[16px] font-bold tabular-nums">{r.q}</span><button className="w-10 h-10 flex items-center justify-center hover:bg-mist disabled:opacity-40" aria-label="수량 증가" disabled={ex || r.q >= 99} onClick={() => setQty((q) => ({ ...q, [r.product.id]: Math.min(99, r.q + 1) }))}>+</button></div>
+                      <div className="flex items-center gap-2"><span className="font-bold text-[17px] tabular-nums">{won(r.useSku.salePrice * r.q)}</span><button className="btn-outline btn-sm" disabled={ex} onClick={() => { addToCart(r.useSku.id, r.q); toast({ title: "장바구니에 담았습니다", body: `${r.product.name} ×${r.q}`, tone: "success" }); }}>담기</button></div>
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
-          <aside className="card p-5 lg:sticky lg:top-32">
+          <aside className="hidden lg:block card p-5 lg:sticky lg:top-32">
             <div className="font-bold text-lg">한 번에 다시 주문</div>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between"><dt className="text-muted">상품 {active.length}종</dt><dd className="tabular-nums">{won(total)}</dd></div>
@@ -314,8 +314,14 @@ export function RepeatBasketView() {
             </dl>
             <button className="btn-primary btn-lg w-full mt-4" disabled={!active.length} onClick={orderAll}>한 번에 다시 주문 (시연)</button>
             <button className="btn-outline w-full mt-2" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success" }); }}>장바구니에 모두 담기</button>
-            <p className="text-xs text-muted mt-3">정기배송(자동 반복주문)은 다음 단계 기능입니다. 지금은 한 번에 담기까지 제공합니다.</p>
+            <p className="text-[13px] text-muted mt-3">정기배송(자동 반복주문)은 예정 기능입니다.</p>
           </aside>
+          {/* 모바일: 주요 행동(한 번에 주문)을 항상 화면 아래에 */}
+          <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/97 backdrop-blur border-t border-line px-4 pt-2.5 pb-3 safe-bottom shadow-[0_-6px_20px_rgba(16,36,62,0.06)]">
+            <div className="flex items-center justify-between text-[14px] text-muted"><span>{active.length}종 · 배송비 {shipping ? won(shipping) : "무료"}</span><button className="font-semibold text-primary min-h-[32px]" disabled={!active.length} onClick={() => { active.forEach((r) => addToCart(r.useSku.id, r.q)); toast({ title: "장바구니에 모두 담았습니다", tone: "success" }); }}>장바구니에 모두 담기</button></div>
+            <button className="btn-primary w-full !min-h-[52px] mt-1.5 text-[17px]" disabled={!active.length} onClick={orderAll}>{active.length ? `${won(total + shipping)} 한 번에 주문` : "주문할 상품을 포함해 주세요"}</button>
+          </div>
+          <div className="lg:hidden h-24" />
         </div>
       )}
     </div>
@@ -327,14 +333,16 @@ export function TrackView() {
   const customerId = useStore((s) => s.ui.customerId);
   const [q, setQ] = useState("");
   const [result, setResult] = useState<Order | null | undefined>(undefined);
+  const [emptyQ, setEmptyQ] = useState(false);
   const mine = data.orders.filter((o) => o.customerId === customerId && !["delivered", "cancelled", "return"].includes(o.stage));
   return (
     <div className="mx-auto max-w-[900px] px-4 py-5">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight inline-flex items-center gap-2"><PackageSearch className="text-primary" />주문·배송조회</h1>
-      <form className="card mt-4 p-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); const o = data.orders.find((x) => x.id.toLowerCase() === q.trim().toLowerCase()); setResult(o ?? null); }}>
-        <input className="input" placeholder="주문번호 입력 (예: NX260908-0001)" value={q} onChange={(e) => setQ(e.target.value)} aria-label="주문번호" />
+      <form className="card mt-4 p-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (!q.trim()) { setEmptyQ(true); setResult(undefined); return; } setEmptyQ(false); const o = data.orders.find((x) => x.id.toLowerCase() === q.trim().toLowerCase()); setResult(o ?? null); }} noValidate>
+        <input className={`input ${emptyQ ? "!border-danger" : ""}`} placeholder="주문번호 입력 (예: NX260908-0001)" value={q} onChange={(e) => { setQ(e.target.value); if (emptyQ) setEmptyQ(false); }} aria-label="주문번호" aria-invalid={emptyQ} />
         <button className="btn-primary shrink-0">조회</button>
       </form>
+      {emptyQ && <p className="mt-2 text-[14px] text-danger">주문번호를 입력해 주세요.</p>}
       {result === null && <div className="card mt-3"><EmptyState title="주문을 찾을 수 없습니다" body="주문번호를 다시 확인해 주세요. 로그인 상태에서는 아래 진행 중 주문에서 바로 확인할 수 있습니다." /></div>}
       {result && <div className="card mt-3 p-5"><div className="flex items-center justify-between mb-3"><div className="font-bold">{result.id}</div><Link href={`/my/orders/${result.id}`} className="text-primary text-sm font-semibold">상세보기</Link></div><OrderProgress order={result} /></div>}
       <h2 className="section-title mt-8 mb-3">진행 중인 주문</h2>

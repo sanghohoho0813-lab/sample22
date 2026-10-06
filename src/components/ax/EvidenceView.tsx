@@ -51,10 +51,12 @@ export default function EvidenceView() {
       {view === "log" && (
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
-        <Panel title={<span className="inline-flex items-center gap-2"><FileCheck2 size={18} className="text-accent" />AX 성과 기록</span>} sub="단순 로그가 아닌 실증 시스템 — 이전 → 발생 조건 → 추천 → 승인 → 실행 → 결과 → KPI 변화 → 출처 → 담당 → 시각">
+        <Panel title={<span className="inline-flex items-center gap-2"><FileCheck2 size={18} className="text-accent" />AX 성과 기록</span>} sub="무엇을 보고 · 무엇을 했고 · 무엇이 바뀌었는지 시간순으로 남깁니다">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
-            <button onClick={() => setType("all")} className={`chip !min-h-[36px] text-sm ${type === "all" ? "chip-on" : ""}`}>전체</button>
-            {counts.map(({ t, n }) => <button key={t} onClick={() => setType(t)} className={`chip !min-h-[36px] text-sm ${type === t ? "chip-on" : ""}`}>{EVIDENCE_TYPE_LABEL[t] ?? t}<span className="text-muted">{n}</span></button>)}
+            <div className="flex gap-1.5 overflow-x-auto hide-scrollbar w-full -mx-1 px-1 pb-0.5">
+            <button onClick={() => setType("all")} className={`chip !min-h-[36px] text-sm shrink-0 ${type === "all" ? "chip-on" : ""}`}>전체</button>
+            {counts.map(({ t, n }) => <button key={t} onClick={() => setType(t)} className={`chip !min-h-[36px] text-sm shrink-0 whitespace-nowrap ${type === t ? "chip-on" : ""}`}>{EVIDENCE_TYPE_LABEL[t] ?? t}<span className="text-muted">{n}</span></button>)}
+            </div>
             <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-1.5"><div className="relative flex-1 sm:flex-none"><Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" /><input className="input !min-h-[38px] pl-8 text-sm w-full sm:w-44" placeholder="성과 기록 검색" value={q} onChange={(e) => setQ(e.target.value)} /></div>{(["7", "30", "90"] as const).map((p) => <button key={p} onClick={() => setPeriod(p)} className={`chip !min-h-[36px] text-sm shrink-0 ${period === p ? "chip-on" : ""}`}>{p}일</button>)}</div>
           </div>
           {list.length ? (
@@ -82,7 +84,7 @@ export default function EvidenceView() {
         <div className="space-y-4">
           <Panel title="성과 보고서 (12주 실증 후)" sub="지금은 구조만 준비 — 숫자는 실측 후 채웁니다" right={<button className="btn-outline btn-sm" onClick={() => { downloadText(`NEXMART_성과보고서_${new Date().toISOString().slice(0, 10)}.md`, buildEvidencePack(data, ui)); toast({ title: "성과 보고서 초안을 내려받았습니다", tone: "success" }); }}><Download size={14} />초안</button>}>
             <ol className="text-sm space-y-1.5">
-              {["이전 / 기준값", "발생 조건 · 문제", "추천 · 결정", "사람 승인", "실행", "결과", "KPI 변화", "데이터 출처", "담당자 · 시각", "Screenshot / Report"].map((s, i) => <li key={s} className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-mist text-[13px] font-bold flex items-center justify-center">{i + 1}</span>{s}</li>)}
+              {["이전 / 기준값", "발생 조건 · 문제", "추천 · 결정", "사람 승인", "실행", "결과", "KPI 변화", "데이터 출처", "담당자 · 시각", "화면 캡처 · 보고서"].map((s, i) => <li key={s} className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-mist text-[13px] font-bold flex items-center justify-center">{i + 1}</span>{s}</li>)}
             </ol>
             <div className="mt-3 rounded-xl bg-mist p-3 text-xs text-muted">기준값 상태: <b className="text-ink">{baselineCount ? `${baselineCount} / 11 입력 (나머지 미측정 / 입력 필요)` : "미측정 / 입력 필요"}</b><br />목표값: 임의로 정하지 않음<br />현재 수치: 시연용 시뮬레이션</div>
           </Panel>
@@ -93,7 +95,7 @@ export default function EvidenceView() {
               <li><b>7~10주</b> · 다시 구매, 프로모션 마진 비교, 배송위험 사전처리, 실행 결과 축적</li>
               <li><b>11~12주</b> · 이전/이후, 비용·매출·확장성 KPI, 사용 정착, 성과 보고서, 고도화/재설계 결정</li>
             </ul>
-            <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><button onClick={() => setView("pilot")} className="inline-flex items-center gap-1 text-primary"><FlaskConical size={14} />실증 준비 화면 →</button><Link href="/ax/why#16" className="text-primary">기획의도 16 →</Link></div>
+            <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><button onClick={() => setView("pilot")} className="inline-flex items-center gap-1 text-primary"><FlaskConical size={14} />실증 준비 화면 →</button><Link href="/ax/why#16" className="text-primary">기획 의도 16 →</Link></div>
           </Panel>
         </div>
       </div>

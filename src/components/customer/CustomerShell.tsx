@@ -185,7 +185,7 @@ function DemoSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-export default function CustomerShell({ children, hideBottomNav = false, plain = false }: { children: ReactNode; hideBottomNav?: boolean; plain?: boolean }) {
+export default function CustomerShell({ children, hideBottomNav = false, plain = false, stickyBar = false }: { children: ReactNode; hideBottomNav?: boolean; plain?: boolean; /** 화면 하단 고정 주문바가 있는 페이지 — 푸터가 가려지지 않게 여백 확보 */ stickyBar?: boolean }) {
   const pathname = usePathname();
   const hydrated = useHydrated();
   const cartCount = useStore((s) => s.ui.cart.reduce((a, c) => a + c.qty, 0));
@@ -298,19 +298,13 @@ export default function CustomerShell({ children, hideBottomNav = false, plain =
 
       {/* 모바일 Footer */}
       {!plain && (
-        <footer className="md:hidden border-t border-line bg-mist mt-8 px-4 pt-6 pb-24 safe-bottom">
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <Link href="/track" className="rounded-xl bg-white border border-line px-3 py-2.5 font-semibold inline-flex items-center gap-1.5"><PackageSearch size={15} className="text-primary" />주문·배송조회</Link>
-            <Link href="/my/repeat" className="rounded-xl bg-white border border-line px-3 py-2.5 font-semibold inline-flex items-center gap-1.5"><RotateCcw size={15} className="text-primary" />다시 구매</Link>
-            <Link href="/fast" className="rounded-xl bg-white border border-line px-3 py-2.5 font-semibold inline-flex items-center gap-1.5"><Zap size={15} className="text-primary" />빠른배송</Link>
-            <Link href="/my" className="rounded-xl bg-white border border-line px-3 py-2.5 font-semibold inline-flex items-center gap-1.5"><Bell size={15} className="text-primary" />취소·반품</Link>
-          </div>
+        <footer className={`md:hidden border-t border-line bg-mist mt-8 px-4 pt-5 ${stickyBar && !hideBottomNav ? "pb-48" : hideBottomNav ? "pb-36" : "pb-24"} safe-bottom`}>
           {!inIframe && (
-            <Link href="/ax" className="btn-outline w-full mt-3 justify-start gap-2 border-primary/40 text-primary">
+            <Link href="/ax" className="btn-outline w-full justify-start gap-2 border-primary/40 text-primary">
               <LayoutDashboard size={18} />AX 운영화면 보기<ChevronRight size={16} className="ml-auto" />
             </Link>
           )}
-          <div className="mt-4 text-xs text-muted leading-relaxed">
+          <div className="mt-4 text-[13px] text-muted leading-relaxed">
             <div className="font-black text-base text-navy">NEXMART</div>
             <p className="mt-1">(주)넥스마트 · 가상의 시연 기업 · 고객센터 1588-0000 (시연)</p>
             <p className="mt-1">이 사이트는 AX+플랫폼 시연용 가상 서비스이며 실제 결제·배송은 연결되어 있지 않습니다.</p>

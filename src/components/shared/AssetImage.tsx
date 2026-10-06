@@ -4,6 +4,8 @@ import type { CategorySlug } from "@/lib/types";
 import manifest from "@/lib/assets.generated.json";
 
 const AVAILABLE = manifest as Record<string, string>;
+/** 실제 사진 파일이 있는 슬롯인지 — 없으면 빈 자리표시를 여러 개 늘어놓지 않기 위해 사용 */
+export const hasAsset = (key: string) => !!AVAILABLE[key];
 
 const CAT_HUE: Record<CategorySlug, number> = { food: 24, living: 190, kitchen: 150, home: 210, digital: 250, pet: 35, baby: 330, health: 120 };
 const CAT_LABEL: Record<CategorySlug, string> = { food: "식품", living: "생활", kitchen: "주방", home: "리빙", digital: "디지털", pet: "반려", baby: "유아", health: "건강" };

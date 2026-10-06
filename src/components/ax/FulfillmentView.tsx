@@ -62,15 +62,16 @@ export default function FulfillmentView() {
         <KpiCard label="오늘 출고대상" value={num(fk.todayShip)} />
         <KpiCard label="마감임박" value={num(fk.cutoffSoon)} tone="warn" sub="15:00 마감 4시간 이내" />
         <KpiCard label="지연위험" value={num(highRisk.length)} tone={highRisk.length ? "danger" : "good"} onClick={() => setTab("risk")} />
-        <KpiCard label="피킹 처리량" value={num(fk.pickingThroughput)} sub="오늘" />
-        <KpiCard label="포장 처리량" value={num(fk.packingThroughput)} sub="오늘" />
+        {/* 처리량은 보조 지표 — 휴대폰에서는 핵심 6개만 */}
+        <div className="hidden lg:block"><KpiCard label="피킹 처리량" value={num(fk.pickingThroughput)} sub="오늘" /></div>
+        <div className="hidden lg:block"><KpiCard label="포장 처리량" value={num(fk.packingThroughput)} sub="오늘" /></div>
         <KpiCard label="정시출고율" value={pct(fk.onTimeRate, 0)} tone="good" />
         <KpiCard label="평균 처리시간" value={`${fk.avgCycleHours.toFixed(1)}시간`} sub="주문→출고" />
       </div>
 
-      <Panel title={<span className="inline-flex items-center gap-2"><Truck size={18} className="text-accent" />출고 관제</span>} sub={<span><Term term="Fulfillment" desc={TERMS.fulfillment}>주문·출고</Term>: 주문 이후 상품을 피킹·포장·출고·배송하는 전체 처리과정 — 지연위험과 우선처리 대상을 한눈에</span>} right={<AiReady title="배송 지연 위험" now="마감·배송약속·구역 적체·재고예외 규칙 점수 (L2 추천)" method="규칙 + 통계" next="시간대별 처리량 예측으로 마감 초과 확률 계산" />}>
-        <div className="grid sm:grid-cols-5 gap-2 mb-4">
-          {data.warehouses.map((w) => <button key={w.id} onClick={() => setWh(wh === w.id ? "all" : w.id)} className={`rounded-xl border p-3 text-left ${wh === w.id ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}><div className="text-xs text-muted">{w.name}</div><div className={`font-bold ${w.congestion > 0.7 ? "text-danger" : ""}`}>적체 {Math.round(w.congestion * 100)}%</div><Meter value={w.congestion} color={w.congestion > 0.7 ? "#D93A3A" : w.congestion > 0.5 ? "#F47A3C" : "var(--t-primary)"} className="mt-1.5" /><div className="text-[13px] text-muted mt-1">대기 {data.orders.filter((o) => o.warehouseId === w.id && ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"].includes(o.stage)).length}건</div></button>)}
+      <Panel title={<span className="inline-flex items-center gap-2"><Truck size={18} className="text-accent" />출고 관제</span>} sub={<span>구역별 적체와 <Term term="주문·출고" desc={TERMS.fulfillment}>주문 처리 단계</Term>를 한눈에 — 구역을 누르면 해당 주문만 봅니다</span>} right={<AiReady title="배송 지연 위험" now="마감·배송약속·구역 적체·재고예외 규칙 점수 (L2 추천)" method="규칙 + 통계" next="시간대별 처리량 예측으로 마감 초과 확률 계산" />}>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+          {data.warehouses.map((w) => <button key={w.id} onClick={() => setWh(wh === w.id ? "all" : w.id)} aria-pressed={wh === w.id} className={`rounded-xl border p-3 text-left ${wh === w.id ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}><div className="text-[13px] text-muted truncate">{w.name}</div><div className={`font-bold ${w.congestion > 0.7 ? "text-danger" : ""}`}>적체 {Math.round(w.congestion * 100)}%</div><Meter value={w.congestion} color={w.congestion > 0.7 ? "#D93A3A" : w.congestion > 0.5 ? "#F47A3C" : "var(--t-primary)"} className="mt-1.5" /><div className="text-[13px] text-muted mt-1">대기 {data.orders.filter((o) => o.warehouseId === w.id && ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"].includes(o.stage)).length}건</div></button>)}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Tabs value={tab} onChange={setTab} tabs={[{ key: "board", label: "상태 보드" }, { key: "risk", label: "지연위험", count: highRisk.length }, { key: "list", label: "전체 목록", count: orders.length }]} className="flex-1" />
@@ -120,10 +121,12 @@ export default function FulfillmentView() {
         )}
       </Panel>
 
-      <Panel title="상태 정의" sub="AX 운영화면에서 단계를 바꾸면 고객 마이페이지에도 같은 시각에 반영됩니다">
-        <div className="flex flex-wrap gap-1.5 text-xs">{(Object.keys(ORDER_STAGE_LABEL) as OrderStage[]).map((s) => <StatusBadge key={s} status={s} />)}</div>
-        <div className="mt-2 text-xs text-muted">고객 표시: 주문접수 → 상품준비 → 출고완료 → 배송중 → 배송완료</div>
-      </Panel>
+      <details className="card p-4 sm:p-5 group">
+        <summary className="cursor-pointer list-none flex items-center justify-between font-bold text-lg">주문 단계 안내<span className="text-[14px] font-semibold text-primary group-open:hidden">펼치기</span><span className="text-[14px] font-semibold text-primary hidden group-open:inline">접기</span></summary>
+        <p className="text-sm text-muted mt-1">여기서 단계를 바꾸면 고객 마이페이지에도 같은 시각에 반영됩니다.</p>
+        <div className="flex flex-wrap gap-1.5 text-xs mt-3">{(Object.keys(ORDER_STAGE_LABEL) as OrderStage[]).map((s) => <StatusBadge key={s} status={s} />)}</div>
+        <div className="mt-2 text-[13px] text-muted">고객 화면 표시: 주문접수 → 상품준비 → 출고완료 → 배송중 → 배송완료</div>
+      </details>
 
       <OrderDrawer orderId={orderId} onClose={() => setOrderId(null)} />
       <ActionDrawer action={action} onClose={() => setAction(null)} onOpenOrder={(id) => { setAction(null); setOrderId(id); }} />

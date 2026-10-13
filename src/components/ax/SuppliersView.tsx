@@ -339,7 +339,7 @@ export default function SuppliersView() {
           </p>
         )}
         {cmp.length > 0 && (
-          <div className="table-wrap">
+          <div className="table-wrap" data-nostack>
             <table className="table min-w-[640px]">
               <thead>
                 <tr>

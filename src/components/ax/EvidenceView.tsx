@@ -444,7 +444,7 @@ function OpsOutcome({ onOpen }: { onOpen: (a: AXAction) => void }) {
                       </span>
                     </td>
                     <td className="text-[13px]">{m.metric}</td>
-                    <td className="whitespace-nowrap text-right text-[13px] tabular-nums">
+                    <td className="text-right text-[13px] sm:whitespace-nowrap">
                       {m.before} → <b>{m.after}</b>
                     </td>
                     <td>

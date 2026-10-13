@@ -311,21 +311,25 @@ export function Basis({ children }: { children: ReactNode }) {
   );
 }
 
-/** 상단 상태줄 칸 */
+/** 상단 상태줄 칸 — onClick이 있으면 그 상태로 거르는 버튼이 된다 */
 export function StatusCell({
   label,
   value,
   sub,
   tone = "neutral",
+  onClick,
+  pressed,
 }: {
   label: ReactNode;
   value: ReactNode;
   sub?: ReactNode;
   tone?: "neutral" | "danger" | "warn" | "good";
+  onClick?: () => void;
+  pressed?: boolean;
 }) {
   const t = { neutral: "", danger: "text-danger", warn: "text-orange", good: "text-teal" }[tone];
-  return (
-    <div className="min-w-0 px-4 py-3 first:pl-0 sm:first:pl-4">
+  const body = (
+    <>
       <div className="text-[13px] font-semibold text-muted">{label}</div>
       <div
         className={`mt-0.5 whitespace-nowrap text-[22px] font-black tabular-nums leading-tight tracking-tight ${t}`}
@@ -333,6 +337,18 @@ export function StatusCell({
         {value}
       </div>
       {sub && <div className="mt-0.5 text-[13px] leading-snug text-muted">{sub}</div>}
-    </div>
+    </>
   );
+  if (onClick)
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={pressed}
+        className={`min-w-0 px-4 py-3 text-left transition-colors hover:bg-mist ${pressed ? "bg-soft" : ""}`}
+      >
+        {body}
+      </button>
+    );
+  return <div className="min-w-0 px-4 py-3 first:pl-0 sm:first:pl-4">{body}</div>;
 }

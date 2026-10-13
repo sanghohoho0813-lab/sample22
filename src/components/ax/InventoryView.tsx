@@ -9,7 +9,8 @@ import { num, won, wonShort } from "@/lib/format";
 import { StatusBadge } from "@/components/shared/Badge";
 import { Sparkline } from "@/components/shared/Charts";
 import { EmptyState, Term, TERMS, AiReady } from "@/components/shared/Bits";
-import { KpiCard, Panel } from "./Widgets";
+import { Panel } from "./Widgets";
+import { StatusCell } from "./OpsUi";
 import { ActionDrawer, SkuDrawer } from "./Drawers";
 import type { AXAction } from "@/lib/types";
 import { useToast } from "@/components/shared/Toast";
@@ -95,46 +96,60 @@ export default function InventoryView() {
 
   return (
     <div className="space-y-4">
-      <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <KpiCard
-          label="품절위험"
-          value={counts(["stockout", "urgent", "low"])}
-          tone="danger"
-          onClick={() => setGroup("risk")}
-          sub="예상 소진 < 리드타임×1.8"
-        />
-        <KpiCard
-          label="긴급발주"
-          value={counts(["urgent", "stockout"])}
-          tone="warn"
-          onClick={() => setGroup("urgent")}
-          sub="예상 소진 < 리드타임"
-        />
-        <KpiCard
-          label="발주·입고 진행"
-          value={counts(["po_progress", "inbound"])}
-          tone="primary"
-          onClick={() => setGroup("inbound")}
-          sub={`발주서 ${openPos.length}건`}
-        />
-        <KpiCard
-          label="과잉·저회전"
-          value={counts(["overstock", "slow"])}
-          tone="neutral"
-          onClick={() => setGroup("slow")}
-          sub={
-            showCost
+      <section
+        aria-label="재고 현황"
+        className="card grid grid-cols-2 sm:grid-cols-3 sm:divide-x xl:grid-cols-5"
+      >
+        {[
+          {
+            key: "risk" as Group,
+            label: "품절 위험",
+            value: `${counts(["stockout", "urgent", "low"])}개`,
+            sub: "소진 예상 < 리드타임×1.8",
+            tone: "danger" as const,
+          },
+          {
+            key: "urgent" as Group,
+            label: "긴급 발주",
+            value: `${counts(["urgent", "stockout"])}개`,
+            sub: "소진 예상 < 리드타임",
+            tone: "warn" as const,
+          },
+          {
+            key: "inbound" as Group,
+            label: "발주·입고 진행",
+            value: `${counts(["po_progress", "inbound"])}개`,
+            sub: `발주서 ${openPos.length}건`,
+            tone: "neutral" as const,
+          },
+          {
+            key: "slow" as Group,
+            label: "과잉·저회전",
+            value: `${counts(["overstock", "slow"])}개`,
+            sub: showCost
               ? `재고금액 ${wonShort(insights.filter((i) => ["overstock", "slow"].includes(i.status)).reduce((a, i) => a + i.stockValue, 0))}`
-              : "재고일수 75일+"
-          }
-        />
-        <KpiCard
-          label={showCost ? "총 재고금액" : "총 SKU"}
-          value={showCost ? wonShort(totalValue) : insights.length}
-          sub={`활성 SKU ${insights.length}개`}
-          tone="good"
-        />
-      </div>
+              : "재고일수 75일 초과",
+            tone: "neutral" as const,
+          },
+          {
+            key: null,
+            label: showCost ? "총 재고금액" : "활성 SKU",
+            value: showCost ? wonShort(totalValue) : `${insights.length}개`,
+            sub: `활성 SKU ${insights.length}개`,
+            tone: "neutral" as const,
+          },
+        ].map((c) => (
+          <StatusCell
+            key={c.label}
+            label={c.label}
+            value={c.value}
+            sub={c.sub}
+            tone={c.tone}
+            onClick={c.key ? () => setGroup(c.key!) : undefined}
+            pressed={c.key ? group === c.key : undefined}
+          />
+        ))}
+      </section>
 
       <Panel
         title={

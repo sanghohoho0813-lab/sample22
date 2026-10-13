@@ -486,7 +486,8 @@ function useStackedTables() {
         });
         const wrap = t.parentElement;
         if (!wrap) return;
-        wrap.classList.add("stackable");
+        // 행·열이 모두 의미 있는 비교표(매트릭스)는 카드로 쌓지 않고 가로 스크롤로 둔다
+        if (!wrap.hasAttribute("data-nostack")) wrap.classList.add("stackable");
         const scrollable =
           wrap.scrollWidth > wrap.clientWidth + 1 || wrap.scrollHeight > wrap.clientHeight + 1;
         if (scrollable && !wrap.hasAttribute("tabindex")) {

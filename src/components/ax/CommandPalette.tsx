@@ -20,12 +20,14 @@ export function CommandButton({ onOpen }: { onOpen: () => void }) {
     <button
       onClick={onOpen}
       className="btn-ghost btn-sm !px-2 text-muted sm:!px-3"
-      aria-label="검색 (Ctrl+K)"
+      title="검색 (Ctrl+K)"
       aria-keyshortcuts="Control+K Meta+K"
     >
-      <Search size={18} />
-      <span className="hidden text-[14px] xl:inline">검색</span>
-      <span className="kbd hidden xl:inline-flex">⌘K</span>
+      <Search size={18} aria-hidden="true" />
+      <span className="sr-only text-[14px] xl:not-sr-only">검색</span>
+      <span className="kbd hidden xl:inline-flex" aria-hidden="true">
+        ⌘K
+      </span>
     </button>
   );
 }

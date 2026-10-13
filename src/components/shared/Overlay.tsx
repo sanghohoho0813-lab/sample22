@@ -58,9 +58,10 @@ export default function Overlay({
     };
     window.addEventListener("keydown", onKey);
     const t = setTimeout(() => {
-      const el = panelRef.current?.querySelector<HTMLElement>(
-        "[data-autofocus], button, [href], input, select, textarea",
-      );
+      // data-autofocus를 단 요소가 있으면 그것을, 없으면 첫 번째 조작 요소(대개 닫기 버튼)를 잡는다
+      const el =
+        panelRef.current?.querySelector<HTMLElement>("input[data-autofocus]") ??
+        panelRef.current?.querySelector<HTMLElement>("[data-autofocus], button, [href], input, select, textarea");
       el?.focus();
     }, 30);
     return () => {

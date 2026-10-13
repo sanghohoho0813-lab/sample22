@@ -9,7 +9,8 @@ import { StatusBadge } from "@/components/shared/Badge";
 import Badge from "@/components/shared/Badge";
 import { Sparkline } from "@/components/shared/Charts";
 import { EmptyState, Term, TERMS } from "@/components/shared/Bits";
-import { KpiCard, Panel } from "./Widgets";
+import { StatusCell } from "./OpsUi";
+import { Panel } from "./Widgets";
 import type { Product } from "@/lib/types";
 import type { SkuInsight } from "@/lib/engines";
 import { SkuDrawer, ActionDrawer } from "./Drawers";
@@ -99,31 +100,37 @@ export default function ProductsView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard
+      <section aria-label="상품 현황" className="card grid grid-cols-2 sm:divide-x lg:grid-cols-4">
+        <StatusCell
           label="활성 상품"
-          value={data.products.filter((p) => p.status === "active").length}
+          value={`${data.products.filter((p) => p.status === "active").length}개`}
           sub={`SKU ${data.skus.length}개 · 카테고리 ${data.categories.length}`}
-          tone="primary"
+          onClick={() => setStatus("all")}
+          pressed={status === "all"}
         />
-        <KpiCard
-          label="품절위험 상품"
-          value={rows.filter((r) => ["stockout", "urgent", "low"].includes(r.worst?.status)).length}
+        <StatusCell
+          label="품절 위험 상품"
+          value={`${rows.filter((r) => ["stockout", "urgent", "low"].includes(r.worst?.status)).length}개`}
+          sub="구성 중 하나라도 위험"
           tone="danger"
           onClick={() => setStatus("risk")}
+          pressed={status === "risk"}
         />
-        <KpiCard
+        <StatusCell
           label="저회전·과잉 상품"
-          value={rows.filter((r) => ["slow", "overstock"].includes(r.worst?.status)).length}
-          tone="neutral"
+          value={`${rows.filter((r) => ["slow", "overstock"].includes(r.worst?.status)).length}개`}
+          sub="재고일수 75일 초과"
           onClick={() => setStatus("slow")}
+          pressed={status === "slow"}
         />
-        <KpiCard
+        <StatusCell
           label={showCost ? "총 재고금액" : "가상 브랜드"}
-          value={showCost ? wonShort(insights.reduce((a, i) => a + i.stockValue, 0)) : data.brands.length}
-          tone="good"
+          value={
+            showCost ? wonShort(insights.reduce((a, i) => a + i.stockValue, 0)) : `${data.brands.length}개`
+          }
+          sub={showCost ? "원가 기준" : "시연용 가상 브랜드"}
         />
-      </div>
+      </section>
       <Panel
         title="상품 · SKU"
         sub={

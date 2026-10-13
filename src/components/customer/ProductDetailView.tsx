@@ -211,7 +211,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
                 `현재 재고가 없어 입고 후 순차 출고됩니다 (입고예정 ${inv?.inboundEta}).`}
               {promise.kind === "soldout" && "재입고 일정이 확정되면 알려드립니다."}
             </div>
-            {promise.kind === "soldout" &&
+            {(promise.kind === "soldout" || promise.kind === "reserve") &&
               (alerts?.some((x) => x.skuId === sku.id && x.customerId === myId) ? (
                 <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                   <Bell size={15} /> 재입고 알림 신청됨 — 입고되면 알림으로 알려드려요

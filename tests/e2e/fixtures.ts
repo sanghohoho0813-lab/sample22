@@ -31,7 +31,7 @@ export const test = base.extend<{ pageErrors: string[] }>({
     });
     await page.addInitScript((key) => {
       if (!localStorage.getItem(key))
-        localStorage.setItem(key, JSON.stringify({ state: { ui: { tutorialDone: true } }, version: 3 }));
+        localStorage.setItem(key, JSON.stringify({ state: { ui: { tutorialDone: true } }, version: 4 }));
     }, STORE_KEY);
     await use(page);
   },
@@ -44,6 +44,17 @@ export async function ready(page: Page) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator("html[data-hydrated]")).toHaveCount(1);
   await expect(page.locator("main#main")).toBeVisible();
+  // 등장 애니메이션(투명도 0→1) 중에 색 대비를 재면 실제보다 흐리게 측정된다 — 유한 애니메이션이 끝날 때까지 기다린다
+  // (늦게 그려진 목록이 새 애니메이션을 시작할 수 있어 한 번 더 확인)
+  for (let i = 0; i < 2; i++)
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => undefined)),
+      ).then(() => new Promise((r) => setTimeout(r, 50))),
+    );
 }
 
 export const CUSTOMER_ROUTES = [

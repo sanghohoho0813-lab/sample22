@@ -9,7 +9,8 @@ import { StatusBadge } from "@/components/shared/Badge";
 import Badge from "@/components/shared/Badge";
 import Overlay from "@/components/shared/Overlay";
 import { BarChart } from "@/components/shared/Charts";
-import { KpiCard, Panel, Stat, Field } from "./Widgets";
+import { Panel, Stat, Field } from "./Widgets";
+import { StatusCell } from "./OpsUi";
 import { ActionDrawer } from "./Drawers";
 import type { AXAction } from "@/lib/types";
 
@@ -28,22 +29,30 @@ export default function PromotionsView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="진행중 캠페인" value={running.length} tone="primary" />
-        <KpiCard label="캠페인 매출 (진행중)" value={wonShort(running.reduce((a, p) => a + p.revenue, 0))} />
-        <KpiCard
+      <section aria-label="프로모션 현황" className="card grid grid-cols-2 sm:divide-x lg:grid-cols-4">
+        <StatusCell
+          label="진행중 캠페인"
+          value={`${running.length}건`}
+          sub={`전체 ${data.promotions.length}건`}
+        />
+        <StatusCell
+          label="캠페인 매출 (진행중)"
+          value={wonShort(running.reduce((a, p) => a + p.revenue, 0))}
+          sub="원장 주문 기준"
+        />
+        <StatusCell
           label="실질마진 합계"
           value={wonShort(running.reduce((a, p) => a + realMargin(p), 0))}
+          sub="매출 − 원가 − 할인 − 배송비"
           tone="good"
-          sub="매출 - 원가 - 할인 - 배송비"
         />
-        <KpiCard
+        <StatusCell
           label="마진 마이너스 캠페인"
-          value={negative.length}
-          tone={negative.length ? "danger" : "good"}
+          value={`${negative.length}건`}
           sub="매출만 높은 캠페인"
+          tone={negative.length ? "danger" : "good"}
         />
-      </div>
+      </section>
       <Panel
         title={
           <span className="inline-flex items-center gap-2">

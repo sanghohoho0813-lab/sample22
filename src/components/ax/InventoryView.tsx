@@ -288,8 +288,7 @@ export default function InventoryView() {
                 <th className="text-right">수량</th>
                 {showCost && <th className="text-right">금액</th>}
                 <th>입고예정</th>
-                <th>상태</th>
-                <th>담당</th>
+                <th>상태 · 담당</th>
                 <th>
                   <span className="sr-only">작업</span>
                 </th>
@@ -301,17 +300,32 @@ export default function InventoryView() {
                 return (
                   <tr key={po.id} className="row-clickable" onClick={() => setSkuId(po.skuId)}>
                     <td className="whitespace-nowrap font-semibold">{po.id}</td>
-                    <td>
+                    <td className="min-w-[200px]">
                       {ins?.product.name} <span className="text-muted">· {ins?.sku.name}</span>
                     </td>
                     <td className="whitespace-nowrap">{supplierById.get(po.supplierId)?.name}</td>
                     <td className="text-right tabular-nums">{num(po.qty)}</td>
                     {showCost && <td className="text-right tabular-nums">{won(po.qty * po.unitCost)}</td>}
-                    <td className="whitespace-nowrap">{po.expectedAt}</td>
+                    <td className="whitespace-nowrap tabular-nums">
+                      {po.expectedAt.slice(5).replace("-", "/")}
+                      {po.status !== "received" && (
+                        <span className="ml-1 text-[12px] text-muted">
+                          {(() => {
+                            const d = Math.round(
+                              (new Date(`${po.expectedAt}T00:00:00`).getTime() -
+                                new Date(new Date().toDateString()).getTime()) /
+                                86400000,
+                            );
+                            return d > 0 ? `D-${d}` : d === 0 ? "오늘" : `${-d}일 지남`;
+                          })()}
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <StatusBadge status={po.status} />
+                      {po.note && <span className="mt-0.5 block text-[12px] text-orange">{po.note}</span>}
+                      <span className="mt-0.5 block text-[12px] text-muted">{po.actor}</span>
                     </td>
-                    <td className="whitespace-nowrap text-muted">{po.actor}</td>
                     <td>
                       {po.status !== "received" &&
                         po.status !== "cancelled" &&

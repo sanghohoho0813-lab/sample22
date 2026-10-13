@@ -370,7 +370,7 @@ function OpsOutcome({ onOpen }: { onOpen: (a: AXAction) => void }) {
     .map((a) => ({ a, m: a.measurement ?? measureAction(a, data, ledger, now), live: !a.measurement }))
     .sort((x, y) => (x.a.updatedAt < y.a.updatedAt ? 1 : -1));
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+    <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
       <Panel
         title="운영 상태 변화"
         sub={base ? `시연 시작 ${fmtDate(base.at, "datetime")} → 지금` : "기준 시점 없음"}

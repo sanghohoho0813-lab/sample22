@@ -350,5 +350,5 @@ export function StatusCell({
         {body}
       </button>
     );
-  return <div className="min-w-0 px-4 py-3 first:pl-0 sm:first:pl-4">{body}</div>;
+  return <div className="min-w-0 px-4 py-3">{body}</div>;
 }

@@ -90,16 +90,17 @@ export default function CostModelPanel() {
                   <span className="text-[13px] text-muted">{CHANNEL_LABEL[c]}</span>
                   <span className="relative mt-1 block">
                     <input
-                      className="input !min-h-[40px] pr-8 text-right tabular-nums"
-                      inputMode="decimal"
-                      value={(Math.round(model.feeRate[c] * 1000) / 10).toString()}
+                      type="number"
+                      step={0.1}
+                      min={0}
+                      max={50}
+                      className="input !min-h-[40px] pr-8 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      value={Math.round(model.feeRate[c] * 1000) / 10}
                       onChange={(e) => {
-                        const v = Math.min(
-                          50,
-                          Math.max(0, Number(e.target.value.replace(/[^0-9.]/g, "")) || 0),
-                        );
+                        const v = Math.min(50, Math.max(0, Number(e.target.value) || 0));
                         set({ feeRate: { ...model.feeRate, [c]: v / 100 } });
                       }}
+                      aria-label={`${CHANNEL_LABEL[c]} 수수료율 (%)`}
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-muted">
                       %

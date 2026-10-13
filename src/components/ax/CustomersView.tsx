@@ -34,6 +34,7 @@ export default function CustomersView() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [action, setAction] = useState<AXAction | null>(null);
   const [cust, setCust] = useState<string | null>(sp.get("customer"));
+  const [allProducts, setAllProducts] = useState(false);
   useEffect(() => {
     const p = sp.get("product");
     if (p) setProduct(p);
@@ -52,7 +53,7 @@ export default function CustomersView() {
       ),
     [repeat.rows, status, product, q],
   );
-  const pg = usePage(rows, 15);
+  const pg = usePage(rows, 12);
   const repeatActions = data.actions.filter((a) => a.type === "repeat_expose");
   const live = repeatActions.filter((a) => ["in_progress", "done", "measured"].includes(a.stage));
   const keyOf = (r: RepeatOpportunity) => `${r.customerId}|${r.productId}`;
@@ -163,7 +164,7 @@ export default function CustomersView() {
               </tr>
             </thead>
             <tbody>
-              {repeat.byProduct.slice(0, 10).map((b) => {
+              {repeat.byProduct.slice(0, allProducts ? 12 : 5).map((b) => {
                 const open = repeatActions.find(
                   (a) =>
                     a.related.productId === b.productId &&
@@ -220,6 +221,15 @@ export default function CustomersView() {
             </tbody>
           </table>
         </div>
+        {repeat.byProduct.length > 5 && (
+          <button
+            className="btn-ghost btn-sm mt-2"
+            onClick={() => setAllProducts((v) => !v)}
+            aria-expanded={allProducts}
+          >
+            {allProducts ? "상위 5개만 보기" : `상위 ${Math.min(12, repeat.byProduct.length)}개 모두 보기`}
+          </button>
+        )}
         <div className="mt-2">
           <Basis>
             2회 이상 산 고객은 실제 구매 간격 평균, 1회만 산 고객은 상품 평균 주기를 씁니다. 이미 다시

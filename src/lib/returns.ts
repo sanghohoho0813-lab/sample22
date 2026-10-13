@@ -204,6 +204,8 @@ const reasonMix = (rs: ReturnRecord[]) => {
 const lossOf = (rs: ReturnRecord[]) => rs.reduce((a, r) => a + r.lostCogs + RETURN_PICKUP, 0);
 export const pctTxt = (x: number) => `${(x * 100).toFixed(x > 0 && x < 0.001 ? 2 : 1)}%`;
 /** 평소가 거의 0이면 배수가 과장되므로 "급증"으로 표기 */
+/** 평소 비율 — 이전 기간에 한 건도 없었으면 0.0%가 아니라 건수로 말한다 */
+export const baseTxt = (rate: number) => (rate === 0 ? "이전 9주 0건" : `평소 ${pctTxt(rate)}`);
 export const liftTxt = (lift: number) => (lift >= 10 ? "급증" : `${lift.toFixed(1)}배 증가`);
 
 export const returnSignals = memoLast(returnSignalsRaw);
@@ -283,7 +285,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       lotReceivedAt: lot?.receivedAt,
       cost: lossOf(rq),
       evidence: [
-        `최근 4주 불량·파손 ${rq.length}건 / 판매 ${units.r.toLocaleString()}개 = ${pctTxt(recentRate)} (평소 ${pctTxt(baselineRate)})`,
+        `최근 4주 불량·파손 ${rq.length}건 / 판매 ${units.r.toLocaleString()}개 = ${pctTxt(recentRate)} (${baseTxt(baselineRate)})`,
         cp
           ? `${onset.getMonth() + 1}/${onset.getDate()}경부터 증가 (이전 ${pctTxt(cp.before)} → 이후 ${pctTxt(cp.after)})${lot ? ` — 그 무렵 입고 ${lot.id} (${lot.receivedAt}, ${lot.receivedQty.toLocaleString()}개)` : ""}`
           : "증가 시점 특정 어려움 — 전 기간 고르게 높음",
@@ -321,7 +323,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       reasons: reasonMix(rp),
       cost: lossOf(rp),
       evidence: [
-        `최근 4주 오배송·누락 ${rp.length}건 / 출고 ${o.recent.toLocaleString()}건 = ${pctTxt(recentRate)} (평소 ${pctTxt(baselineRate)})`,
+        `최근 4주 오배송·누락 ${rp.length}건 / 출고 ${o.recent.toLocaleString()}건 = ${pctTxt(recentRate)} (${baseTxt(baselineRate)})`,
         w.staff < w.staffPlanned
           ? `작업 인원 ${w.staff}명 (정원 ${w.staffPlanned}명) — 결원 상태에서 피킹 오류 증가`
           : "피킹 검수 단계 점검 필요",
@@ -359,7 +361,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       reasons: reasonMix(rc),
       cost: lossOf(rc),
       evidence: [
-        `최근 4주 ${rc.length}건 / 판매 ${units.r.toLocaleString()}개 = ${pctTxt(recentRate)} (평소 ${pctTxt(baselineRate)})`,
+        `최근 4주 ${rc.length}건 / 판매 ${units.r.toLocaleString()}개 = ${pctTxt(recentRate)} (${baseTxt(baselineRate)})`,
         "같은 사유가 한 상품에 집중 — 상세페이지 규격·호환 정보 확인 필요",
       ],
       suggestion: "상세페이지 규격·호환 표기 수정, 문의 많은 항목 상단 배치",
@@ -399,7 +401,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       reasons: mix,
       cost: lossOf(rs),
       evidence: [
-        `최근 4주 ${rs.length}건 / 판매 ${u.recent.toLocaleString()}개 = ${pctTxt(recentRate)} (평소 ${pctTxt(baselineRate)})`,
+        `최근 4주 ${rs.length}건 / 판매 ${u.recent.toLocaleString()}개 = ${pctTxt(recentRate)} (${baseTxt(baselineRate)})`,
         `주요 사유 ${RETURN_REASON_LABEL[mix[0].reason] ?? mix[0].reason} ${mix[0].count}건 · 공급 ${supplierById.get(sku.primarySupplierId)?.name ?? "-"}`,
       ],
       suggestion:

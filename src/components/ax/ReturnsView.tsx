@@ -5,6 +5,7 @@ import { ArrowRight, Search, ShieldAlert } from "lucide-react";
 import { useData, useExceptions, useLedger, useLookups, useMinute, useReturnSignals } from "@/lib/hooks";
 import { ACTION_STAGE_LABEL, useStore } from "@/lib/store";
 import {
+  baseTxt,
   liftTxt,
   pctTxt,
   returnRecords,
@@ -176,7 +177,7 @@ export default function ReturnsView() {
                       <td className="text-right tabular-nums">{s.recentCount}건</td>
                       <td className="whitespace-nowrap text-right tabular-nums">
                         <b className="text-danger">{pctTxt(s.recentRate)}</b>{" "}
-                        <span className="text-muted">({pctTxt(s.baselineRate)})</span>
+                        <span className="text-muted">({baseTxt(s.baselineRate)})</span>
                       </td>
                       <td className="text-right tabular-nums">{money(s.cost)}</td>
                       <td className="whitespace-nowrap text-[13px] tabular-nums">
@@ -506,7 +507,10 @@ function SignalDrawer({
           {[
             ["최근 4주", `${sig.recentCount}건`],
             ["반품률", pctTxt(sig.recentRate)],
-            ["평소", `${pctTxt(sig.baselineRate)} · ${liftTxt(sig.lift)}`],
+            [
+              "평소",
+              sig.baselineRate === 0 ? "이전 9주 0건" : `${pctTxt(sig.baselineRate)} · ${liftTxt(sig.lift)}`,
+            ],
             ["손실 (4주)", money(sig.cost)],
           ].map(([k, v]) => (
             <div key={k} className="bg-white px-3 py-2.5">

@@ -309,7 +309,7 @@ export default function DashboardView() {
             <button
               role="tab"
               aria-selected={kind === "all"}
-              className={`chip ${kind === "all" ? "chip-on" : ""}`}
+              className={`chip shrink-0 whitespace-nowrap ${kind === "all" ? "chip-on" : ""}`}
               onClick={() => setKind("all")}
             >
               전체 <span className="tabular-nums">{exceptions.length}</span>
@@ -319,7 +319,7 @@ export default function DashboardView() {
                 key={k}
                 role="tab"
                 aria-selected={kind === k}
-                className={`chip ${kind === k ? "chip-on" : ""}`}
+                className={`chip shrink-0 whitespace-nowrap ${kind === k ? "chip-on" : ""}`}
                 onClick={() => setKind(k)}
               >
                 {EXCEPTION_LABEL[k]} <span className="tabular-nums">{n}</span>
@@ -331,60 +331,112 @@ export default function DashboardView() {
               이 유형의 예외가 없습니다. 운영이 정상 범위입니다.
             </p>
           ) : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th className="w-8">#</th>
-                    <th>긴급도</th>
-                    <th>내용</th>
-                    <th className="text-right">영향</th>
-                    <th>기한</th>
-                    <th>실행</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((e, i) => (
-                    <tr key={e.id} className="row-clickable" onClick={() => setEx(e)}>
-                      <td className="tabular-nums text-muted">{i + 1}</td>
-                      <td>
+            <>
+              {/* 모바일: 한 줄 요약 목록 (긴급도·유형 → 제목 → 영향·기한) */}
+              <ol className="space-y-2 sm:hidden">
+                {shown.map((e) => (
+                  <li key={e.id}>
+                    <button
+                      className="w-full rounded-xl border border-line bg-white p-3 text-left active:bg-mist"
+                      onClick={() => setEx(e)}
+                    >
+                      <span className="flex items-center gap-2 text-[12px] font-semibold text-muted">
                         <SeverityTag s={e.severity} />
-                      </td>
-                      <td className="min-w-[220px]">
-                        <div className="text-[12px] font-semibold text-muted">{EXCEPTION_LABEL[e.kind]}</div>
-                        <div className="font-semibold leading-snug">{e.title}</div>
-                        <div className="text-[13px] leading-snug text-muted">{e.evidence[0]}</div>
-                      </td>
-                      <td className="text-right">
-                        <Impact
-                          value={e.impact.value}
-                          unit={e.impact.unit}
-                          label={e.impact.label}
-                          basis={e.impact.basis}
-                        />
-                      </td>
-                      <td className="whitespace-nowrap text-[13px] text-muted">
-                        {e.dueAt
-                          ? fmtDate(
+                        {EXCEPTION_LABEL[e.kind]}
+                        <span className="ml-auto">
+                          {e.action ? (
+                            <span className="text-primary">실행 연결됨</span>
+                          ) : e.actionType ? (
+                            <span className="text-orange">실행 없음</span>
+                          ) : (
+                            "정책 검토"
+                          )}
+                        </span>
+                      </span>
+                      <span className="mt-1.5 block font-semibold leading-snug">{e.title}</span>
+                      <span className="mt-0.5 block text-[13px] leading-snug text-muted">
+                        {e.evidence[0]}
+                      </span>
+                      <span className="mt-2 flex items-baseline justify-between gap-2 text-[13px]">
+                        <span>
+                          <b className="tabular-nums">
+                            {e.impact.unit === "원"
+                              ? money(e.impact.value)
+                              : `${Math.round(e.impact.value).toLocaleString()}${e.impact.unit}`}
+                          </b>{" "}
+                          <span className="text-muted">{e.impact.label}</span>
+                        </span>
+                        {e.dueAt && (
+                          <span className="shrink-0 tabular-nums text-muted">
+                            기한{" "}
+                            {fmtDate(
                               e.dueAt,
                               new Date(e.dueAt).toDateString() === now.toDateString() ? "time" : "md",
-                            )
-                          : "-"}
-                      </td>
-                      <td className="whitespace-nowrap text-[13px]">
-                        {e.action ? (
-                          <span className="font-semibold text-primary">연결됨</span>
-                        ) : e.actionType ? (
-                          <span className="text-orange">실행 없음</span>
-                        ) : (
-                          <span className="text-muted">정책 검토</span>
+                            )}
+                          </span>
                         )}
-                      </td>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <div className="table-wrap hidden sm:block">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th className="w-8">#</th>
+                      <th>긴급도</th>
+                      <th>내용</th>
+                      <th className="text-right">영향</th>
+                      <th>기한</th>
+                      <th>실행</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {shown.map((e, i) => (
+                      <tr key={e.id} className="row-clickable" onClick={() => setEx(e)}>
+                        <td className="tabular-nums text-muted">{i + 1}</td>
+                        <td>
+                          <SeverityTag s={e.severity} />
+                        </td>
+                        <td className="min-w-[220px]">
+                          <div className="text-[12px] font-semibold text-muted">
+                            {EXCEPTION_LABEL[e.kind]}
+                          </div>
+                          <div className="font-semibold leading-snug">{e.title}</div>
+                          <div className="text-[13px] leading-snug text-muted">{e.evidence[0]}</div>
+                        </td>
+                        <td className="text-right">
+                          <Impact
+                            value={e.impact.value}
+                            unit={e.impact.unit}
+                            label={e.impact.label}
+                            basis={e.impact.basis}
+                          />
+                        </td>
+                        <td className="whitespace-nowrap text-[13px] text-muted">
+                          {e.dueAt
+                            ? fmtDate(
+                                e.dueAt,
+                                new Date(e.dueAt).toDateString() === now.toDateString() ? "time" : "md",
+                              )
+                            : "-"}
+                        </td>
+                        <td className="whitespace-nowrap text-[13px]">
+                          {e.action ? (
+                            <span className="font-semibold text-primary">연결됨</span>
+                          ) : e.actionType ? (
+                            <span className="text-orange">실행 없음</span>
+                          ) : (
+                            <span className="text-muted">정책 검토</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
           {queue.length > 10 && (
             <button className="btn-ghost btn-sm mt-2 w-full" onClick={() => setShowAll(!showAll)}>

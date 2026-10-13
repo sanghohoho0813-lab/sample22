@@ -7,7 +7,7 @@ import type { Ledger } from "./ledger";
 import type { OpsException } from "./control";
 import { compareSuppliers, type SkuInsight } from "./engines";
 import { forecastShipments, staffMoveEffect, suggestStaffMove, type ShipForecast } from "./fulfillment";
-import { liftTxt, pctTxt, type ReturnSignal } from "./returns";
+import { baseTxt, liftTxt, pctTxt, type ReturnSignal } from "./returns";
 
 export type ActionDraft = Omit<AXAction, "id" | "createdAt" | "updatedAt" | "source" | "evidenceIds">;
 
@@ -331,7 +331,7 @@ export function draftFromException(
               ? `${sig.subjectLabel} 상세페이지 정보 수정`
               : `${sig.subjectLabel.split(" ")[0]} 피킹 검수 강화`,
         summary: `${sig.title}. ${sig.suggestion}.`,
-        trigger: `최근 4주 반품률 ${pctTxt(sig.recentRate)} — 평소 ${pctTxt(sig.baselineRate)} 대비 ${liftTxt(sig.lift)}`,
+        trigger: `최근 4주 반품률 ${pctTxt(sig.recentRate)} — ${baseTxt(sig.baselineRate)} 대비 ${liftTxt(sig.lift)}`,
         reasons: sig.evidence,
         expectedImpact: "같은 원인의 반품 재발 방지 — 2~4주 후 반품률로 확인",
         owner,
@@ -348,7 +348,7 @@ export function draftFromException(
         baseline: {
           metric: "해당 신호 반품률",
           value: sig.recentRate,
-          display: `${pctTxt(sig.recentRate)} (평소 ${pctTxt(sig.baselineRate)})`,
+          display: `${pctTxt(sig.recentRate)} (${baseTxt(sig.baselineRate)})`,
           at: now.toISOString(),
         },
       };

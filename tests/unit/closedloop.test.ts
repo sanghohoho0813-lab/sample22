@@ -229,3 +229,35 @@ describe("비용 기준 → 이익 판단", () => {
     expect(app(b)).toBeCloseTo(app(a), 0);
   });
 });
+
+describe("모든 실행 유형 — 승인 후 같은 지표로 측정", () => {
+  it("추천·확인 단계 실행을 모두 승인해도 오류 없이 진행되고, 측정은 실행 전 기준값과 같은 지표를 쓴다", () => {
+    const open = st().data.actions.filter((a) => ["recommended", "reviewing"].includes(a.stage));
+    expect(new Set(open.map((a) => a.type)).size).toBeGreaterThanOrEqual(5);
+    for (const a of open) {
+      st().setActionStage(a.id, "approved");
+      const now = st().data.actions.find((x) => x.id === a.id)!;
+      expect(["requested", "in_progress", "done"]).toContain(now.stage);
+      // 시간이 흐른 뒤 측정 (판단 보류 구간을 지나서)
+      const later = new Date(NOW.getTime() + 5 * 86400000);
+      const m = measureAction(now, st().data, getLedger(st().data), later);
+      expect(m.metric.length).toBeGreaterThan(0);
+      expect(["improved", "unchanged", "worse", "pending"]).toContain(m.verdict);
+      if (a.baseline) expect(m.before).toBe(a.baseline.display);
+    }
+  });
+
+  it("보류·기각은 사유를 남기고 부수효과(발주·알림)를 만들지 않는다", () => {
+    const a = st().data.actions.find((x) => x.type === "urgent_po" && x.stage === "recommended")!;
+    const pos = st().data.purchaseOrders.length;
+    const notes = st().data.notifications.length;
+    st().setActionStage(a.id, "held", { reason: "공급사 단가 재협상 중" });
+    const h = st().data.actions.find((x) => x.id === a.id)!;
+    expect(h.stage).toBe("held");
+    expect(h.activity!.at(-1)!.note).toContain("공급사 단가 재협상 중");
+    expect(st().data.purchaseOrders.length).toBe(pos);
+    expect(st().data.notifications.length).toBe(notes);
+    st().setActionStage(a.id, "dismissed", { reason: "중복" });
+    expect(st().data.actions.find((x) => x.id === a.id)!.stage).toBe("dismissed");
+  });
+});

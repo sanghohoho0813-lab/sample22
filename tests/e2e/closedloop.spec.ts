@@ -78,7 +78,8 @@ test.describe("폐쇄 루프", () => {
   test("컨트롤 타워 품절 위험 → 실행 → 담당자 확인 → 발주 승인 → 입고 → 성과 측정", async ({ page }) => {
     await page.goto("/ax");
     await ready(page);
-    await page.locator("tr", { hasText: "품절 위험" }).filter({ visible: true }).first().click();
+    // 데스크톱은 표의 행, 모바일은 요약 목록의 버튼
+    await page.locator("tr, li > button", { hasText: "품절 위험" }).filter({ visible: true }).first().click();
     await drawer(page)
       .getByRole("button", { name: /연결된 실행 열기|실행 만들기/ })
       .click();

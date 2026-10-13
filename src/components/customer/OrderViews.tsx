@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   LayoutDashboard,
 } from "lucide-react";
-import { useData, useLookups, useIsInIframe } from "@/lib/hooks";
+import { useData, useForecast, useLookups, useIsInIframe, useShippingRule } from "@/lib/hooks";
+import { isPreShip } from "@/lib/fulfillment";
 import { CUSTOMER_STAGE_LABEL, useStore } from "@/lib/store";
 import { fmtDate, relTime, won } from "@/lib/format";
 import type { Order, OrderStage } from "@/lib/types";
@@ -428,6 +429,25 @@ function RebuyButton({ order }: { order: Order }) {
   );
 }
 
+/** 출고 전 주문의 예상 출고 시각 — 운영 화면의 출고 시뮬레이션과 같은 계산 (인력 재배치·우선처리가 바로 반영) */
+function ShipEta({ order, forecast }: { order: Order; forecast: ReturnType<typeof useForecast> }) {
+  const p = forecast.orders.find((x) => x.order.id === order.id);
+  if (!p) return null;
+  const sameDay = p.shipAt.toDateString() === new Date().toDateString();
+  const text =
+    p.status === "blocked"
+      ? "일부 상품 입고를 기다리고 있어요. 입고되는 대로 출고합니다."
+      : p.status === "late" || p.status === "overdue"
+        ? `주문이 몰려 다음 출고 회차(${fmtDate(p.shipAt.toISOString(), "md")} ${fmtDate(p.shipAt.toISOString(), "time")}경)에 출고될 예정이에요.`
+        : `${sameDay ? "오늘" : fmtDate(p.shipAt.toISOString(), "md")} ${fmtDate(p.cutoffAt.toISOString(), "time")} 출고 마감 전에 출고될 예정이에요.`;
+  return (
+    <p className="mt-4 flex items-start gap-2 rounded-xl bg-mist px-3 py-2 text-sm">
+      <Truck size={15} className="mt-0.5 shrink-0 text-primary" />
+      <span>{text}</span>
+    </p>
+  );
+}
+
 export function OrderDetailView({ orderId }: { orderId: string }) {
   const data = useData();
   const { productById, warehouseById } = useLookups();
@@ -436,6 +456,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
   const toast = useToast();
   const [ret, setRet] = useState<{ skuId: string } | null>(null);
   const [reason, setReason] = useState("change_mind");
+  const forecast = useForecast();
   const order = data.orders.find((o) => o.id === orderId);
   if (!order)
     return (
@@ -475,10 +496,17 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
           </div>
         </div>
         <OrderProgress order={order} />
+        {isPreShip(order.stage) && <ShipEta order={order} forecast={forecast} />}
         {order.customerNotified && (
           <div className="mt-4 flex items-start gap-2 rounded-xl bg-orange/10 px-3 py-2 text-sm text-orange">
-            <Bell size={15} className="mt-0.5" />
-            물류 사정으로 배송이 하루 지연될 수 있어 미리 안내드립니다. 불편을 드려 죄송합니다.
+            <Bell size={15} className="mt-0.5 shrink-0" />
+            <span>
+              {[...order.history]
+                .reverse()
+                .find((h) => h.note?.startsWith("출고 지연 안내"))
+                ?.note?.replace("출고 지연 안내 · ", "") ?? "배송이 지연될 수 있어"}
+              {" — "}출고가 늦어져 미리 안내드립니다. 불편을 드려 죄송합니다.
+            </span>
           </div>
         )}
         <ol className="mt-5 space-y-3 border-l-2 border-line pl-4">
@@ -646,6 +674,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
 }
 
 export function RepeatBasketView() {
+  const ship = useShippingRule();
   const data = useData();
   const customerId = useStore((s) => s.ui.customerId);
   const placeOrder = useStore((s) => s.placeOrder);
@@ -662,7 +691,7 @@ export function RepeatBasketView() {
   }));
   const active = rows.filter((r) => !excluded.has(r.product.id) && r.useSku);
   const total = active.reduce((a, r) => a + r.useSku.salePrice * r.q, 0);
-  const shipping = total >= 30000 || total === 0 ? 0 : 3000;
+  const shipping = ship.feeFor(total);
 
   const [ordering, setOrdering] = useState(false);
   const orderAll = () => {

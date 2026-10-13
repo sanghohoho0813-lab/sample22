@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { CreditCard, MapPin, Info, Lock } from "lucide-react";
-import { useLookups } from "@/lib/hooks";
+import { useLookups, useShippingRule } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { deliveryPromise, won } from "@/lib/format";
 import AssetImage from "@/components/shared/AssetImage";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/Bits";
 import { useToast } from "@/components/shared/Toast";
 
 export default function CheckoutView() {
+  const ship = useShippingRule();
   const router = useRouter();
   const { skuById, productById, invBySku, customerById } = useLookups();
   const cartAll = useStore((s) => s.ui.cart);
@@ -66,7 +67,7 @@ export default function CheckoutView() {
     [cart, skuById, productById, invBySku],
   );
   const subtotal = rows.reduce((a, r) => a + r.sku.salePrice * r.c.qty, 0);
-  const shipping = subtotal >= 30000 ? 0 : 3000;
+  const shipping = ship.feeFor(subtotal);
   const eta = rows.length
     ? rows.some((r) => r.promise.kind !== "fast")
       ? "일반배송 포함 · 2~3일 내 도착"

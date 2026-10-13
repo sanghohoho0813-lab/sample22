@@ -56,11 +56,13 @@ export default function InventoryView() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [sort, setSort] = useState<"priority" | "days" | "value" | "trend">("priority");
-  const [skuId, setSkuId] = useState<string | null>(null);
+  const [skuId, setSkuId] = useState<string | null>(sp.get("sku"));
   const [action, setAction] = useState<AXAction | null>(null);
   useEffect(() => {
     const s = sp.get("status") as Group | null;
     if (s && GROUPS.some((g) => g.key === s)) setGroup(s);
+    const k = sp.get("sku");
+    if (k) setSkuId(k);
   }, [sp]);
 
   const list = useMemo(() => {

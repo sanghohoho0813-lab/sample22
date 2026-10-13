@@ -18,7 +18,7 @@ import {
   Repeat,
 } from "lucide-react";
 import AssetImage from "@/components/shared/AssetImage";
-import { useData, useInsights } from "@/lib/hooks";
+import { useData, useForecast, useInsights, useMargin, useRepeat } from "@/lib/hooks";
 import { Term, TERMS } from "@/components/shared/Bits";
 
 function Sec({
@@ -84,6 +84,24 @@ export default function WhyAxView() {
   const insights = useInsights();
   const risk = insights.filter((i) => ["urgent", "stockout", "low"].includes(i.status)).length;
   const slow = insights.filter((i) => ["slow", "overstock"].includes(i.status));
+  const margin = useMargin(30);
+  const repeat = useRepeat();
+  const forecast = useForecast();
+  // 서술 속 숫자도 화면과 같은 계산에서 가져온다 (문구에 박아 두지 않는다)
+  const finiteDays = insights.filter(
+    (i) => i.product.status === "active" && Number.isFinite(i.daysOfStock) && i.inv.onHand > 0,
+  );
+  const minDays = Math.min(...finiteDays.map((i) => i.daysOfStock));
+  const maxDays = Math.max(...finiteDays.map((i) => i.daysOfStock));
+  const daysOf = (name: string) => {
+    const i = insights.find((x) => x.product.name.includes(name) && Number.isFinite(x.daysOfStock));
+    return i ? `${Math.round(i.daysOfStock)}일치` : "-";
+  };
+  const humid = insights.find((i) => i.product.name.includes("가습기"));
+  const top = margin.bySku[0];
+  const poor = margin.revenueRichMarginPoor[0];
+  const zoneC = forecast.zones.find((z) => z.warehouse.id === "wh-C");
+  const pct = (r: number) => `${(r * 100).toFixed(1)}%`;
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[220px_1fr]">
       <nav
@@ -178,10 +196,13 @@ export default function WhyAxView() {
           </Big>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <Card title="판매량과 마진이 따로 움직인다">
-              물티슈는 잘 팔리지만 할인 후 마진이 9%. 가습기는 안 팔리지만 재고는 186개.
+              {top && poor
+                ? `매출 1위 ${top.label.split(" · ")[0]}의 공헌이익률은 ${pct(top.marginRate)}, 매출 상위 ${poor.label.split(" · ")[0]}는 ${pct(poor.marginRate)}. `
+                : ""}
+              가습기는 안 팔리지만 재고는 {humid?.inv.onHand ?? 0}개.
             </Card>
             <Card title="품절과 과잉이 동시에 생긴다">
-              같은 창고 안에서 어떤 SKU는 2.7일치, 어떤 SKU는 465일치.
+              같은 창고 안에서 어떤 SKU는 {minDays.toFixed(1)}일치, 어떤 SKU는 {Math.round(maxDays)}일치.
             </Card>
             <Card title="사람이 매일 판단해야 한다">
               무엇을 언제 얼마나 발주할지, 어떤 주문을 먼저 처리할지 — 매일 수십 번.
@@ -290,7 +311,7 @@ export default function WhyAxView() {
               <p className="mt-1 text-sm text-muted">
                 재고일수 75일 이상. 재고금액 약{" "}
                 {Math.round(slow.reduce((a, i) => a + i.stockValue, 0) / 10000).toLocaleString()}만원이 창고에
-                묶여 있습니다. 미니가습기 465일치, 온열매트 280일치.
+                묶여 있습니다. 미니가습기 {daysOf("가습기")}, 온열매트 {daysOf("온열매트")}.
               </p>
             </div>
           </div>
@@ -319,8 +340,9 @@ export default function WhyAxView() {
           <Big>생활용품은 반복구매 상품입니다. 재구매를 놓치는 것은 신규고객을 놓치는 것보다 비쌉니다.</Big>
           <div className="card mt-4 p-4 text-[17px] leading-relaxed">
             <b>고객 김서연</b>은 물티슈를 21일, 세제를 35일, 배변패드를 18일마다 삽니다. 주기가 왔을 때 아무
-            제안이 없으면 다른 곳에서 삽니다. 지금 이런 고객이 <b>42명</b> 주기 도래 상태입니다 (시연). 다시
-            구매 노출 시 지난달 전환율 31%였습니다 — 이 숫자도 실측으로 다시 확인합니다.
+            제안이 없으면 다른 곳에서 삽니다. 지금 이런 고객이 <b>{repeat.dueCustomers.toLocaleString()}명</b>{" "}
+            주기 도래·지남 상태입니다 (시연 데이터). 노출 후 효과는 추정 전환율이 아니라 대상 고객의 실제
+            재주문으로만 셉니다.
           </div>
         </Sec>
 
@@ -465,14 +487,18 @@ export default function WhyAxView() {
             <div className="card space-y-2 p-4 text-sm">
               <div className="inline-flex items-center gap-1.5 font-bold">
                 <Truck size={15} className="text-accent" />
-                배송 사례 — C구역 마감임박 12건
+                배송 사례 — C구역 출고 병목
               </div>
               <ul className="space-y-1">
                 {[
-                  "오후 3시 출고마감까지 3시간",
-                  "C구역 피킹 적체 82% (평균 40%)",
-                  "오늘 배송약속 주문 12건이 피킹 이전 단계",
-                  "지연 시 고객 사전안내 필요",
+                  zoneC ? `작업 인원 ${zoneC.staff}명 (정원 ${zoneC.warehouse.staffPlanned}명)` : "",
+                  zoneC
+                    ? `남은 작업 ${Math.round(zoneC.remainingWorkMin)}분 / 마감 전 가용 ${Math.round(zoneC.capacityMin)}분 (부하 ${Math.round(zoneC.utilization * 100)}%)`
+                    : "",
+                  zoneC
+                    ? `마감 초과 예상 ${zoneC.late}건 · 아슬아슬 ${zoneC.tight}건 · 재고 부족 ${zoneC.blocked}건`
+                    : "",
+                  "지연이 확실한 주문은 마감 전에 고객 사전안내",
                 ].map((r) => (
                   <li key={r} className="flex gap-2">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
@@ -481,11 +507,11 @@ export default function WhyAxView() {
                 ))}
               </ul>
               <div className="rounded-lg bg-mist p-2.5 text-xs">
-                실행: A구역 피커 2명 임시 배치 → 12건 우선 피킹 → 출고 → 고객 마이페이지 ‘출고완료’ 반영.
-                마감을 넘길 4건은 CS가 사전 안내.
+                실행: 여유 구역 인원을 C구역으로 옮겼을 때 효과를 먼저 시뮬레이션 → 재배치·우선 피킹 승인 →
+                출고 → 고객 마이페이지 ‘출고완료’ 반영. 그래도 넘길 주문은 CS가 새 예정일로 사전 안내.
               </div>
               <Link
-                href="/ax/fulfillment?tab=risk"
+                href="/ax/fulfillment?tab=forecast"
                 className="inline-flex items-center gap-1 font-semibold text-primary"
               >
                 출고 관제 열기 <ArrowRight size={14} />
@@ -496,8 +522,9 @@ export default function WhyAxView() {
                 <Term term="Fulfillment" desc={TERMS.fulfillment}>
                   주문·출고
                 </Term>
-                는 주문 이후 상품을 피킹·포장·출고·배송하는 전체 과정입니다. 주문마다 마감시각·배송약속·구역
-                적체·재고예외로 <b>지연위험 점수</b>를 계산해 무엇을 먼저 처리할지 보여줍니다.
+                는 주문 이후 상품을 피킹·포장·출고·배송하는 전체 과정입니다. 구역별 인원·남은
+                작업량·마감시각으로 주문마다 <b>포장 완료 예상 시각</b>을 시뮬레이션해, 마감을 넘길 주문을
+                미리 찾고 무엇을 먼저 처리할지 보여줍니다.
               </p>
               <p className="text-sm text-muted">
                 여기서 상태를 바꾸면 고객 화면이 함께 바뀝니다. “내 주문 어디쯤이에요?” 전화가 줄어드는

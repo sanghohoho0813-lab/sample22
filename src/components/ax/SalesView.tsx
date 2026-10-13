@@ -1,276 +1,315 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useData, useInsights } from "@/lib/hooks";
-import { sumRange, prevRange, safeDiv } from "@/lib/kpi";
-import { fmtDate, pct, won, wonShort, num } from "@/lib/format";
-import { KpiCard, Panel } from "./Widgets";
-import { BarChart, LineChart, Donut } from "@/components/shared/Charts";
-import { Tabs, Term, TERMS } from "@/components/shared/Bits";
+import { useSearchParams } from "next/navigation";
+import { Search, Settings2 } from "lucide-react";
+import { useData, useMargin } from "@/lib/hooks";
+import { useStore } from "@/lib/store";
+import { DEFAULT_COST_MODEL } from "@/lib/costs";
+import type { MarginRow } from "@/lib/margin";
+import { fmtDate, wonShort } from "@/lib/format";
+import { LineChart } from "@/components/shared/Charts";
+import { Tabs } from "@/components/shared/Bits";
+import { Panel } from "./Widgets";
 import { SkuDrawer } from "./Drawers";
+import { Basis, money, Pager, pctText, SortTh, StatusCell, usePage, useSort } from "./OpsUi";
+
+type Dim = "sku" | "customer" | "channel" | "category";
+const DIM_LABEL: Record<Dim, string> = {
+  sku: "SKU",
+  customer: "고객",
+  channel: "채널",
+  category: "카테고리",
+};
 
 export default function SalesView() {
   const data = useData();
-  const insights = useInsights();
-  const [range, setRange] = useState<"day" | "week" | "month">("day");
+  const sp = useSearchParams();
+  const [days, setDays] = useState<7 | 30 | 90>(30);
+  const [dim, setDim] = useState<Dim>((sp.get("tab") as Dim) || "sku");
+  const [q, setQ] = useState(sp.get("q") ?? "");
+  const [onlyFlag, setOnlyFlag] = useState(false);
   const [skuId, setSkuId] = useState<string | null>(null);
-  const cur = sumRange(data, 30);
-  const prev = prevRange(data, 30);
-  const series = useMemo(() => {
-    if (range === "day")
-      return data.dailySales
-        .slice(-30)
-        .map((d) => ({ label: fmtDate(d.date, "md"), value: d.revenue, value2: d.grossMargin }));
-    if (range === "week") {
-      const out = [];
-      for (let i = 0; i < 12; i++) {
-        const s = data.dailySales.slice(-(12 - i) * 7, i === 11 ? undefined : -(11 - i) * 7);
-        if (!s.length) continue;
-        out.push({
-          label: `W${i + 1}`,
-          value: s.reduce((a, d) => a + d.revenue, 0),
-          value2: s.reduce((a, d) => a + d.grossMargin, 0),
-        });
-      }
-      return out;
-    }
-    const m = new Map<string, { value: number; value2: number }>();
-    data.dailySales.forEach((d) => {
-      const k = d.date.slice(0, 7);
-      const c = m.get(k) ?? { value: 0, value2: 0 };
-      c.value += d.revenue;
-      c.value2 += d.grossMargin;
-      m.set(k, c);
-    });
-    return Array.from(m.entries()).map(([k, v]) => ({ label: k.slice(2), ...v }));
-  }, [data.dailySales, range]);
-  const catRows = [...data.categorySales]
-    .map((c) => ({
-      ...c,
-      name: data.categories.find((x) => x.slug === c.categorySlug)!.name,
-      rate: safeDiv(c.margin, c.revenue),
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
-  // high-revenue low-margin products
-  const skuRows = insights
-    .map((i) => {
-      const rev = i.demand.order7d * 4 * i.sku.salePrice;
-      const cogs = i.demand.order7d * 4 * i.sku.cost;
-      const promo = data.promotions.some((p) => p.status === "running" && p.skuIds.includes(i.sku.id));
-      const disc = promo ? rev * 0.1 : 0;
-      const ship = (i.demand.order7d * 4 * 0.6 * 2400) / 2.6;
-      const margin = rev - cogs - disc - ship;
-      return { i, rev, margin, rate: safeDiv(margin, rev), promo };
-    })
-    .filter((r) => r.rev > 0)
-    .sort((a, b) => b.rev - a.rev);
-  const lowMargin = skuRows.filter((r) => r.rate < 0.18).slice(0, 8);
-  const promoDelta = data.promotions
-    .filter((p) => p.status !== "planned")
-    .map((p) => ({
-      label: p.name.slice(0, 10),
-      value: p.revenue,
-      value2: p.revenue - p.cogs - p.discountCost - p.shippingCost,
-    }));
+  useEffect(() => {
+    const t = sp.get("tab") as Dim | null;
+    if (t && DIM_LABEL[t]) setDim(t);
+    const qq = sp.get("q");
+    if (qq) setQ(qq);
+  }, [sp]);
+  const m = useMargin(days);
+  const model = useStore((s) => s.ui.costModel) ?? DEFAULT_COST_MODEL;
+  const t = m.total;
+  const flagged = useMemo(() => new Set(m.revenueRichMarginPoor.map((r) => r.key)), [m]);
+
+  const base: MarginRow[] =
+    dim === "sku"
+      ? m.bySku
+      : dim === "customer"
+        ? m.byCustomer
+        : dim === "channel"
+          ? m.byChannel
+          : m.byCategory;
+  const filtered = useMemo(
+    () =>
+      base.filter(
+        (r) =>
+          (!q.trim() || r.label.toLowerCase().includes(q.trim().toLowerCase())) &&
+          (!onlyFlag || dim !== "sku" || flagged.has(r.key)),
+      ),
+    [base, q, onlyFlag, dim, flagged],
+  );
+  const sort = useSort(
+    filtered,
+    {
+      revenue: (r) => r.revenue,
+      contribution: (r) => r.contribution,
+      rate: (r) => r.marginRate,
+      shipping: (r) => r.shipping,
+      fee: (r) => r.channelFee,
+      discount: (r) => r.discount,
+      orders: (r) => r.orders,
+    },
+    "revenue",
+  );
+  const pg = usePage(sort.sorted, 15);
+  const series = data.dailySales.slice(-(days === 7 ? 8 : days === 30 ? 31 : 90), -1).map((d) => ({
+    label: fmtDate(d.date, "md"),
+    value: d.revenue,
+    value2: d.grossMargin,
+  }));
+  const steps = m.waterfall;
+  const maxAbs = Math.max(...steps.map((s) => Math.abs(s.value)), 1);
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-6">
-        <KpiCard
-          label="순매출 (30일)"
-          value={wonShort(cur.revenue)}
-          delta={safeDiv(cur.revenue - prev.revenue, prev.revenue)}
-          tone="primary"
-          big
-        />
-        <KpiCard
-          label={
-            <Term term="매출총이익" desc={TERMS.grossMargin}>
-              추정 매출총이익
-            </Term>
-          }
-          value={wonShort(cur.grossMargin)}
-          delta={safeDiv(cur.grossMargin - prev.grossMargin, prev.grossMargin)}
-          sub={`마진율 ${pct(safeDiv(cur.grossMargin, cur.revenue))}`}
-          tone="good"
-          big
-        />
-        <KpiCard
-          label="주문수"
-          value={num(cur.orders)}
-          delta={safeDiv(cur.orders - prev.orders, prev.orders)}
-        />
-        <KpiCard label="객단가" value={won(safeDiv(cur.revenue, cur.orders))} />
-        <KpiCard
-          label="할인 · 배송비"
-          value={wonShort(cur.discount + cur.shippingCost)}
-          sub={`할인 ${pct(safeDiv(cur.discount, cur.revenue))} · 배송비 ${pct(safeDiv(cur.shippingCost, cur.revenue))}`}
-          tone="warn"
-        />
-        <KpiCard
-          label="취소·반품"
-          value={num(cur.returns)}
-          sub={`반품률 ${pct(safeDiv(cur.returns, cur.orders))}`}
-          tone="neutral"
-          href="/ax/returns"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          className="inline-flex rounded-lg border border-line bg-white p-0.5 text-sm"
+          role="group"
+          aria-label="기간"
+        >
+          {([7, 30, 90] as const).map((d) => (
+            <button
+              key={d}
+              className={`rounded-md px-3 py-1 ${days === d ? "bg-soft font-semibold text-primary" : "text-muted"}`}
+              aria-pressed={days === d}
+              onClick={() => setDays(d)}
+            >
+              최근 {d}일
+            </button>
+          ))}
+        </div>
+        <Link
+          href="/ax/settings?tab=cost"
+          className="inline-flex items-center gap-1 text-sm font-semibold text-primary"
+        >
+          <Settings2 size={15} /> 비용 기준 (택배 {model.parcelBase.toLocaleString()}원 · 제휴몰 수수료{" "}
+          {pctText(model.feeRate.partner)})
+        </Link>
       </div>
 
-      <Panel
-        title="매출 · 추정 마진 추이"
-        sub="매출이 증가했지만 할인과 배송비 때문에 실질수익성이 낮아진 구간을 봅니다"
-        right={
-          <Tabs
-            value={range}
-            onChange={setRange}
-            tabs={[
-              { key: "day", label: "일" },
-              { key: "week", label: "주" },
-              { key: "month", label: "월" },
-            ]}
-            className="!border-0"
+      <section
+        aria-label="매출과 이익"
+        className="card grid grid-cols-2 sm:grid-cols-3 sm:divide-x xl:grid-cols-6"
+      >
+        <StatusCell
+          label="순매출"
+          value={money(t.revenue)}
+          sub={`할인 후 · 주문 ${t.orders.toLocaleString()}건`}
+        />
+        <StatusCell
+          label="공헌이익"
+          value={money(t.contribution)}
+          sub="모든 변동비 차감 후"
+          tone={t.contribution > 0 ? "good" : "danger"}
+        />
+        <StatusCell
+          label="공헌이익률"
+          value={pctText(t.marginRate)}
+          sub={`객단가 ${money(t.orders ? t.revenue / t.orders : 0)}`}
+        />
+        <StatusCell
+          label="할인"
+          value={money(t.discount)}
+          sub={`매출 대비 ${pctText(t.revenue ? t.discount / (t.revenue + t.discount) : 0)}`}
+        />
+        <StatusCell
+          label="순운임"
+          value={money(t.shipping)}
+          sub={`매출 대비 ${pctText(t.revenue ? t.shipping / t.revenue : 0)}`}
+        />
+        <StatusCell
+          label="채널 수수료"
+          value={money(t.channelFee)}
+          sub={`매출 대비 ${pctText(t.revenue ? t.channelFee / t.revenue : 0)}`}
+        />
+      </section>
+
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <Panel
+          title="매출에서 이익까지"
+          sub={`최근 ${days}일 · 원장 주문 ${t.orders.toLocaleString()}건 집계`}
+        >
+          <ol className="space-y-2">
+            {steps.map((s, i) => {
+              const last = i === steps.length - 1;
+              const first = i === 0;
+              const w = (Math.abs(s.value) / maxAbs) * 100;
+              return (
+                <li
+                  key={s.label}
+                  className="grid grid-cols-[88px_minmax(0,1fr)_92px] items-center gap-2 text-[14px]"
+                >
+                  <span className={first || last ? "font-bold" : "text-muted"}>{s.label}</span>
+                  <span className="h-5 rounded bg-mist">
+                    <span
+                      className={`block h-full rounded ${first ? "bg-primary" : last ? "bg-teal" : "bg-orange/70"}`}
+                      style={{ width: `${Math.max(1.5, w)}%` }}
+                    />
+                  </span>
+                  <span className={`text-right tabular-nums ${first || last ? "font-bold" : ""}`}>
+                    {first || last ? money(s.value) : `−${money(-s.value)}`}
+                    {!first && (
+                      <span className="block text-[11px] text-muted">
+                        {pctText(Math.abs(s.value) / (steps[0].value || 1))}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="mt-3">
+            <Basis>
+              공헌이익 = 순매출 + 고객 배송비 − 상품원가 − 운임 − 포장 − 채널 수수료 − 반품 손실(환불 − 재판매
+              원가회수 + 회수운임). 고정비(인건비·임대)는 포함하지 않습니다.
+            </Basis>
+          </div>
+        </Panel>
+        <Panel title="순매출 · 매출총이익 추이" sub="매출총이익 = 순매출 − 상품원가 − 순운임">
+          <LineChart
+            data={series}
+            label1="순매출"
+            label2="매출총이익"
+            format={wonShort}
+            showEvery={days === 7 ? 1 : days === 30 ? 3 : 10}
           />
-        }
-      >
-        <LineChart
-          data={series}
-          label1="순매출"
-          label2="추정마진"
-          format={wonShort}
-          showEvery={range === "day" ? 3 : 1}
-          height={240}
-        />
-      </Panel>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="카테고리별 매출·마진" sub="매출 순 · 마진율 낮은 카테고리는 원가·배송비 점검">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>카테고리</th>
-                  <th className="text-right">매출</th>
-                  <th className="text-right">주문</th>
-                  <th className="text-right">추정마진</th>
-                  <th className="text-right">마진율</th>
-                </tr>
-              </thead>
-              <tbody>
-                {catRows.map((c) => (
-                  <tr
-                    key={c.categorySlug}
-                    className="row-clickable"
-                    onClick={() =>
-                      setSkuId(
-                        insights.find((i) => i.product.categorySlug === c.categorySlug)?.sku.id ?? null,
-                      )
-                    }
-                  >
-                    <td className="font-semibold">{c.name}</td>
-                    <td className="text-right tabular-nums">{wonShort(c.revenue)}</td>
-                    <td className="text-right tabular-nums">{num(c.orders)}</td>
-                    <td className="text-right tabular-nums">{wonShort(c.margin)}</td>
-                    <td
-                      className={`text-right font-semibold tabular-nums ${c.rate < 0.2 ? "text-danger" : ""}`}
-                    >
-                      {pct(c.rate, 0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-        <Panel title="주문채널 · 비용 구조" sub="현재는 자사 고객 플랫폼 단일 채널이 대부분">
-          <div className="grid items-center gap-4 sm:grid-cols-2">
-            <Donut
-              parts={[
-                { label: "자사 플랫폼", value: 92, color: "var(--t-primary)" },
-                { label: "전화·B2B 소량", value: 8, color: "var(--t-accent)" },
-              ]}
-            />
-            <Donut
-              parts={[
-                {
-                  label: "상품원가",
-                  value: cur.revenue - cur.grossMargin - cur.discount - cur.shippingCost,
-                  color: "#66727F",
-                },
-                { label: "할인", value: cur.discount, color: "var(--t-accent)" },
-                { label: "배송비", value: cur.shippingCost, color: "var(--t-secondary)" },
-                { label: "매출총이익", value: cur.grossMargin, color: "var(--t-primary)" },
-              ]}
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            외부 쇼핑채널 연동은 연결 준비 단계입니다. 채널이 늘면 채널별 마진을 같은 방식으로 비교합니다.
-          </p>
         </Panel>
       </div>
 
       <Panel
-        title="고매출 · 저마진 상품"
-        sub="매출은 높지만 할인·배송비 후 실질마진이 18% 미만인 SKU (최근 4주 추정)"
+        title="어디서 이익이 새는가"
+        sub="매출 순으로 보되, 매출 상위 30% 안에서 이익률이 하위 30%인 SKU를 표시합니다"
         right={
-          <Link href="/ax/promotions" className="text-sm font-semibold text-primary">
-            프로모션 조정
-          </Link>
+          dim === "sku" ? (
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[var(--t-primary)]"
+                checked={onlyFlag}
+                onChange={(e) => setOnlyFlag(e.target.checked)}
+              />
+              매출 상위·이익 하위만 ({flagged.size})
+            </label>
+          ) : null
         }
       >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Tabs
+            value={dim}
+            onChange={(d) => {
+              setDim(d);
+              pg.setPage(0);
+            }}
+            tabs={(Object.keys(DIM_LABEL) as Dim[]).map((k) => ({ key: k, label: DIM_LABEL[k] }))}
+            className="flex-1"
+          />
+          {(dim === "sku" || dim === "customer") && (
+            <label className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <input
+                className="input !min-h-[38px] w-56 pl-9 text-sm"
+                placeholder={dim === "sku" ? "상품명 검색" : "고객명 검색"}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label="검색"
+              />
+            </label>
+          )}
+        </div>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>상품 · SKU</th>
-                <th className="text-right">추정 매출</th>
-                <th className="text-right">추정 마진</th>
-                <th className="text-right">마진율</th>
-                <th>프로모션</th>
-                <th>실행</th>
+                <th>{DIM_LABEL[dim]}</th>
+                <SortTh k="orders" sort={sort} className="text-right">
+                  주문
+                </SortTh>
+                <SortTh k="revenue" sort={sort} className="text-right">
+                  순매출
+                </SortTh>
+                <SortTh k="discount" sort={sort} className="text-right">
+                  할인
+                </SortTh>
+                <SortTh k="shipping" sort={sort} className="text-right">
+                  순운임
+                </SortTh>
+                <SortTh k="fee" sort={sort} className="text-right">
+                  수수료
+                </SortTh>
+                <th className="text-right">반품 손실</th>
+                <SortTh k="contribution" sort={sort} className="text-right">
+                  공헌이익
+                </SortTh>
+                <SortTh k="rate" sort={sort} className="text-right">
+                  이익률
+                </SortTh>
               </tr>
             </thead>
             <tbody>
-              {lowMargin.map((r) => (
-                <tr key={r.i.sku.id} className="row-clickable" onClick={() => setSkuId(r.i.sku.id)}>
-                  <td className="font-semibold">
-                    {r.i.product.name} <span className="font-normal text-muted">· {r.i.sku.name}</span>
-                  </td>
-                  <td className="text-right tabular-nums">{wonShort(r.rev)}</td>
-                  <td className="text-right tabular-nums">{wonShort(r.margin)}</td>
-                  <td
-                    className={`text-right font-bold tabular-nums ${r.rate < 0.12 ? "text-danger" : "text-orange"}`}
+              {pg.rows.map((r) => {
+                const flag = dim === "sku" && flagged.has(r.key);
+                return (
+                  <tr
+                    key={r.key}
+                    className={dim === "sku" ? "row-clickable" : ""}
+                    onClick={() => dim === "sku" && setSkuId(r.key)}
                   >
-                    {pct(r.rate, 0)}
-                  </td>
-                  <td>
-                    {r.promo ? (
-                      <span className="badge bg-accent/15 text-accent">진행중</span>
-                    ) : (
-                      <span className="text-muted">-</span>
-                    )}
-                  </td>
-                  <td className="text-xs font-semibold text-primary">
-                    {r.promo ? "할인율 조정 검토" : "묶음가·배송조건 검토"}
-                  </td>
-                </tr>
-              ))}
+                    <td className="min-w-[200px]">
+                      <span className="font-semibold">{r.label}</span>
+                      {flag && (
+                        <span className="ml-1.5 rounded bg-danger/10 px-1.5 py-0.5 text-[11px] font-bold text-danger">
+                          매출 상위·이익 하위
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right tabular-nums">{r.orders.toLocaleString()}</td>
+                    <td className="text-right tabular-nums">{money(r.revenue)}</td>
+                    <td className="text-right tabular-nums text-muted">{money(r.discount)}</td>
+                    <td className="text-right tabular-nums text-muted">{money(r.shipping)}</td>
+                    <td className="text-right tabular-nums text-muted">{money(r.channelFee)}</td>
+                    <td className="text-right tabular-nums text-muted">{money(r.returnLoss)}</td>
+                    <td
+                      className={`text-right font-semibold tabular-nums ${r.contribution < 0 ? "text-danger" : ""}`}
+                    >
+                      {money(r.contribution)}
+                    </td>
+                    <td
+                      className={`text-right font-bold tabular-nums ${r.marginRate < t.marginRate * 0.6 ? "text-danger" : ""}`}
+                    >
+                      {pctText(r.marginRate)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        <Pager pg={pg} />
       </Panel>
-
-      <Panel
-        title="프로모션 전후 비교"
-        sub="매출만 높은 캠페인을 성공으로 표시하지 않습니다 — 실질마진과 함께 봅니다"
-        right={
-          <Link href="/ax/promotions" className="text-sm font-semibold text-primary">
-            상세
-          </Link>
-        }
-      >
-        <BarChart data={promoDelta} label1="매출" label2="실질마진" format={wonShort} height={200} />
-      </Panel>
-
       <SkuDrawer skuId={skuId} onClose={() => setSkuId(null)} />
     </div>
   );

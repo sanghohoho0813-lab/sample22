@@ -422,6 +422,8 @@ export interface DemoData {
   actions: AXAction[];
   evidence: EvidenceLog[];
   notifications: Notification[];
+  /** 품절 상품 재입고 알림 신청 — 입고 처리 시 해당 고객에게 알림 후 비운다 */
+  restockAlerts?: { skuId: string; customerId: string; at: string }[];
   aggregates: {
     customerCount: number;
     orderCount90d: number;

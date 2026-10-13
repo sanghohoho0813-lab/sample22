@@ -7,7 +7,7 @@ import type { Ledger } from "./ledger";
 import type { OpsException } from "./control";
 import { compareSuppliers, type SkuInsight } from "./engines";
 import { forecastShipments, staffMoveEffect, suggestStaffMove, type ShipForecast } from "./fulfillment";
-import type { ReturnSignal } from "./returns";
+import { liftTxt, pctTxt, type ReturnSignal } from "./returns";
 
 export type ActionDraft = Omit<AXAction, "id" | "createdAt" | "updatedAt" | "source" | "evidenceIds">;
 
@@ -71,8 +71,10 @@ export function draftFromException(
       const opts = compareSuppliers(data, ins.sku.id, urgent ? "urgent" : "normal", {
         now,
         ledger: ctx.ledger,
+        qty: ex.related.preferQty,
       });
-      const best = opts.find((o) => o.recommended);
+      const best =
+        opts.find((o) => o.supplier.id === ex.related.preferSupplierId) ?? opts.find((o) => o.recommended);
       const qty = best?.orderQty ?? ins.recommendedQty;
       const days = ins.daysOfStock === Infinity ? "-" : ins.daysOfStock.toFixed(1);
       return {
@@ -186,7 +188,8 @@ export function draftFromException(
     }
     case "staff_rebalance": {
       const zone = ex.related.warehouseId;
-      const sug = suggestStaffMove(data, now, bulkyFn(data));
+      const custom = ex.related.staffMove;
+      const sug = custom ? { ...custom } : suggestStaffMove(data, now, bulkyFn(data));
       if (!zone || !sug || sug.to !== zone) return draftFromException(ex, ctx, "priority_order");
       const from = data.warehouses.find((w) => w.id === sug.from)!;
       const to = data.warehouses.find((w) => w.id === sug.to)!;
@@ -328,7 +331,7 @@ export function draftFromException(
               ? `${sig.subjectLabel} 상세페이지 정보 수정`
               : `${sig.subjectLabel.split(" ")[0]} 피킹 검수 강화`,
         summary: `${sig.title}. ${sig.suggestion}.`,
-        trigger: `최근 4주 반품률이 평소의 ${sig.lift.toFixed(1)}배`,
+        trigger: `최근 4주 반품률 ${pctTxt(sig.recentRate)} — 평소 ${pctTxt(sig.baselineRate)} 대비 ${liftTxt(sig.lift)}`,
         reasons: sig.evidence,
         expectedImpact: "같은 원인의 반품 재발 방지 — 2~4주 후 반품률로 확인",
         owner,
@@ -345,7 +348,7 @@ export function draftFromException(
         baseline: {
           metric: "해당 신호 반품률",
           value: sig.recentRate,
-          display: `${(sig.recentRate * 100).toFixed(1)}% (평소 ${(sig.baselineRate * 100).toFixed(1)}%)`,
+          display: `${pctTxt(sig.recentRate)} (평소 ${pctTxt(sig.baselineRate)})`,
           at: now.toISOString(),
         },
       };

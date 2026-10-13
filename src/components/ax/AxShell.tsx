@@ -38,6 +38,7 @@ import { Freshness } from "@/components/shared/Bits";
 import Overlay from "@/components/shared/Overlay";
 import { THEMES } from "@/lib/themes";
 import Tutorial from "./Tutorial";
+import CommandPalette, { CommandButton, useCommandHotkey } from "./CommandPalette";
 import SampleBridgeCTA, { SidebarBridgeCTA } from "@/components/shared/SampleBridgeCTA";
 import { useToast } from "@/components/shared/Toast";
 
@@ -75,7 +76,7 @@ const ALL: RoleKey[] = ["owner", "buyer", "ops", "cs"];
 const I = {
   dashboard: {
     href: "/ax",
-    label: "경영 대시보드",
+    label: "컨트롤 타워",
     icon: LayoutDashboard,
     color: "#2F6FED",
     family: "exec",
@@ -148,7 +149,7 @@ const I = {
   },
   sales: {
     href: "/ax/sales",
-    label: "매출·마진",
+    label: "매출·이익",
     icon: TrendingUp,
     color: "#2459CC",
     family: "exec",
@@ -551,6 +552,10 @@ export default function AxShell({
     (a) => !["done", "dismissed"].includes(a.stage) && (role === "owner" || a.owner === role),
   ).length;
   const closeMenu = useCallback(() => setMenu(false), []);
+  const [cmd, setCmd] = useState(false);
+  const openCmd = useCallback(() => setCmd(true), []);
+  const closeCmd = useCallback(() => setCmd(false), []);
+  useCommandHotkey(openCmd);
   useStackedTables();
 
   useEffect(() => {
@@ -746,6 +751,7 @@ export default function AxShell({
               )}
             </div>
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+              {hydrated && <CommandButton onOpen={openCmd} />}
               {actions}
               <div className="relative">
                 <button
@@ -857,6 +863,7 @@ export default function AxShell({
 
       {preview && <DevicePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />}
       {tutorial && <Tutorial onClose={() => setTutorial(false)} />}
+      <CommandPalette open={cmd} onClose={closeCmd} />
       <Overlay
         open={resetOpen}
         onClose={() => setResetOpen(false)}

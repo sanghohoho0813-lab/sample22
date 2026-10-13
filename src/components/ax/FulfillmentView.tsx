@@ -1,20 +1,19 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Truck, AlertTriangle, Bell, Search, Rocket } from "lucide-react";
-import { useData, useLookups, useOrderRisks } from "@/lib/hooks";
-import { ORDER_STAGE_LABEL, useStore } from "@/lib/store";
-import { fulfillmentKpis } from "@/lib/kpi";
-import { fmtDate, num, pct, relTime, won } from "@/lib/format";
+import { Truck, Search } from "lucide-react";
+import { useCustomerName, useData, useForecast, useLedger, useLookups, useMinute } from "@/lib/hooks";
+import { isPreShip } from "@/lib/fulfillment";
+import ShipForecastPanel from "./ShipForecastPanel";
+import { StatusCell } from "./OpsUi";
+import { ORDER_STAGE_LABEL } from "@/lib/store";
+import { fmtDate, relTime, won } from "@/lib/format";
 import type { Order, OrderStage } from "@/lib/types";
 import { StatusBadge } from "@/components/shared/Badge";
-import Badge from "@/components/shared/Badge";
-import { Meter } from "@/components/shared/Charts";
-import { EmptyState, Tabs, Term, TERMS, AiReady } from "@/components/shared/Bits";
-import { KpiCard, Panel } from "./Widgets";
+import { Tabs, Term, AiReady } from "@/components/shared/Bits";
+import { Panel } from "./Widgets";
 import { OrderDrawer, ActionDrawer } from "./Drawers";
 import type { AXAction } from "@/lib/types";
-import { useToast } from "@/components/shared/Toast";
 
 const COLS: { key: string; label: string; stages: OrderStage[] }[] = [
   { key: "new", label: "신규·확인", stages: ["new", "confirmed"] },
@@ -27,26 +26,29 @@ const COLS: { key: string; label: string; stages: OrderStage[] }[] = [
 
 export default function FulfillmentView() {
   const data = useData();
-  const risks = useOrderRisks();
-  const { customerById, warehouseById } = useLookups();
-  const advance = useStore((s) => s.advanceOrder);
-  const createPriorityAction = useStore((s) => s.createPriorityAction);
-  const role = useStore((s) => s.ui.role);
+  const ledger = useLedger();
+  const now = useMinute();
+  const forecast = useForecast();
+  const customerName = useCustomerName();
+  const { warehouseById } = useLookups();
   const [action, setAction] = useState<AXAction | null>(null);
-  const toast = useToast();
   const sp = useSearchParams();
-  const [tab, setTab] = useState<"board" | "risk" | "list">((sp.get("tab") as never) || "board");
+  const initialTab = (sp.get("tab") === "risk" ? "forecast" : sp.get("tab")) as
+    "forecast" | "board" | "list" | null;
+  const [tab, setTab] = useState<"forecast" | "board" | "list">(initialTab ?? "forecast");
   const [orderId, setOrderId] = useState<string | null>(sp.get("order"));
   const [q, setQ] = useState("");
-  const [wh, setWh] = useState("all");
+  const [wh, setWh] = useState(sp.get("zone") ?? "all");
   useEffect(() => {
     const o = sp.get("order");
     if (o) setOrderId(o);
     const t = sp.get("tab");
-    if (t === "risk") setTab("risk");
+    if (t === "risk" || t === "forecast") setTab("forecast");
+    else if (t === "board" || t === "list") setTab(t);
+    const z = sp.get("zone");
+    if (z) setWh(z);
   }, [sp]);
-  const fk = useMemo(() => fulfillmentKpis(data.orders), [data.orders]);
-  const riskMap = useMemo(() => new Map(risks.map((r) => [r.order.id, r])), [risks]);
+  const predMap = useMemo(() => new Map(forecast.orders.map((p) => [p.order.id, p])), [forecast]);
   const orders = useMemo(
     () =>
       data.orders.filter(
@@ -54,66 +56,57 @@ export default function FulfillmentView() {
           (wh === "all" || o.warehouseId === wh) &&
           (!q ||
             o.id.toLowerCase().includes(q.toLowerCase()) ||
-            customerById.get(o.customerId)?.name.includes(q) ||
+            customerName(o.customerId).includes(q) ||
             o.items.some((it) => it.name.includes(q))),
       ),
-    [data.orders, wh, q, customerById],
+    [data.orders, wh, q, customerName],
   );
-  const highRisk = risks.filter((r) => r.level !== "low");
-  const canOps = role === "owner" || role === "ops";
-  const pickingWaitRisk = risks.filter(
-    (r) => r.level === "high" && ["new", "confirmed", "picking_wait"].includes(r.order.stage),
-  );
-  const coveredByAction = useMemo(
-    () =>
-      new Set(
-        data.actions
-          .filter((a) => a.type === "priority_order" && !["done", "dismissed"].includes(a.stage))
-          .flatMap((a) => a.related.orderIds ?? []),
-      ),
-    [data.actions],
-  );
-  const uncovered = pickingWaitRisk.filter((r) => !coveredByAction.has(r.order.id));
-  const makePriorityAction = () => {
-    const id = createPriorityAction(uncovered.map((r) => r.order.id));
-    if (!id) {
-      toast({
-        title: "생성할 대상이 없습니다",
-        body: "위험 주문이 이미 진행 중인 실행에 포함되어 있습니다.",
-        tone: "info",
-      });
-      return;
-    }
-    setAction(useStore.getState().data.actions.find((x) => x.id === id) ?? null);
-    toast({
-      title: "우선처리 실행을 생성했습니다",
-      body: "승인하면 해당 주문이 피킹 단계로 전환됩니다.",
-      tone: "success",
-    });
-  };
+  // 최근 30일 정시 출고율 — 원장 출고 기록 기준
+  const onTime30 = useMemo(() => {
+    const recent = ledger?.orders.filter((o) => o.day <= 30) ?? [];
+    return recent.length ? 1 - recent.filter((o) => o.shipLate).length / recent.length : 1;
+  }, [ledger]);
+  const due = forecast.orders.filter((p) => p.cutoffAt <= forecast.nextCutoff);
+  const late = due.filter((p) => p.status === "late").length;
+  const blocked = due.filter((p) => p.status === "blocked").length;
+  const overdue = due.filter((p) => p.status === "overdue").length;
+  const pending = data.orders.filter((o) => isPreShip(o.stage));
+  const minsLeft = Math.max(0, Math.round((forecast.nextCutoff.getTime() - now.getTime()) / 60000));
 
   return (
     <div className="space-y-4">
-      <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
-        <KpiCard label="신규주문" value={num(fk.newOrders)} tone="primary" />
-        <KpiCard label="오늘 출고대상" value={num(fk.todayShip)} />
-        <KpiCard label="마감임박" value={num(fk.cutoffSoon)} tone="warn" sub="15:00 마감 4시간 이내" />
-        <KpiCard
-          label="지연위험"
-          value={num(highRisk.length)}
-          tone={highRisk.length ? "danger" : "good"}
-          onClick={() => setTab("risk")}
+      <section
+        aria-label="출고 현황"
+        className="card grid grid-cols-2 sm:grid-cols-3 sm:divide-x xl:grid-cols-5"
+      >
+        <StatusCell
+          label={`다음 출고마감 ${String(forecast.nextCutoff.getHours()).padStart(2, "0")}:00`}
+          value={`${Math.floor(minsLeft / 60)}시간 ${minsLeft % 60}분`}
+          sub={forecast.nextCutoff.toDateString() === now.toDateString() ? "오늘 집하" : "내일 집하"}
         />
-        {/* 처리량은 보조 지표 — 휴대폰에서는 핵심 6개만 */}
-        <div className="hidden lg:block">
-          <KpiCard label="피킹 처리량" value={num(fk.pickingThroughput)} sub="오늘" />
-        </div>
-        <div className="hidden lg:block">
-          <KpiCard label="포장 처리량" value={num(fk.packingThroughput)} sub="오늘" />
-        </div>
-        <KpiCard label="정시출고율" value={pct(fk.onTimeRate, 0)} tone="good" />
-        <KpiCard label="평균 처리시간" value={`${fk.avgCycleHours.toFixed(1)}시간`} sub="주문→출고" />
-      </div>
+        <StatusCell
+          label="미출고 주문"
+          value={`${pending.length.toLocaleString()}건`}
+          sub={`우선처리 ${pending.filter((o) => o.priority).length}건`}
+        />
+        <StatusCell
+          label="마감 내 출고 예상"
+          value={`${Math.round(forecast.onTimeRate * 100)}%`}
+          sub={`대상 ${due.length}건 (시뮬레이션)`}
+          tone={forecast.onTimeRate < 0.9 ? "danger" : forecast.onTimeRate < 0.97 ? "warn" : "good"}
+        />
+        <StatusCell
+          label="마감 위험"
+          value={`${late + blocked + overdue}건`}
+          sub={`초과 예상 ${late} · 재고부족 ${blocked} · 이월 ${overdue}`}
+          tone={late + blocked + overdue ? "danger" : "good"}
+        />
+        <StatusCell
+          label="정시 출고율 (30일)"
+          value={`${(onTime30 * 100).toFixed(1)}%`}
+          sub="원장 출고 기록 기준"
+        />
+      </section>
 
       <Panel
         title={
@@ -124,76 +117,75 @@ export default function FulfillmentView() {
         }
         sub={
           <span>
-            구역별 적체와{" "}
-            <Term term="주문·출고" desc={TERMS.fulfillment}>
-              주문 처리 단계
-            </Term>
-            를 한눈에 — 구역을 누르면 해당 주문만 봅니다
+            지금 대기열과 인원으로 계산한{" "}
+            <Term
+              term="출고 예측"
+              desc="구역별 인원 × 남은 근무시간과 주문별 작업시간으로, 각 주문이 몇 시에 포장까지 끝나는지 계산합니다."
+            >
+              출고 예측
+            </Term>{" "}
+            — 문제가 생기기 전에 인원·순서·고객 안내를 조정합니다
           </span>
         }
         right={
           <AiReady
-            title="배송 지연 위험"
-            now="마감·배송약속·구역 적체·재고예외 규칙 점수 (L2 추천)"
-            method="규칙 + 통계"
-            next="시간대별 처리량 예측으로 마감 초과 확률 계산"
+            title="출고 예측"
+            now="구역 인원·근무시간·작업시간 시뮬레이션 (L2 추천, 사람이 승인)"
+            method="이산 시뮬레이션 + 재고 배정"
+            next="시간대별 실제 처리 속도를 학습해 작업시간 자동 보정"
           />
         }
       >
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {data.warehouses.map((w) => (
-            <button
-              key={w.id}
-              onClick={() => setWh(wh === w.id ? "all" : w.id)}
-              aria-pressed={wh === w.id}
-              className={`rounded-xl border p-3 text-left ${wh === w.id ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}
-            >
-              <div className="truncate text-[13px] text-muted">{w.name}</div>
-              <div className={`font-bold ${w.congestion > 0.7 ? "text-danger" : ""}`}>
-                적체 {Math.round(w.congestion * 100)}%
-              </div>
-              <Meter
-                value={w.congestion}
-                color={w.congestion > 0.7 ? "#D93A3A" : w.congestion > 0.5 ? "#F47A3C" : "var(--t-primary)"}
-                className="mt-1.5"
-              />
-              <div className="mt-1 text-[13px] text-muted">
-                대기{" "}
-                {
-                  data.orders.filter(
-                    (o) =>
-                      o.warehouseId === w.id &&
-                      ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"].includes(
-                        o.stage,
-                      ),
-                  ).length
-                }
-                건
-              </div>
-            </button>
-          ))}
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Tabs
             value={tab}
             onChange={setTab}
             tabs={[
+              { key: "forecast", label: "출고 예측", count: late + blocked + overdue },
               { key: "board", label: "상태 보드" },
-              { key: "risk", label: "지연위험", count: highRisk.length },
               { key: "list", label: "전체 목록", count: orders.length },
             ]}
             className="flex-1"
           />
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              className="input !min-h-[38px] w-56 pl-9 text-sm"
-              placeholder="주문번호·고객·상품"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+          {tab !== "forecast" && (
+            <>
+              <select
+                className="input !min-h-[38px] w-auto text-sm"
+                value={wh}
+                onChange={(e) => setWh(e.target.value)}
+                aria-label="구역"
+              >
+                <option value="all">전체 구역</option>
+                {data.warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  className="input !min-h-[38px] w-56 pl-9 text-sm"
+                  placeholder="주문번호·고객·상품"
+                  aria-label="주문 검색"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {tab === "forecast" && (
+          <div className="mt-4">
+            <ShipForecastPanel
+              zoneFilter={wh}
+              onZone={setWh}
+              onOpenOrder={setOrderId}
+              onOpenAction={setAction}
             />
           </div>
-        </div>
+        )}
 
         {tab === "board" && (
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -206,117 +198,34 @@ export default function FulfillmentView() {
                     <span className="text-xs font-semibold text-muted">{items.length}</span>
                   </div>
                   <div className="max-h-[520px] space-y-1.5 overflow-y-auto pr-0.5">
-                    {items.slice(0, 30).map((o) => (
-                      <OrderMini
-                        key={o.id}
-                        o={o}
-                        risk={riskMap.get(o.id)?.level}
-                        name={customerById.get(o.customerId)?.name}
-                        onOpen={() => setOrderId(o.id)}
-                      />
-                    ))}
+                    {items.slice(0, 40).map((o) => {
+                      const pr = predMap.get(o.id);
+                      return (
+                        <OrderMini
+                          key={o.id}
+                          o={o}
+                          risk={
+                            pr && ["late", "overdue", "blocked"].includes(pr.status)
+                              ? "high"
+                              : pr?.status === "tight"
+                                ? "mid"
+                                : undefined
+                          }
+                          name={customerName(o.customerId)}
+                          onOpen={() => setOrderId(o.id)}
+                        />
+                      );
+                    })}
+                    {items.length > 40 && (
+                      <div className="px-1 py-2 text-center text-xs text-muted">
+                        외 {items.length - 40}건 — 전체 목록에서 검색
+                      </div>
+                    )}
                     {!items.length && <div className="px-1 py-3 text-xs text-muted">없음</div>}
                   </div>
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {tab === "risk" && (
-          <div className="mt-3">
-            {pickingWaitRisk.length > 0 && canOps && (
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm">
-                <div className="inline-flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-danger" />
-                  <b>피킹 전 단계 고위험 주문 {pickingWaitRisk.length}건</b> — 마감 전 우선 피킹이 필요합니다.
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {uncovered.length > 0 && (
-                    <button className="btn-outline btn-sm" onClick={makePriorityAction}>
-                      <Rocket size={14} />
-                      실행 생성 ({uncovered.length}건)
-                    </button>
-                  )}
-                  <button
-                    className="btn-primary btn-sm"
-                    onClick={() => {
-                      pickingWaitRisk.forEach((r) => advance(r.order.id, "picking", "박운영"));
-                      toast({
-                        title: `${pickingWaitRisk.length}건 우선 피킹 시작`,
-                        body: "고객 마이페이지 '상품준비' 반영",
-                        tone: "success",
-                      });
-                    }}
-                  >
-                    전체 우선처리
-                  </button>
-                </div>
-              </div>
-            )}
-            {highRisk.length ? (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>주문</th>
-                      <th>고객</th>
-                      <th>구역</th>
-                      <th>단계</th>
-                      <th>배송약속</th>
-                      <th>위험</th>
-                      <th>원인</th>
-                      <th>
-                        <span className="sr-only">작업</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {highRisk.map((r) => (
-                      <tr key={r.order.id} className="row-clickable" onClick={() => setOrderId(r.order.id)}>
-                        <td className="whitespace-nowrap font-semibold">
-                          {r.order.id}
-                          {r.order.customerNotified && <Bell size={12} className="ml-1 inline text-orange" />}
-                        </td>
-                        <td>{customerById.get(r.order.customerId)?.name}</td>
-                        <td className="whitespace-nowrap text-xs">
-                          {warehouseById.get(r.order.warehouseId)?.name}
-                        </td>
-                        <td>
-                          <StatusBadge status={r.order.stage} />
-                        </td>
-                        <td className="whitespace-nowrap text-muted">
-                          {fmtDate(r.order.promisedAt, "datetime")}
-                        </td>
-                        <td>
-                          <Badge tone={r.level === "high" ? "danger" : "warn"}>{r.score}</Badge>
-                        </td>
-                        <td className="max-w-[260px] text-xs text-muted">{r.causes.join(" · ")}</td>
-                        <td>
-                          {canOps && ["new", "confirmed", "picking_wait"].includes(r.order.stage) && (
-                            <button
-                              className="btn-outline btn-sm whitespace-nowrap"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                advance(r.order.id, "picking");
-                                toast({ title: "우선 피킹 시작", tone: "success" });
-                              }}
-                            >
-                              우선처리
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <EmptyState
-                title="지연위험 주문이 없습니다"
-                body="마감·배송약속·구역 적체 기준으로 위험이 감지되면 여기에 표시됩니다."
-              />
-            )}
           </div>
         )}
 
@@ -337,11 +246,11 @@ export default function FulfillmentView() {
                 </tr>
               </thead>
               <tbody>
-                {orders.slice(0, 80).map((o) => (
+                {orders.slice(0, 120).map((o) => (
                   <tr key={o.id} className="row-clickable" onClick={() => setOrderId(o.id)}>
                     <td className="whitespace-nowrap font-semibold">{o.id}</td>
                     <td className="whitespace-nowrap text-muted">{relTime(o.createdAt)}</td>
-                    <td className="whitespace-nowrap">{customerById.get(o.customerId)?.name}</td>
+                    <td className="whitespace-nowrap">{customerName(o.customerId)}</td>
                     <td className="max-w-[240px] truncate">
                       {o.items[0].name}
                       {o.items.length > 1 ? ` 외 ${o.items.length - 1}` : ""}

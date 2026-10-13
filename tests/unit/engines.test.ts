@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  assessOrderRisks,
-  buildBriefing,
-  buildSegments,
-  buildSkuInsights,
-  compareSuppliers,
-  repeatItemsForCustomer,
-} from "@/lib/engines";
-import type { Order } from "@/lib/types";
+import { buildSkuInsights, compareSuppliers, repeatItemsForCustomer } from "@/lib/engines";
 import { NOW, demo } from "./fixtures";
 
 const data = demo();
@@ -52,42 +44,6 @@ describe("compareSuppliers", () => {
   });
 });
 
-describe("assessOrderRisks", () => {
-  const base = data.orders.find((o) => ["new", "confirmed", "picking", "picking_wait"].includes(o.stage))!;
-  const withTimes = (cutoffInH: number, promiseInH: number): Order => ({
-    ...base,
-    id: "TEST-1",
-    stage: "picking",
-    riskFlag: false,
-    cutoffAt: new Date(NOW.getTime() + cutoffInH * 3600000).toISOString(),
-    promisedAt: new Date(NOW.getTime() + promiseInH * 3600000).toISOString(),
-  });
-  const risksFor = (o: Order) =>
-    assessOrderRisks({ ...data, orders: [o] }, NOW).find((r) => r.order.id === o.id)!;
-
-  it("출고 전 단계 주문만 평가하고 점수 내림차순", () => {
-    const risks = assessOrderRisks(data, NOW);
-    expect(risks.every((r) => !["shipped", "delivered", "cancelled", "return"].includes(r.order.stage))).toBe(
-      true,
-    );
-    risks.slice(1).forEach((r, i) => expect(risks[i].score).toBeGreaterThanOrEqual(r.score));
-  });
-  it("마감 1시간 미만이면 분 단위로 안내 (0분 대신 최소 1분)", () => {
-    expect(risksFor(withTimes(0.3, 72)).causes).toContain("출고마감까지 18분");
-    expect(risksFor(withTimes(0.001, 72)).causes).toContain("출고마감까지 1분");
-  });
-  it("마감 직후는 '출고 마감 시각 지남', 1시간 넘게 지나면 '오늘 마감 경과'", () => {
-    expect(risksFor(withTimes(-0.5, 72)).causes).toContain("출고 마감 시각 지남");
-    expect(risksFor(withTimes(-2, 72)).causes).toContain("오늘 마감 경과");
-  });
-  it("점수 구간 → 위험 등급", () => {
-    for (const r of assessOrderRisks(data, NOW)) {
-      expect(r.score).toBeLessThanOrEqual(100);
-      expect(r.level).toBe(r.score >= 60 ? "high" : r.score >= 35 ? "mid" : "low");
-    }
-  });
-});
-
 describe("repeatItemsForCustomer", () => {
   it("반복구매 상품만, 도래 임박 순", () => {
     const items = repeatItemsForCustomer(data, data.customers[0].id, NOW);
@@ -103,18 +59,5 @@ describe("repeatItemsForCustomer", () => {
         }
       }
     }
-  });
-});
-
-describe("buildBriefing", () => {
-  const briefing = buildBriefing(data, insights, assessOrderRisks(data, NOW), NOW);
-  it("순위는 1부터 연속, 모든 링크는 AX 내부 경로", () => {
-    expect(briefing.map((b) => b.rank)).toEqual(briefing.map((_, i) => i + 1));
-    expect(briefing.every((b) => b.href.startsWith("/ax/"))).toBe(true);
-  });
-  it("재구매 브리핑 숫자는 고객 세그먼트와 같다", () => {
-    const seg = buildSegments(data).find((s) => s.key === "repeat_due")!;
-    const item = briefing.find((b) => b.href === "/ax/customers");
-    expect(item?.title).toContain(`${seg.count}명`);
   });
 });

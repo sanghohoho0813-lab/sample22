@@ -72,6 +72,11 @@ export interface OpsException {
     poId?: string;
     signalId?: string;
     promotionId?: string;
+    /** 공급사 비교표에서 사람이 고른 공급사 (없으면 총비용 추천) */
+    preferSupplierId?: string;
+    preferQty?: number;
+    /** 인력 재배치 시뮬레이터에서 고른 이동 (없으면 추천안) */
+    staffMove?: { from: string; to: string; n: number };
   };
 }
 

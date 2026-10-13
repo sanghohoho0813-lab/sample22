@@ -8,6 +8,7 @@ import type {
   AXAction,
   ActionStage,
   CartItem,
+  Notification as AppNotification,
   DemoData,
   EvidenceLog,
   EvidenceType,
@@ -771,7 +772,23 @@ export const useStore = create<StoreState>()(
                 body: `${pred?.shortSkus.length ? "일부 상품 입고 대기로" : "주문 집중으로"} 출고가 늦어집니다. 새 도착 예정 ${eta.getMonth() + 1}/${eta.getDate()}.`,
                 read: false,
               });
-              return { ...o, customerNotified: true, updatedAt: t };
+              eta.setHours(21, 0, 0, 0);
+              const later = eta.getTime() > new Date(o.promisedAt).getTime();
+              return {
+                ...o,
+                customerNotified: true,
+                promisedAt: later ? eta.toISOString() : o.promisedAt,
+                updatedAt: t,
+                history: [
+                  ...o.history,
+                  {
+                    at: t,
+                    stage: o.stage,
+                    actor,
+                    note: `출고 지연 안내 · 새 도착 예정 ${eta.getMonth() + 1}/${eta.getDate()}`,
+                  },
+                ],
+              };
             });
             notifications = [...newNotes, ...notifications];
             step("in_progress", "안내 발송");
@@ -1037,7 +1054,47 @@ export const useStore = create<StoreState>()(
           dataSource: "입고",
           mode: "Demo Evidence",
         };
-        set({ data: { ...s.data, inventory, purchaseOrders, actions, evidence: [ev, ...s.data.evidence] } });
+        // 재입고 알림을 신청한 고객에게 입고 사실을 알린다 (신청 → 발주 → 입고 → 고객 알림)
+        const alerts = s.data.restockAlerts ?? [];
+        const waiting = alerts.filter((x) => x.skuId === po.skuId);
+        const sku = s.data.skus.find((k) => k.id === po.skuId);
+        const pname = sku ? s.data.products.find((x) => x.id === sku.productId)?.name : undefined;
+        const restockNotes: AppNotification[] = waiting.map((x) => ({
+          id: uid("n"),
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          customerId: x.customerId,
+          title: `${pname ?? "알림 신청 상품"} 재입고`,
+          body: `신청하신 ${sku?.name ?? ""} 구성이 다시 들어왔어요. 지금 주문할 수 있습니다.`,
+          read: false,
+        }));
+        set({
+          data: {
+            ...s.data,
+            inventory,
+            purchaseOrders,
+            actions,
+            notifications: [...restockNotes, ...s.data.notifications],
+            restockAlerts: alerts.filter((x) => x.skuId !== po.skuId),
+            evidence: [
+              ...(waiting.length
+                ? [
+                    {
+                      ...ev,
+                      id: uid("ev"),
+                      type: "CUSTOMER" as const,
+                      title: `재입고 알림 ${waiting.length}명 발송`,
+                      detail: `${pname} ${sku?.name ?? ""} 입고 — 알림 신청 고객에게 발송`,
+                      kpiDelta: `알림 ${waiting.length}건`,
+                    },
+                  ]
+                : []),
+              ev,
+              ...s.data.evidence,
+            ],
+          },
+        });
       },
       addEvidence: (e) => {
         const id = uid("ev");
@@ -1166,9 +1223,12 @@ export const useStore = create<StoreState>()(
           const t = nowIso();
           const sku = s.data.skus.find((k) => k.id === skuId);
           const p = sku ? s.data.products.find((x) => x.id === sku.productId) : undefined;
+          const cid = s.ui.customerId;
+          if ((s.data.restockAlerts ?? []).some((x) => x.skuId === skuId && x.customerId === cid)) return {};
           return {
             data: {
               ...s.data,
+              restockAlerts: [...(s.data.restockAlerts ?? []), { skuId, customerId: cid, at: t }],
               demand: s.data.demand.map((d) =>
                 d.skuId === skuId ? { ...d, restockRequests: (d.restockRequests ?? 0) + 1 } : d,
               ),

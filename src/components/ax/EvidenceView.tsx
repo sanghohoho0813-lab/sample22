@@ -7,12 +7,15 @@ import { buildEvidencePack, downloadText } from "@/lib/evidencePack";
 import { useToast } from "@/components/shared/Toast";
 import Link from "next/link";
 import { FileCheck2, Search, Download, FlaskConical } from "lucide-react";
-import { useData, useLookups } from "@/lib/hooks";
+import { useData, useLedger, useLookups, useMinute } from "@/lib/hooks";
+import { measureAction, opsSnapshot } from "@/lib/lifecycle";
+import { actionTypeLabel } from "@/lib/engines";
 import { dateKey, fmtDate } from "@/lib/format";
 import type { EvidenceType } from "@/lib/types";
 import Badge from "@/components/shared/Badge";
 import { EmptyState, Tabs } from "@/components/shared/Bits";
-import { KpiCard, Panel } from "./Widgets";
+import { Panel } from "./Widgets";
+import { Basis, money, StatusCell, VerdictTag } from "./OpsUi";
 import { ActionDrawer } from "./Drawers";
 import type { AXAction } from "@/lib/types";
 import { EVIDENCE_TYPE_LABEL, EVIDENCE_MODE_LABEL, STAGE_LABEL } from "@/lib/labels";
@@ -67,34 +70,38 @@ export default function EvidenceView() {
   );
   const counts = TYPES.map((t) => ({ t, n: data.evidence.filter((e) => e.type === t).length }));
   const results = data.evidence.filter((e) => e.type === "RESULT").length;
+  const measured = data.actions.filter((a) => a.stage === "measured" && a.measurement);
+  const waiting = data.actions.filter((a) => a.stage === "done");
+  const verdicts = { improved: 0, unchanged: 0, worse: 0, pending: 0 };
+  measured.forEach((a) => (verdicts[a.measurement!.verdict] += 1));
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard
-          label="성과 기록 총계"
-          value={data.evidence.length}
-          tone="primary"
-          sub="기준값·실행·결과·…"
+      <section aria-label="성과 현황" className="card grid grid-cols-2 sm:grid-cols-4 sm:divide-x">
+        <StatusCell
+          label="측정한 실행"
+          value={`${measured.length}건`}
+          sub={`개선 ${verdicts.improved} · 변화 없음 ${verdicts.unchanged} · 악화 ${verdicts.worse}`}
         />
-        <KpiCard label="결과 기록" value={results} tone="good" sub="실행 → 결과 연결" />
-        <KpiCard
-          label="위험 · 예외"
-          value={data.evidence.filter((e) => ["RISK", "EXCEPTION"].includes(e.type)).length}
-          tone="warn"
+        <StatusCell
+          label="측정 대기"
+          value={`${waiting.length}건`}
+          sub="완료됐지만 아직 같은 지표로 재지 않음"
+          tone={waiting.length ? "warn" : "neutral"}
         />
-        <KpiCard
+        <StatusCell
+          label="성과 기록"
+          value={`${data.evidence.length}건`}
+          sub={`결과 ${results} · 위험·예외 ${data.evidence.filter((e) => ["RISK", "EXCEPTION"].includes(e.type)).length}`}
+        />
+        <StatusCell
           label="실증 상태"
           value={ui.stage === "DEMO" ? (baselineCount ? "준비 중" : "준비") : STAGE_LABEL[ui.stage]}
-          sub={
-            ui.stage === "DEMO"
-              ? `책임자 ${ui.pilot.owner ? "지정" : "미지정"} · 기준값 ${baselineCount}건`
-              : `책임자 ${ui.pilot.owner} · 기준값 ${baselineCount}건`
-          }
-          tone={ui.stage === "DEMO" ? "neutral" : "primary"}
-          onClick={() => setView("pilot")}
+          sub={`책임자 ${ui.pilot.owner || "미지정"} · 기준값 ${baselineCount}건`}
         />
-      </div>
+      </section>
+
+      <OpsOutcome onOpen={setAction} />
 
       <Tabs
         value={view}
@@ -290,6 +297,171 @@ export default function EvidenceView() {
         </div>
       )}
       <ActionDrawer action={action} onClose={() => setAction(null)} />
+    </div>
+  );
+}
+
+/** 시연 시작 시점 운영 상태 → 지금, 그리고 실행별 같은 지표 재측정. 금액 절감액은 만들지 않는다. */
+function OpsOutcome({ onOpen }: { onOpen: (a: AXAction) => void }) {
+  const data = useData();
+  const ledger = useLedger();
+  const now = useMinute();
+  const snap = useMemo(() => opsSnapshot(data, ledger, now), [data, ledger, now]);
+  const base = data.baseline;
+  const rows: {
+    k: string;
+    b: number | undefined;
+    n: number;
+    fmt: (v: number) => string;
+    good: "down" | "up";
+    note: string;
+  }[] = [
+    {
+      k: "품절 위험 SKU",
+      b: base?.stockoutRiskSkus,
+      n: snap.stockoutRiskSkus,
+      fmt: (v) => `${v}개`,
+      good: "down",
+      note: "결품·긴급·부족 상태 판매중 SKU",
+    },
+    {
+      k: "다음 마감 출고 위험 주문",
+      b: base?.lateOrders,
+      n: snap.lateOrders,
+      fmt: (v) => `${v}건`,
+      good: "down",
+      note: "출고 시뮬레이션상 마감을 넘기는 주문",
+    },
+    {
+      k: "느린 재고 금액",
+      b: base?.slowStockValue,
+      n: snap.slowStockValue,
+      fmt: money,
+      good: "down",
+      note: "재고일수 75일 초과 SKU의 재고 원가",
+    },
+    {
+      k: "반품 원인 신호",
+      b: base?.returnSignals,
+      n: snap.returnSignals,
+      fmt: (v) => `${v}건`,
+      good: "down",
+      note: "통계적으로 유의한 반품 증가",
+    },
+    {
+      k: "재구매 주기 도래 고객",
+      b: base?.repeatDueCustomers,
+      n: snap.repeatDueCustomers,
+      fmt: (v) => `${v.toLocaleString()}명`,
+      good: "down",
+      note: "아직 다시 주문하지 않은 도래·지남 고객",
+    },
+    {
+      k: "열린 실행",
+      b: base?.openActions,
+      n: snap.openActions,
+      fmt: (v) => `${v}건`,
+      good: "down",
+      note: "추천~실행중 단계",
+    },
+  ];
+  const acted = data.actions
+    .filter((a) => ["in_progress", "requested", "done", "measured"].includes(a.stage))
+    .map((a) => ({ a, m: a.measurement ?? measureAction(a, data, ledger, now), live: !a.measurement }))
+    .sort((x, y) => (x.a.updatedAt < y.a.updatedAt ? 1 : -1));
+  return (
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <Panel
+        title="운영 상태 변화"
+        sub={base ? `시연 시작 ${fmtDate(base.at, "datetime")} → 지금` : "기준 시점 없음"}
+      >
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>지표</th>
+                <th className="text-right">시작</th>
+                <th className="text-right">지금</th>
+                <th className="text-right">변화</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const d = r.b === undefined ? 0 : r.n - r.b;
+                const better = r.good === "down" ? d < 0 : d > 0;
+                return (
+                  <tr key={r.k}>
+                    <td>
+                      <span className="font-semibold">{r.k}</span>
+                      <span className="block text-[12px] text-muted">{r.note}</span>
+                    </td>
+                    <td className="whitespace-nowrap text-right tabular-nums text-muted">
+                      {r.b === undefined ? "-" : r.fmt(r.b)}
+                    </td>
+                    <td className="whitespace-nowrap text-right font-semibold tabular-nums">{r.fmt(r.n)}</td>
+                    <td
+                      className={`whitespace-nowrap text-right font-semibold tabular-nums ${d === 0 ? "text-muted" : better ? "text-teal" : "text-danger"}`}
+                    >
+                      {r.b === undefined
+                        ? "-"
+                        : d === 0
+                          ? "변화 없음"
+                          : `${d > 0 ? "+" : "−"}${r.fmt(Math.abs(d))}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-2">
+          <Basis>
+            시연 데이터 위에서 실행 전후 운영 상태를 같은 계산식으로 다시 잰 값입니다. 절감액·매출 증가액으로
+            환산하지 않습니다 — 금액 효과는 실증 기간 실측값으로만 보고합니다.
+          </Basis>
+        </div>
+      </Panel>
+      <Panel title="실행별 성과" sub="실행 전 기준값과 같은 지표로 다시 측정 — 판단 보류도 그대로 표시">
+        {acted.length ? (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>실행</th>
+                  <th>지표</th>
+                  <th className="text-right">전 → 후</th>
+                  <th>판정</th>
+                </tr>
+              </thead>
+              <tbody>
+                {acted.map(({ a, m, live }) => (
+                  <tr key={a.id} className="row-clickable" onClick={() => onOpen(a)}>
+                    <td className="min-w-[200px]">
+                      <span className="font-semibold">{a.title}</span>
+                      <span className="block text-[12px] text-muted">
+                        {actionTypeLabel(a.type)} ·{" "}
+                        {live ? "지금 계산" : `측정 ${fmtDate(m.measuredAt, "md")}`}
+                      </span>
+                    </td>
+                    <td className="text-[13px]">{m.metric}</td>
+                    <td className="whitespace-nowrap text-right text-[13px] tabular-nums">
+                      {m.before} → <b>{m.after}</b>
+                    </td>
+                    <td>
+                      <VerdictTag v={m.verdict} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="아직 실행된 항목이 없습니다"
+            body="실행 센터에서 승인하면 여기서 전후를 잽니다."
+          />
+        )}
+      </Panel>
     </div>
   );
 }

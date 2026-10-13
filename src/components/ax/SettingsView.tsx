@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Check,
@@ -24,14 +24,19 @@ import Badge from "@/components/shared/Badge";
 import Overlay from "@/components/shared/Overlay";
 import { useToast } from "@/components/shared/Toast";
 import { DevicePreview } from "./AxShell";
+import CostModelPanel from "./CostModelPanel";
 import { useIsInIframe } from "@/lib/hooks";
 import { STAGE_LABEL } from "@/lib/labels";
 
 export default function SettingsView() {
   const sp = useSearchParams();
-  const [tab, setTab] = useState<"theme" | "display" | "role" | "data" | "ai" | "tech" | "demo">(
+  const [tab, setTab] = useState<"theme" | "display" | "role" | "cost" | "data" | "ai" | "tech" | "demo">(
     (sp.get("tab") as never) || "theme",
   );
+  useEffect(() => {
+    const t = sp.get("tab");
+    if (t) setTab(t as never);
+  }, [sp]);
   const theme = useStore((s) => s.ui.theme);
   const setTheme = useStore((s) => s.setTheme);
   const fontScale = useStore((s) => s.ui.fontScale);
@@ -56,6 +61,7 @@ export default function SettingsView() {
           { key: "theme", label: "테마 (9)" },
           { key: "display", label: "표시" },
           { key: "role", label: "역할·권한" },
+          { key: "cost", label: "비용 기준" },
           { key: "data", label: "데이터·연결" },
           { key: "ai", label: "AI 상태" },
           { key: "tech", label: "기술·사업화 자산" },
@@ -444,6 +450,8 @@ export default function SettingsView() {
         </Panel>
       )}
 
+      {tab === "cost" && <CostModelPanel />}
+
       {tab === "demo" && (
         <Panel
           title={
@@ -455,8 +463,15 @@ export default function SettingsView() {
         >
           <div className="space-y-3 text-sm">
             <div className="rounded-xl bg-mist p-3">
-              <b>시나리오</b> · A 물티슈 수요급증·품절위험 · B 주방세제 공급사 납기지연 · C 미니가습기
-              저회전·마진주의 · D C구역 주문·출고 지연위험 · E 재구매 기회 (김서연)
+              <b>심어 둔 운영 상황</b> — 엔진은 무엇이 심어졌는지 모르고 데이터만 보고 찾습니다
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-[13px]">
+                <li>물티슈 수요 급증 → 품절 위험 · 긴급 발주</li>
+                <li>주방세제 공급사 납기 지연 통보 → 대체 공급 비교</li>
+                <li>C구역 결원(정원 2명 중 1명) + 대형 기업 주문 → 출고 마감 병목</li>
+                <li>KF94 마스크 재고 소진 → 미출고 주문 보류 · 고객 안내</li>
+                <li>한 공급사 입고 로트 이후 불량 반품 증가 · 물걸레 청소포 상세정보 불일치</li>
+                <li>미니가습기 저회전·과잉재고 · 저마진 SKU · 재구매 주기 도래 고객</li>
+              </ul>
             </div>
             <button className="btn-danger" onClick={() => setResetOpen(true)}>
               <RotateCcw size={16} />

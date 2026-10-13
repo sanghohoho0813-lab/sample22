@@ -1340,7 +1340,9 @@ export function generateDemoData(now = new Date(), opts: { ledgerOnly?: boolean 
     });
     if (business) discount += Math.round(subtotal * 0.06);
     const shippingFee =
-      business || subtotal - discount >= DEFAULT_COST_MODEL.freeShippingThreshold ? 0 : 3000;
+      business || subtotal - discount >= DEFAULT_COST_MODEL.freeShippingThreshold
+        ? 0
+        : DEFAULT_COST_MODEL.shippingFee;
     return { subtotal, discount, shippingFee, total: subtotal - discount + shippingFee, promotionId };
   };
   const promiseFor = (items: OrderItem[], cutoff: Date) => {

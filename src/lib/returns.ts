@@ -202,7 +202,9 @@ const reasonMix = (rs: ReturnRecord[]) => {
     .sort((a, b) => b.count - a.count);
 };
 const lossOf = (rs: ReturnRecord[]) => rs.reduce((a, r) => a + r.lostCogs + RETURN_PICKUP, 0);
-const pctTxt = (x: number) => `${(x * 100).toFixed(1)}%`;
+export const pctTxt = (x: number) => `${(x * 100).toFixed(x > 0 && x < 0.001 ? 2 : 1)}%`;
+/** 평소가 거의 0이면 배수가 과장되므로 "급증"으로 표기 */
+export const liftTxt = (lift: number) => (lift >= 10 ? "급증" : `${lift.toFixed(1)}배 증가`);
 
 export const returnSignals = memoLast(returnSignalsRaw);
 
@@ -267,7 +269,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       id: `sig-sup-${sup.id}`,
       kind: "supplier",
       route: "supplier",
-      title: `${sup.name} 불량·파손 반품 ${lift.toFixed(1)}배 증가`,
+      title: `${sup.name} 불량·파손 반품 ${liftTxt(lift)}`,
       subjectLabel: sup.name,
       supplierId: sup.id,
       skuIds: affected,
@@ -308,7 +310,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       id: `sig-wh-${w.id}`,
       kind: "warehouse",
       route: "warehouse",
-      title: `${w.name.split(" ")[0]} 오배송·구성누락 ${lift.toFixed(1)}배 증가`,
+      title: `${w.name.split(" ")[0]} 오배송·구성누락 ${liftTxt(lift)}`,
       subjectLabel: w.name,
       warehouseId: w.id,
       skuIds: Array.from(new Set(rp.map((r) => r.skuId))),
@@ -346,7 +348,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       id: `sig-content-${p.id}`,
       kind: "content",
       route: "content",
-      title: `${p.name} '상품정보 차이' 반품 ${lift.toFixed(1)}배`,
+      title: `${p.name} '상품정보 차이' 반품 ${liftTxt(lift)}`,
       subjectLabel: p.name,
       productId: p.id,
       skuIds: ids,
@@ -385,7 +387,7 @@ function returnSignalsRaw(data: DemoData, ledger: Ledger | null, now: Date): Ret
       id: `sig-sku-${sku.id}`,
       kind: "sku",
       route,
-      title: `${p.name} ${sku.name} 반품 ${lift.toFixed(1)}배`,
+      title: `${p.name} ${sku.name} 반품 ${liftTxt(lift)}`,
       subjectLabel: `${p.name} · ${sku.name}`,
       productId: p.id,
       supplierId: sku.primarySupplierId,
@@ -433,13 +435,14 @@ export function returnSummary(data: DemoData, ledger: Ledger | null, now: Date):
     const k = ROUTE_OF[r.reason] ?? "customer";
     byRouteMap.set(k, (byRouteMap.get(k) ?? 0) + 1);
   });
-  const weeks = Math.ceil((ledger?.days ?? 89) / 7);
+  // 7일 단위로 꽉 찬 구간만 (원장 시작 쪽 부분 주는 건수가 적어 보이는 착시를 만든다)
+  const weeks = Math.floor(((ledger?.days ?? 89) + 1) / 7);
   const weekly = Array.from({ length: weeks }, (_, i) => {
     const w = weeks - 1 - i;
-    const start = new Date(now.getTime() - (w + 1) * 7 * 86400000);
+    const start = new Date(now.getTime() - ((w + 1) * 7 - 1) * 86400000);
     return {
       weekStart: `${start.getMonth() + 1}/${start.getDate()}`,
-      count: recs.filter((r) => r.daysAgo > w * 7 && r.daysAgo <= (w + 1) * 7).length,
+      count: recs.filter((r) => r.daysAgo >= w * 7 && r.daysAgo < (w + 1) * 7).length,
     };
   });
   const skuCount = new Map<string, number>();

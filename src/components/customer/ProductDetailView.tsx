@@ -14,8 +14,9 @@ import {
   Zap,
   Store,
   PackageCheck,
+  Bell,
 } from "lucide-react";
-import { useData, useLookups } from "@/lib/hooks";
+import { useData, useLookups, useShippingRule } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { searchProducts, summarize } from "@/lib/catalog";
 import { deliveryPromise, won } from "@/lib/format";
@@ -46,6 +47,7 @@ const REVIEWS = [
 ];
 
 export default function ProductDetailView({ productId }: { productId: string }) {
+  const ship = useShippingRule();
   const data = useData();
   const router = useRouter();
   const { brandById, categoryBySlug, invBySku, supplierById } = useLookups();
@@ -54,6 +56,9 @@ export default function ProductDetailView({ productId }: { productId: string }) 
   const toggleWishlist = useStore((s) => s.toggleWishlist);
   const wishlist = useStore((s) => s.ui.wishlist);
   const pushRecentView = useStore((s) => s.pushRecentView);
+  const requestRestock = useStore((s) => s.requestRestock);
+  const myId = useStore((s) => s.ui.customerId);
+  const alerts = useStore((s) => s.data.restockAlerts);
   const toast = useToast();
   const summary = useMemo(() => (product ? summarize(data, product) : null), [data, product]);
   const [skuId, setSkuId] = useState<string>("");
@@ -206,10 +211,33 @@ export default function ProductDetailView({ productId }: { productId: string }) 
                 `현재 재고가 없어 입고 후 순차 출고됩니다 (입고예정 ${inv?.inboundEta}).`}
               {promise.kind === "soldout" && "재입고 일정이 확정되면 알려드립니다."}
             </div>
+            {promise.kind === "soldout" &&
+              (alerts?.some((x) => x.skuId === sku.id && x.customerId === myId) ? (
+                <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                  <Bell size={15} /> 재입고 알림 신청됨 — 입고되면 알림으로 알려드려요
+                </p>
+              ) : (
+                <button
+                  className="btn-outline btn-sm mt-2"
+                  onClick={() => {
+                    requestRestock(sku.id);
+                    toast({
+                      title: "재입고 알림을 신청했습니다",
+                      body: "입고되면 알림함으로 알려드려요.",
+                      tone: "success",
+                    });
+                  }}
+                >
+                  <Bell size={15} /> 재입고 알림 신청
+                </button>
+              ))}
             <div className="mt-2 inline-flex items-center gap-1 text-xs text-muted">
               <PackageCheck size={13} />
               {available > 0 ? (available <= 20 ? `남은 재고 ${available}개` : "재고 충분") : "재고 없음"} ·
-              배송비 {sku.salePrice * qty >= 30000 ? "무료" : "3,000원 (3만원 이상 무료)"}
+              배송비{" "}
+              {ship.feeFor(sku.salePrice * qty) === 0
+                ? "무료"
+                : `${ship.fee.toLocaleString()}원 (${(ship.threshold / 10000).toLocaleString()}만원 이상 무료)`}
             </div>
           </div>
 

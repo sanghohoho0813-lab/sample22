@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { Minus, Plus, Trash2, Heart, ShoppingCart, ArrowRight } from "lucide-react";
-import { useData, useLookups } from "@/lib/hooks";
+import { useData, useLookups, useShippingRule } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { deliveryPromise, won } from "@/lib/format";
 import AssetImage from "@/components/shared/AssetImage";
@@ -13,6 +13,7 @@ import { searchProducts } from "@/lib/catalog";
 import ProductCard, { ProductRail } from "./ProductCard";
 
 export default function CartView() {
+  const ship = useShippingRule();
   const data = useData();
   const { skuById, productById, invBySku } = useLookups();
   const cart = useStore((s) => s.ui.cart);
@@ -41,7 +42,7 @@ export default function CartView() {
   );
   const selected = rows.filter((r) => r.c.selected);
   const subtotal = selected.reduce((a, r) => a + r.sku.salePrice * r.c.qty, 0);
-  const shipping = subtotal === 0 ? 0 : subtotal >= 30000 ? 0 : 3000;
+  const shipping = ship.feeFor(subtotal);
   const allSelected = rows.length > 0 && rows.every((r) => r.c.selected);
   const suggestions = searchProducts(data, { sort: "popular" })
     .filter((s) => !cart.some((c) => c.skuId === s.defaultSku.id))
@@ -194,9 +195,9 @@ export default function CartView() {
                 <dt className="text-muted">배송비</dt>
                 <dd className="tabular-nums">{shipping === 0 ? "무료" : won(shipping)}</dd>
               </div>
-              {subtotal > 0 && subtotal < 30000 && (
+              {subtotal > 0 && subtotal < ship.threshold && (
                 <div className="rounded-lg bg-soft px-2.5 py-1.5 text-xs text-primary">
-                  {won(30000 - subtotal)} 더 담으면 무료배송
+                  {won(ship.threshold - subtotal)} 더 담으면 무료배송
                 </div>
               )}
               <div className="flex justify-between border-t border-line pt-3 text-base">
@@ -229,8 +230,10 @@ export default function CartView() {
               <span className="text-muted">
                 {selected.length}개 · 배송비 {shipping === 0 ? "무료" : won(shipping)}
               </span>
-              {subtotal > 0 && subtotal < 30000 && (
-                <span className="font-semibold text-primary">{won(30000 - subtotal)} 더 담으면 무료배송</span>
+              {subtotal > 0 && subtotal < ship.threshold && (
+                <span className="font-semibold text-primary">
+                  {won(ship.threshold - subtotal)} 더 담으면 무료배송
+                </span>
               )}
             </div>
             <Link

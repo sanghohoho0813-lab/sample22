@@ -3,32 +3,30 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronRight,
   Clock3,
   Factory,
-  FileCheck2,
   Package,
-  PauseCircle,
   Truck,
   User,
-  XCircle,
   Bell,
   Play,
   Sparkles,
   Rocket,
 } from "lucide-react";
-import type { AXAction, Order, OrderStage } from "@/lib/types";
-import { useData, useInsights, useLookups, useOrderRisks } from "@/lib/hooks";
-import { CUSTOMER_STAGE_LABEL, ORDER_STAGE_LABEL, ROLE_LABEL, useStore } from "@/lib/store";
+import type { AXAction, OrderStage } from "@/lib/types";
+import { useData, useForecast, useInsights, useLedger, useLookups, useMinute } from "@/lib/hooks";
+import { isAtRisk, SHIP_STATUS_LABEL } from "@/lib/fulfillment";
+import { CUSTOMER_STAGE_LABEL, ORDER_STAGE_LABEL, useStore } from "@/lib/store";
 import { actionTypeLabel, compareSuppliers, type SkuInsight } from "@/lib/engines";
 import { fmtDate, num, pct, relTime, won } from "@/lib/format";
 import Overlay from "@/components/shared/Overlay";
 import Badge, { StatusBadge } from "@/components/shared/Badge";
-import { Sparkline, Meter } from "@/components/shared/Charts";
+import { Sparkline } from "@/components/shared/Charts";
 import { Tabs, Term, TERMS, AiReady } from "@/components/shared/Bits";
 import { Field, Reasons, Stat } from "./Widgets";
 import { useToast } from "@/components/shared/Toast";
+import OrderCalcPanel from "./OrderCalcPanel";
 import { EVIDENCE_TYPE_LABEL } from "@/lib/labels";
 
 const URG: Record<string, { label: string; cls: string }> = {
@@ -110,425 +108,7 @@ export function ActionCard({
   );
 }
 
-export function ActionDrawer({
-  action,
-  onClose,
-  onOpenSku,
-  onOpenOrder,
-}: {
-  action: AXAction | null;
-  onClose: () => void;
-  onOpenSku?: (skuId: string) => void;
-  onOpenOrder?: (orderId: string) => void;
-}) {
-  const data = useData();
-  const { productById, skuById, supplierById, customerById } = useLookups();
-  const setActionStage = useStore((s) => s.setActionStage);
-  const role = useStore((s) => s.ui.role);
-  const toast = useToast();
-  const [hold, setHold] = useState<null | "held" | "dismissed">(null);
-  const [reason, setReason] = useState("");
-  const [qty, setQty] = useState<number | null>(null);
-  const [supId, setSupId] = useState<string | null>(null);
-  const a = action ? (data.actions.find((x) => x.id === action.id) ?? action) : null;
-  const options = useMemo(
-    () =>
-      a?.related.skuId
-        ? compareSuppliers(data, a.related.skuId, a.type === "urgent_po" ? "urgent" : "normal")
-        : [],
-    [data, a],
-  );
-  if (!a) return null;
-  const p = a.related.productId ? productById.get(a.related.productId) : undefined;
-  const sku = a.related.skuId ? skuById.get(a.related.skuId) : undefined;
-  const isPo = a.type === "urgent_po" || a.type === "alt_supplier";
-  const chosenSup =
-    supId ??
-    a.proposal?.supplierId ??
-    options.find((o) => o.recommended)?.supplier.id ??
-    a.related.supplierId;
-  const chosenQty = qty ?? a.proposal?.qty ?? 0;
-  const canAct = role === "owner" || role === a.owner;
-  const evidence = data.evidence.filter((e) => e.actionId === a.id);
-  const orders = (a.related.orderIds ?? [])
-    .map((id) => data.orders.find((o) => o.id === id))
-    .filter(Boolean) as Order[];
-  const po = a.related.poId ? data.purchaseOrders.find((x) => x.id === a.related.poId) : undefined;
-
-  const act = (stage: AXAction["stage"]) => {
-    setActionStage(a.id, stage, { qty: chosenQty, supplierId: chosenSup, reason });
-    const msg: Record<string, string> = {
-      reviewing: "검토를 시작했습니다",
-      approved: isPo ? "승인 → 발주 요청이 생성되었습니다" : "승인 → 실행되었습니다",
-      done: "완료 처리되었습니다",
-      held: "보류했습니다",
-      dismissed: "무시 처리했습니다",
-      in_progress: "실행 중으로 전환했습니다",
-    };
-    toast({
-      title: msg[stage] ?? "처리했습니다",
-      body: "관련 데이터와 성과 기록이 갱신되었습니다.",
-      tone: stage === "dismissed" ? "info" : "success",
-    });
-    setHold(null);
-  };
-
-  const nextLabel =
-    a.type === "priority_order"
-      ? "우선처리 시작"
-      : a.type === "delay_notice"
-        ? "고객 안내 발송"
-        : a.type === "repeat_expose"
-          ? "노출 시작"
-          : a.type === "promo_adjust"
-            ? "할인율 조정 적용"
-            : a.type === "stop_po"
-              ? "발주 보류 확정"
-              : "승인 · 발주 요청";
-
-  return (
-    <Overlay
-      open={!!action}
-      onClose={onClose}
-      variant="drawer"
-      size="lg"
-      title={a.title}
-      subtitle={
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className={`badge ${URG[a.urgency].cls}`}>{URG[a.urgency].label}</span>
-          <span className="text-[14px] font-semibold">{actionTypeLabel(a.type)}</span>
-          <StatusBadge status={a.stage} />
-          <span className="basis-full text-[14px]">
-            담당 {a.assignee} · 추천 {relTime(a.recommendedAt)} ·{" "}
-            {new Date(a.dueAt).getTime() < Date.now() && !["done", "dismissed"].includes(a.stage) ? (
-              <b className="text-danger">기한 지남</b>
-            ) : (
-              <>마감 {fmtDate(a.dueAt, "datetime")}</>
-            )}
-          </span>
-        </span>
-      }
-      footer={
-        <div className="flex flex-wrap gap-2">
-          {!canAct && (
-            <div className="w-full text-xs text-muted">
-              이 실행은 {ROLE_LABEL[a.owner]} 권한에서 처리합니다. (현재 {ROLE_LABEL[role]})
-            </div>
-          )}
-          {["recommended", "reviewing", "held"].includes(a.stage) && canAct && (
-            <>
-              {a.stage === "recommended" && (
-                <button className="btn-outline" onClick={() => act("reviewing")}>
-                  검토 시작
-                </button>
-              )}
-              <button className="btn-primary" onClick={() => act("approved")} data-autofocus>
-                <CheckCircle2 size={16} />
-                {nextLabel}
-              </button>
-              <button className="btn-outline" onClick={() => setHold("held")}>
-                <PauseCircle size={16} />
-                보류
-              </button>
-              <button className="btn-ghost text-muted" onClick={() => setHold("dismissed")}>
-                <XCircle size={16} />
-                무시
-              </button>
-            </>
-          )}
-          {["approved", "requested", "in_progress"].includes(a.stage) && canAct && (
-            <>
-              {a.type === "priority_order" && (
-                <button className="btn-primary" onClick={() => act("done")}>
-                  <Truck size={16} />
-                  출고 완료 처리 → 고객 반영
-                </button>
-              )}
-              {isPo && po && po.status !== "received" && <ReceiveButton poId={po.id} />}
-              {!isPo && a.type !== "priority_order" && (
-                <button className="btn-primary" onClick={() => act("done")}>
-                  <CheckCircle2 size={16} />
-                  완료
-                </button>
-              )}
-            </>
-          )}
-          {["done", "dismissed"].includes(a.stage) && (
-            <div className="inline-flex items-center gap-1 text-sm text-muted">
-              <FileCheck2 size={15} />
-              {a.stage === "done"
-                ? "완료된 실행입니다. 결과와 성과 기록이 기록되었습니다."
-                : `무시됨 — ${a.holdReason ?? "사유 미기록"}`}
-            </div>
-          )}
-        </div>
-      }
-    >
-      <div className="space-y-5">
-        <div className="rounded-xl bg-mist p-4 text-[17px] leading-relaxed">{a.summary}</div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="발생 조건">{a.trigger}</Field>
-          <Field label="예상 영향">{a.expectedImpact}</Field>
-        </div>
-        <Reasons items={a.reasons} />
-        {a.caution && (
-          <div className="flex items-start gap-2 rounded-xl border border-orange/40 bg-orange/5 px-3 py-2.5 text-sm">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-orange" />
-            <div>
-              <b>주의</b> · {a.caution}
-            </div>
-          </div>
-        )}
-
-        {/* proposal / supplier selection */}
-        {isPo && sku && ["recommended", "reviewing", "held"].includes(a.stage) && (
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-              대안 · 공급사 선택 (L3 — 사람이 승인)
-            </div>
-            <div className="space-y-2">
-              {options.map((o) => {
-                const on = o.supplier.id === chosenSup;
-                return (
-                  <label
-                    key={o.supplier.id}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${on ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="sup"
-                      checked={on}
-                      onChange={() => setSupId(o.supplier.id)}
-                      className="mt-1 accent-[var(--t-primary)]"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <b>{o.supplier.name}</b>
-                        {o.recommended && <Badge tone="primary">추천</Badge>}
-                        <span className="text-xs text-muted">점수 {o.score}</span>
-                      </div>
-                      <div className="mt-0.5 text-sm text-muted">
-                        {o.tradeoffs.join(" · ")} · 정시 {Math.round(o.supplier.onTimeRate * 100)}% · 충족{" "}
-                        {Math.round(o.supplier.fillRate * 100)}% · 예상입고 {o.expectedArrival}
-                      </div>
-                    </div>
-                    <div className="text-right text-sm">
-                      <div className="font-bold tabular-nums">{won(o.sp.unitCost)}</div>
-                      <div className="text-xs text-muted">개당</div>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="text-sm">
-                발주수량{" "}
-                <input
-                  type="number"
-                  className="input ml-1 inline-block !min-h-[40px] w-28"
-                  value={chosenQty}
-                  min={1}
-                  inputMode="numeric"
-                  max={99999}
-                  onChange={(e) => {
-                    const n = Math.floor(Number(e.target.value));
-                    /* 빈칸·문자·음수는 1로, 비정상적으로 큰 수는 상한 */ setQty(
-                      Number.isFinite(n) ? Math.min(99999, Math.max(1, n)) : 1,
-                    );
-                  }}
-                />
-              </label>
-              <span className="text-sm text-muted">
-                예상 발주금액{" "}
-                <b className="tabular-nums text-ink">
-                  {won(
-                    chosenQty * (options.find((o) => o.supplier.id === chosenSup)?.sp.unitCost ?? sku.cost),
-                  )}
-                </b>
-              </span>
-              {a.proposal?.note && <span className="text-xs text-muted">· {a.proposal.note}</span>}
-            </div>
-          </div>
-        )}
-        {po && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 text-sm">
-            <div>
-              <b>발주 {po.id}</b> · {supplierById.get(po.supplierId)?.name} · {po.qty}개 · 입고예정{" "}
-              {po.expectedAt}
-            </div>
-            <StatusBadge status={po.status} />
-          </div>
-        )}
-
-        {orders.length > 0 && (
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-              관련 주문 {orders.length}건
-            </div>
-            <div className="table-wrap max-h-64 overflow-y-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>주문</th>
-                    <th>고객</th>
-                    <th>단계</th>
-                    <th>배송약속</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.id} className="row-clickable" onClick={() => onOpenOrder?.(o.id)}>
-                      <td className="font-semibold">{o.id}</td>
-                      <td>{customerById.get(o.customerId)?.name}</td>
-                      <td>
-                        <StatusBadge status={o.stage} />
-                      </td>
-                      <td className="text-muted">
-                        {fmtDate(o.promisedAt, "datetime")}
-                        {o.customerNotified && <Bell size={12} className="ml-1 inline text-orange" />}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        {a.related.customerIds?.length ? (
-          <div className="text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">대상 고객 (일부)</span>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {a.related.customerIds.map((id) => (
-                <span key={id} className="chip !min-h-[30px] text-xs">
-                  {customerById.get(id)?.name}
-                </span>
-              ))}
-              <span className="chip !min-h-[30px] text-xs text-muted">외 다수</span>
-            </div>
-          </div>
-        ) : null}
-
-        {p && sku && (
-          <button
-            onClick={() => onOpenSku?.(sku.id)}
-            className="flex w-full items-center justify-between rounded-xl border border-line px-3 py-2.5 text-left hover:bg-mist"
-          >
-            <div className="text-sm">
-              <b>{p.name}</b> · {sku.name}
-              <div className="text-xs text-muted">SKU 상세 · 수요신호 · 재고 · 공급사 이력 보기</div>
-            </div>
-            <ChevronRight size={16} className="text-muted" />
-          </button>
-        )}
-
-        {a.result && (
-          <div className="rounded-xl border border-teal/30 bg-teal/10 p-3 text-sm">
-            <b>결과</b> · {a.result}
-          </div>
-        )}
-        {a.holdReason && a.stage === "held" && (
-          <div className="rounded-xl bg-mist p-3 text-sm">
-            <b>보류 사유</b> · {a.holdReason}
-          </div>
-        )}
-
-        <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            성과 기록 {evidence.length}건
-          </div>
-          {evidence.length ? (
-            <ul className="space-y-2">
-              {evidence.map((e) => (
-                <li key={e.id} className="flex gap-2 text-sm">
-                  <Badge
-                    tone={
-                      e.type === "RESULT"
-                        ? "success"
-                        : e.type === "RISK" || e.type === "EXCEPTION"
-                          ? "danger"
-                          : "primary"
-                    }
-                  >
-                    {EVIDENCE_TYPE_LABEL[e.type] ?? e.type}
-                  </Badge>
-                  <div>
-                    <div className="font-semibold">{e.title}</div>
-                    <div className="text-muted">{e.detail}</div>
-                    <div className="text-xs text-muted">
-                      {e.actor} · {fmtDate(e.createdAt, "datetime")} · {e.mode}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="text-sm text-muted">아직 성과 기록이 없습니다. 검토·승인 시 자동 기록됩니다.</div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-muted">
-          <AiReady
-            compact
-            title="실행 추천 근거"
-            now="규칙 + 통계 기반 계산 (예상 소진일, 리드타임, 추세)"
-            method="규칙 + 통계 + 최적화 · L3 (사람 승인)"
-            next="LLM이 근거를 자연어로 요약하고 담당자 질문에 답변"
-          />
-          추천은 규칙·통계 계산이며, 사람이 승인해야 실행됩니다.
-        </div>
-      </div>
-
-      <Overlay
-        open={!!hold}
-        onClose={() => setHold(null)}
-        title={hold === "held" ? "보류 사유" : "무시 사유"}
-        size="sm"
-        footer={
-          <div className="flex gap-2">
-            <button className="btn-outline flex-1" onClick={() => setHold(null)}>
-              취소
-            </button>
-            <button className="btn-primary flex-1" onClick={() => act(hold!)}>
-              {hold === "held" ? "보류" : "무시"}
-            </button>
-          </div>
-        }
-      >
-        <textarea
-          className="input min-h-[100px] py-2"
-          placeholder="선택 사항 — 예: 11월 1일 재평가, 시즌 프로모션 예정"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-        <p className="mt-2 text-xs text-muted">
-          사유는 성과 기록에 기록되어 나중에 ‘왜 안 했는지’를 남깁니다.
-        </p>
-      </Overlay>
-    </Overlay>
-  );
-}
-
-function ReceiveButton({ poId }: { poId: string }) {
-  const receive = useStore((s) => s.receiveInbound);
-  const toast = useToast();
-  return (
-    <button
-      className="btn-primary"
-      onClick={() => {
-        receive(poId);
-        toast({
-          title: "입고 처리했습니다",
-          body: "가용재고가 늘고 고객 상품 상세의 재고·배송예정이 갱신됩니다.",
-          tone: "success",
-        });
-      }}
-    >
-      <Package size={16} />
-      입고 완료 처리 (시연)
-    </button>
-  );
-}
+export { ActionDrawer } from "./ActionDrawer";
 
 // ---------- SKU Drawer ----------
 export function SkuDrawer({
@@ -542,6 +122,8 @@ export function SkuDrawer({
 }) {
   const data = useData();
   const insights = useInsights();
+  const ledger = useLedger();
+  const now = useMinute();
   const { supplierById, warehouseById, categoryBySlug } = useLookups();
   const role = useStore((s) => s.ui.role);
   const createActionFromSku = useStore((s) => s.createActionFromSku);
@@ -559,9 +141,10 @@ export function SkuDrawer({
               : ins && ["slow", "overstock"].includes(ins.status)
                 ? "overstock"
                 : "normal",
+            { now, ledger },
           )
         : [],
-    [data, skuId, ins],
+    [data, skuId, ins, now, ledger],
   );
   if (!ins) return null;
   const p = ins.product;
@@ -669,34 +252,7 @@ export function SkuDrawer({
               </div>
             </div>
             <Reasons items={ins.reasons} title="판단 근거 (수요신호)" />
-            <div className="grid gap-2 text-sm sm:grid-cols-3">
-              <Stat
-                label={
-                  <Term term="안전재고" desc={TERMS.safetyStock}>
-                    안전재고
-                  </Term>
-                }
-                value={num(ins.safetyStock)}
-                sub={ins.shortage > 0 ? `부족 ${ins.shortage}` : "충족"}
-              />
-              <Stat
-                label="발주 우선순위"
-                value={`${ins.priority}/100`}
-                sub={
-                  <Meter
-                    value={ins.priority}
-                    max={100}
-                    color={ins.priority > 70 ? "#D93A3A" : "var(--t-primary)"}
-                    className="mt-1"
-                  />
-                }
-              />
-              <Stat
-                label="추천 검토수량"
-                value={ins.recommendedQty ? `${num(ins.recommendedQty)}개` : "-"}
-                sub={ins.recommendedQty ? `최소주문 ${ins.sku.moq}` : "발주 불필요"}
-              />
-            </div>
+            <OrderCalcPanel ins={ins} />
             {showCost && (
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <Stat label="판매가" value={won(ins.sku.salePrice)} />
@@ -935,7 +491,7 @@ const FLOW: OrderStage[] = [
 
 export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const data = useData();
-  const risks = useOrderRisks();
+  const forecast = useForecast();
   const { customerById, warehouseById, productById } = useLookups();
   const advance = useStore((s) => s.advanceOrder);
   const notify = useStore((s) => s.notifyCustomer);
@@ -944,7 +500,8 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
   const o = orderId ? data.orders.find((x) => x.id === orderId) : undefined;
   if (!o) return null;
   const c = customerById.get(o.customerId);
-  const risk = risks.find((r) => r.order.id === o.id);
+  const pred = forecast.orders.find((p) => p.order.id === o.id);
+  const risk = pred && isAtRisk(pred.status) ? pred : undefined;
   const idx = FLOW.indexOf(o.stage);
   const next = idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : null;
   const canOps = role === "owner" || role === "ops";
@@ -961,9 +518,7 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
         <span className="inline-flex flex-wrap items-center gap-2">
           <StatusBadge status={o.stage} />
           {risk && (
-            <Badge tone={risk.level === "high" ? "danger" : risk.level === "mid" ? "warn" : "neutral"}>
-              지연위험 {risk.score}
-            </Badge>
+            <Badge tone={risk.status === "tight" ? "warn" : "danger"}>{SHIP_STATUS_LABEL[risk.status]}</Badge>
           )}
           <span>
             {fmtDate(o.createdAt, "datetime")} · {warehouseById.get(o.warehouseId)?.name}
@@ -1023,19 +578,26 @@ export function OrderDrawer({ orderId, onClose }: { orderId: string | null; onCl
       }
     >
       <div className="space-y-4">
-        {risk && risk.level !== "low" && (
+        {pred && (
           <div
-            className={`rounded-xl p-3 text-sm ${risk.level === "high" ? "border border-danger/30 bg-danger/10" : "border border-orange/30 bg-orange/10"}`}
+            className={`rounded-xl p-3 text-sm ${risk ? (risk.status === "tight" ? "border border-orange/30 bg-orange/10" : "border border-danger/30 bg-danger/10") : "border border-line bg-mist"}`}
           >
             <div className="flex items-center gap-1 font-bold">
-              <AlertTriangle size={15} />
-              지연위험 {risk.level === "high" ? "높음" : "보통"} ({risk.score}점)
+              {risk && <AlertTriangle size={15} />}
+              출고 예측 · {SHIP_STATUS_LABEL[pred.status]}
             </div>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5">
-              {risk.causes.map((x, i) => (
-                <li key={i}>{x}</li>
-              ))}
-            </ul>
+            <p className="mt-1">
+              {pred.status === "blocked"
+                ? "재고가 모자라 피킹을 시작할 수 없습니다."
+                : `${pred.warehouseId.replace("wh-", "").toUpperCase()}구역 대기 ${pred.queuePos}번째 · 포장 완료 예상 ${fmtDate(pred.readyAt.toISOString(), "time")} · 마감 ${fmtDate(pred.cutoffAt.toISOString(), "time")} (${pred.slackMin >= 0 ? `여유 ${Math.round(pred.slackMin)}분` : `${Math.round(-pred.slackMin)}분 초과`})`}
+            </p>
+            {pred.reasons.length > 0 && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {pred.reasons.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
         <div className="grid grid-cols-2 gap-2">

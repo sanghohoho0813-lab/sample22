@@ -1,4 +1,5 @@
 // NEXMART shared domain types — Customer Platform and Business AX share ONE store.
+import type { Channel } from "./costs";
 
 export type Provenance = "demo" | "live";
 
@@ -39,6 +40,8 @@ export interface Product extends BaseRecord {
   avgRepeatCycleDays?: number;
   imageKey?: string; // future asset mapping (NEXMART-PHOTO-xx)
   status: "active" | "paused";
+  /** 중량·부피 상품 — 택배 할증·작업시간 증가 */
+  bulky?: boolean;
 }
 
 export interface SKU extends BaseRecord {
@@ -77,7 +80,12 @@ export interface SupplierProduct {
 export interface Warehouse {
   id: string;
   name: string; // 물류구역 A~E
-  congestion: number; // 0-1 피킹 적체
+  /** 생성 시점의 작업 부하(필요 작업 ÷ 가능 작업). 화면은 출고 시뮬레이션으로 다시 계산한다 */
+  congestion: number;
+  /** 피킹·포장 작업 인원 */
+  staff: number;
+  /** 정원 (결원 확인용) */
+  staffPlanned: number;
 }
 
 export interface Inventory {
@@ -109,6 +117,7 @@ export interface PurchaseOrder extends BaseRecord {
   receivedAt?: string;
   actionId?: string;
   actor: string;
+  note?: string;
 }
 
 export interface Customer extends BaseRecord {
@@ -131,18 +140,26 @@ export interface DemandSignal {
   cartPrev7d: number;
   order7d: number;
   orderPrev7d: number;
-  /** last 14 days daily unit sales */
+  /** 최근 14일(완료된 날) 일별 판매수량 — [0]=14일 전 … [13]=어제 */
   dailySales: number[];
+  /** 오늘 접수된 수량 (진행 중인 하루) */
+  today: number;
+  /** 고객 재입고 알림 신청 수 */
+  restockRequests?: number;
 }
 
 export interface DailySalesPoint {
   date: string; // YYYY-MM-DD
   orders: number;
+  /** 순매출 (할인 후 상품 매출) */
   revenue: number;
+  /** 매출총이익 = 순매출 − 상품원가 − 순배송비 */
   grossMargin: number;
   discount: number;
+  /** 순배송비 = 회사가 낸 운임 − 고객 부담 배송비 */
   shippingCost: number;
   returns: number;
+  cogs?: number;
 }
 
 export interface CategorySales {
@@ -199,6 +216,9 @@ export interface Order extends BaseRecord {
   promotionId?: string;
   riskFlag?: boolean;
   customerNotified?: boolean;
+  channel?: Channel;
+  /** 우선처리 지정 — 출고 대기열 맨 앞 */
+  priority?: boolean;
 }
 
 export interface ReturnRequest extends BaseRecord {
@@ -236,10 +256,44 @@ export type ActionType =
   | "priority_order"
   | "delay_notice"
   | "repeat_expose"
-  | "promo_adjust";
+  | "promo_adjust"
+  | "staff_rebalance"
+  | "quality_issue";
 
+/**
+ * 실행 라이프사이클: 추천됨 → 담당자 확인 → 승인 → 실행중 → 완료 → 성과 측정
+ * (held·dismissed는 옆길, requested는 발주 요청 후 입고 대기 = 실행중의 한 형태)
+ */
 export type ActionStage =
-  "recommended" | "reviewing" | "approved" | "requested" | "in_progress" | "done" | "dismissed" | "held";
+  | "recommended"
+  | "reviewing"
+  | "approved"
+  | "requested"
+  | "in_progress"
+  | "done"
+  | "measured"
+  | "dismissed"
+  | "held";
+
+export interface ActivityEntry {
+  at: string;
+  actor: string;
+  /** 단계 변경이면 from → to */
+  from?: ActionStage;
+  to?: ActionStage;
+  note: string;
+}
+
+/** 실행 전·후를 같은 지표로 잰 결과 */
+export interface Measurement {
+  metric: string;
+  before: string;
+  after: string;
+  /** 개선 / 변화 없음 / 악화 / 아직 판단 불가 */
+  verdict: "improved" | "unchanged" | "worse" | "pending";
+  note: string;
+  measuredAt: string;
+}
 
 export type Urgency = "critical" | "high" | "mid" | "low";
 
@@ -276,6 +330,18 @@ export interface AXAction extends BaseRecord {
   holdReason?: string;
   evidenceIds: string[];
   scenario?: "A" | "B" | "C" | "D" | "E";
+  /** 영향 규모 — 계산식과 함께 (추정치는 추정이라고 표시) */
+  impact?: { label: string; value: number; unit: "원" | "건" | "개" | "명"; basis: string };
+  /** 실행 전 기준값 (성과 측정의 비교 대상) */
+  baseline?: { metric: string; value: number; display: string; at: string };
+  measurement?: Measurement;
+  activity?: ActivityEntry[];
+  /** 인력 재배치 · 품질 이슈 등 유형별 세부 */
+  detail?: {
+    staffMove?: { from: string; to: string; n: number };
+    route?: "supplier" | "content" | "warehouse";
+    returnSignal?: string;
+  };
 }
 
 export type EvidenceType =
@@ -320,8 +386,23 @@ export interface CartItem {
   selected: boolean;
 }
 
+/** 운영 상태 스냅샷 — 시연 시작 시점과 지금을 같은 기준으로 비교 */
+export interface OpsSnapshot {
+  at: string;
+  stockoutRiskSkus: number;
+  stockoutRiskSkuIds: string[];
+  lateOrders: number;
+  lateOrderIds: string[];
+  slowStockValue: number;
+  openActions: number;
+  repeatDueCustomers: number;
+  returnSignals: number;
+}
+
 export interface DemoData {
   generatedAt: string;
+  /** 시연 시작 시점의 운영 상태 (성과 비교 기준) */
+  baseline?: OpsSnapshot;
   categories: Category[];
   brands: Brand[];
   products: Product[];

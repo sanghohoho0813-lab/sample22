@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DemoData } from "@/lib/types";
 import { generateDemoData } from "@/lib/seed";
 import { useStore } from "@/lib/store";
 import { NOW } from "./fixtures";
@@ -15,12 +16,18 @@ const inStockSkus = () =>
     .data.skus.filter((k) => availableOf(k.id) > 10)
     .map((k) => k.id);
 
-beforeEach(() => {
+// 시드는 한 번만 만들고 테스트마다 같은 불변 객체로 되돌린다 (스토어 액션은 원본을 바꾸지 않는다)
+let base: DemoData;
+beforeAll(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
+  base = generateDemoData(NOW);
+});
+beforeEach(() => {
+  vi.setSystemTime(NOW);
   localStorage.clear();
-  useStore.setState({ data: generateDemoData(NOW) });
-  st().resetDemo();
+  useStore.setState({ data: base });
+  useStore.setState((s) => ({ ui: { ...s.ui, cart: [], theme: "deep-teal", fontScale: "normal" } }));
 });
 
 describe("장바구니", () => {
@@ -124,9 +131,9 @@ describe("cancelOrder", () => {
     expect(availableOf(a)).toBe(before);
   });
   it("이미 출고된 주문은 취소되지 않는다", () => {
-    const shipped = st().data.orders.find((o) => o.stage === "shipped")!;
+    const shipped = st().data.orders.find((o) => ["shipped", "in_transit", "delivered"].includes(o.stage))!;
     st().cancelOrder(shipped.id);
-    expect(st().data.orders.find((o) => o.id === shipped.id)!.stage).toBe("shipped");
+    expect(st().data.orders.find((o) => o.id === shipped.id)!.stage).toBe(shipped.stage);
   });
 });
 

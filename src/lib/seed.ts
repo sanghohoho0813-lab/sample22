@@ -1,5 +1,4 @@
 import type {
-  AXAction,
   Brand,
   Category,
   CategorySales,
@@ -8,7 +7,6 @@ import type {
   DailySalesPoint,
   DemandSignal,
   DemoData,
-  EvidenceLog,
   Inventory,
   Order,
   OrderItem,
@@ -23,16 +21,26 @@ import type {
   Warehouse,
 } from "./types";
 import { dateKey } from "./format";
-
-// ---------- deterministic RNG ----------
-function mulberry32(seed: number) {
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { mulberry32, makeSampler } from "./rng";
+import { DEFAULT_COST_MODEL, isBulky, orderEconomics, type Channel } from "./costs";
+import {
+  generateCustomerBase,
+  generateLedger,
+  HOUR_WEIGHTS,
+  type Ledger,
+  type LedgerCustomer,
+} from "./ledger";
+import { rememberLedger } from "./ledgerCache";
+import {
+  cutoffForCreated,
+  cutoffOnOrAfter,
+  finishAfterWork,
+  forecastShipments,
+  toShift,
+  workMinutes,
+} from "./fulfillment";
+import { buildSeedActions } from "./seedActions";
+import { opsSnapshot } from "./lifecycle";
 
 const SEED = 20260908;
 let rnd = mulberry32(SEED);
@@ -913,12 +921,13 @@ const SUPPLIER_SEEDS: Omit<Supplier, "id" | "createdAt" | "updatedAt" | "source"
   },
 ];
 
+// 작업 인원: C구역은 정원 2명 중 1명 결원 (시나리오 D — 데이터에서 병목이 드러나야 한다)
 const WAREHOUSES: Warehouse[] = [
-  { id: "wh-A", name: "A구역 (생활·위생)", congestion: 0.35 },
-  { id: "wh-B", name: "B구역 (식품·냉장)", congestion: 0.42 },
-  { id: "wh-C", name: "C구역 (주방·리빙)", congestion: 0.82 },
-  { id: "wh-D", name: "D구역 (반려·유아)", congestion: 0.3 },
-  { id: "wh-E", name: "E구역 (디지털·건강)", congestion: 0.25 },
+  { id: "wh-A", name: "A구역 (생활·위생)", congestion: 0, staff: 3, staffPlanned: 3 },
+  { id: "wh-B", name: "B구역 (식품·냉장)", congestion: 0, staff: 3, staffPlanned: 3 },
+  { id: "wh-C", name: "C구역 (주방·리빙)", congestion: 0, staff: 1, staffPlanned: 2 },
+  { id: "wh-D", name: "D구역 (반려·유아)", congestion: 0, staff: 2, staffPlanned: 2 },
+  { id: "wh-E", name: "E구역 (디지털·건강)", congestion: 0, staff: 2, staffPlanned: 2 },
 ];
 
 const CAT_WH: Record<CategorySlug, string> = {
@@ -973,7 +982,7 @@ const DISTRICTS = [
 ];
 
 // ---------- generator ----------
-export function generateDemoData(now = new Date()): DemoData {
+export function generateDemoData(now = new Date(), opts: { ledgerOnly?: boolean } = {}): DemoData {
   // 호출마다 같은 시드로 다시 시작 — "시연 초기화"를 눌러도 처음과 같은 데이터가 나온다
   rnd = mulberry32(SEED);
   const nowIso = iso(now);
@@ -1011,6 +1020,7 @@ export function generateDemoData(now = new Date()): DemoData {
       isRepeatable: !!p.repeat,
       avgRepeatCycleDays: p.repeat,
       status: "active",
+      bulky: isBulky(p),
     });
 
     const bundles = p.bundles ?? [1];
@@ -1090,6 +1100,7 @@ export function generateDemoData(now = new Date()): DemoData {
           order7d,
           orderPrev7d,
           dailySales: daily,
+          today: 0,
         });
       }
     }
@@ -1216,112 +1227,96 @@ export function generateDemoData(now = new Date()): DemoData {
     joinedAt: iso(addDays(now, -ri(60, 700))),
   }));
 
-  // ---------- daily sales 90d ----------
-  const dailySales: DailySalesPoint[] = [];
-  const totalVelocity = Array.from(velocityBySku.values()).reduce((a, c) => a + c, 0); // units/day
-  const avgPrice = 11800;
-  for (let d = 89; d >= 0; d--) {
-    const date = addDays(now, -d);
-    const dow = date.getDay();
-    const weekend = dow === 0 || dow === 6 ? 1.18 : 1;
-    const trend = 1 + (89 - d) * 0.0025; // slight growth
-    const units = totalVelocity * weekend * trend * rf(0.85, 1.15);
-    const orders = Math.round(units / 2.6);
-    const revenue = Math.round(units * avgPrice * rf(0.95, 1.05));
-    const discount = Math.round(revenue * rf(0.04, 0.09));
-    const shippingCost = Math.round(orders * 2400 * rf(0.6, 0.85));
-    const cogs = Math.round(revenue * rf(0.62, 0.67));
-    dailySales.push({
-      date: dayStr(date),
-      orders,
-      revenue,
-      discount,
-      shippingCost,
-      grossMargin: revenue - cogs - discount - shippingCost,
-      returns: Math.round(orders * rf(0.03, 0.06)),
-    });
-  }
+  // ---------- 공용 조회 ----------
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const bulkyOf = (pid: string) => !!productById.get(pid)?.bulky;
+  const whOf = (pid: string) => CAT_WH[productById.get(pid)!.categorySlug];
+  const customerBase = generateCustomerBase(customers, now);
 
-  const categorySales: CategorySales[] = CATEGORIES.map((c) => {
-    const catSkus = skus.filter((s) => products.find((p) => p.id === s.productId)!.categorySlug === c.slug);
-    const units30 = catSkus.reduce((a, s) => a + (velocityBySku.get(s.id) ?? 0) * 30, 0);
-    const avg = catSkus.reduce((a, s) => a + s.salePrice, 0) / Math.max(1, catSkus.length);
-    const revenue = Math.round(units30 * avg);
-    const costAvg = catSkus.reduce((a, s) => a + s.cost, 0) / Math.max(1, catSkus.length);
-    return {
-      categorySlug: c.slug,
-      revenue,
-      orders: Math.round(units30 / 2.4),
-      margin: Math.round(units30 * (avg - costAvg) * 0.82),
-    };
-  });
+  // 시나리오가 정한 "가용재고" — 예약재고를 실제 미출고 주문으로 다시 계산한 뒤 보유재고를 맞춘다
+  const intendedAvailable = new Map(inventory.map((i) => [i.skuId, Math.max(0, i.onHand - i.reserved)]));
+  const forcedEmpty = new Set([skuMask.id]); // 품절 — 내일 입고 (시나리오)
 
-  // ---------- orders (recent detailed) ----------
-  const orders: Order[] = [];
-  const stages: OrderStage[] = [
-    "new",
-    "confirmed",
-    "picking_wait",
-    "picking",
-    "packing_wait",
-    "ship_wait",
-    "shipped",
-    "in_transit",
-    "delivered",
+  // ---------- promotions (기간·대상) ----------
+  const promoDefs: {
+    id: string;
+    name: string;
+    skuIds: string[];
+    segment: string;
+    rate: number;
+    start: number;
+    end: number;
+  }[] = [
+    {
+      id: "promo-01",
+      name: "가을맞이 생활필수품 기획전",
+      skuIds: [
+        findSku("프리미엄 물티슈 100매", 10).id,
+        findSku("액상 세탁세제 3L", 1).id,
+        findSku("3겹 롤화장지 30롤", 1).id,
+      ],
+      segment: "전체",
+      rate: 0.1,
+      start: -12,
+      end: 2,
+    },
+    {
+      id: "promo-02",
+      name: "반려 가족 재구매 감사전",
+      skuIds: [skuPad.id, findSku("고양이 모래 벤토나이트 10kg", 1).id],
+      segment: "반복상품 구매주기 도래",
+      rate: 0.12,
+      start: -7,
+      end: 7,
+    },
+    {
+      id: "promo-03",
+      name: "미니가전 재고 정리",
+      skuIds: [skuC.id, skuHeat.id],
+      segment: "카테고리 충성고객",
+      rate: 0.25,
+      start: -20,
+      end: -3,
+    },
+    {
+      id: "promo-05",
+      name: "생수·즉석밥 복귀 쿠폰",
+      skuIds: [skuWater.id, findSku("즉석 흰밥 210g 12개", 1).id],
+      segment: "장바구니 이탈",
+      rate: 0.05,
+      start: -14,
+      end: 0,
+    },
+    {
+      id: "promo-06",
+      name: "유아용품 정기 특가",
+      skuIds: [skuDiaper.id, findSku("아기 물티슈 프리미엄 70매", 10).id],
+      segment: "카테고리 충성고객",
+      rate: 0.1,
+      start: -40,
+      end: -25,
+    },
+    {
+      id: "promo-07",
+      name: "주방 새단장 위크",
+      skuIds: [findSku("실리콘 밀폐용기 6종", 1).id, findSku("세라믹 프라이팬 28cm", 1).id],
+      segment: "전체",
+      rate: 0.15,
+      start: 3,
+      end: 10,
+    },
   ];
-  const cutoffToday = new Date(now);
-  cutoffToday.setHours(15, 0, 0, 0);
+  const promoRateToday = (skuId: string) => {
+    const pr = promoDefs.find((x) => x.skuIds.includes(skuId) && x.start <= 0 && x.end >= 0);
+    return pr ? { id: pr.id, rate: pr.rate } : null;
+  };
+
+  // ---------- orders: 시나리오 고객(김서연) 이력 ----------
+  const orders: Order[] = [];
   const staff = ["박운영", "이물류", "최피킹", "정포장"];
   let orderSeq = 1;
-  const mkOrder = (opts: {
-    customer: Customer;
-    items: OrderItem[];
-    stage: OrderStage;
-    createdAt: Date;
-    warehouseId?: string;
-    promiseDays?: number;
-    risk?: boolean;
-    repeat?: boolean;
-    promotionId?: string;
-  }) => {
-    const subtotal = opts.items.reduce((a, it) => a + it.unitPrice * it.qty, 0);
-    const discount = opts.promotionId ? Math.round(subtotal * 0.1) : 0;
-    const shippingFee = subtotal - discount >= 30000 ? 0 : 3000;
-    const id = `NX${dayStr(opts.createdAt).replace(/-/g, "").slice(2)}-${String(orderSeq++).padStart(4, "0")}`;
-    const stageIdx = stages.indexOf(opts.stage);
-    const history = stages.slice(0, Math.max(1, stageIdx + 1)).map((s, i) => ({
-      at: iso(addHours(opts.createdAt, i * rf(1, 6))),
-      stage: s,
-      actor: i === 0 ? "고객" : pick(staff),
-    }));
-    const wh =
-      opts.warehouseId ?? CAT_WH[products.find((p) => p.id === opts.items[0].productId)!.categorySlug];
-    const o: Order = {
-      ...base,
-      id,
-      createdAt: iso(opts.createdAt),
-      updatedAt: history[history.length - 1].at,
-      customerId: opts.customer.id,
-      items: opts.items,
-      subtotal,
-      discount,
-      shippingFee,
-      total: subtotal - discount + shippingFee,
-      stage: opts.stage,
-      warehouseId: wh,
-      promisedAt: iso(addDays(opts.createdAt, opts.promiseDays ?? 2)),
-      cutoffAt: iso(cutoffToday),
-      assignee: stageIdx >= 2 ? pick(staff) : undefined,
-      history,
-      isRepeatOrder: opts.repeat,
-      promotionId: opts.promotionId,
-      riskFlag: opts.risk,
-    };
-    orders.push(o);
-    return o;
-  };
   const itemOf = (sku: SKU, qty = 1): OrderItem => {
-    const p = products.find((x) => x.id === sku.productId)!;
+    const p = productById.get(sku.productId)!;
     return {
       skuId: sku.id,
       productId: p.id,
@@ -1332,892 +1327,518 @@ export function generateDemoData(now = new Date()): DemoData {
       unitCost: sku.cost,
     };
   };
-  const fastSkus = skus.filter((s) => products.find((p) => p.id === s.productId)!.deliveryType === "fast");
-
-  // Current customer (c-001 김서연) purchase history for Repeat Basket (Scenario E)
+  const pricing = (items: OrderItem[], business: boolean) => {
+    const subtotal = items.reduce((a, it) => a + it.unitPrice * it.qty, 0);
+    let discount = 0;
+    let promotionId: string | undefined;
+    items.forEach((it) => {
+      const pr = promoRateToday(it.skuId);
+      if (pr) {
+        discount += Math.round(it.unitPrice * it.qty * pr.rate);
+        promotionId ??= pr.id;
+      }
+    });
+    if (business) discount += Math.round(subtotal * 0.06);
+    const shippingFee =
+      business || subtotal - discount >= DEFAULT_COST_MODEL.freeShippingThreshold ? 0 : 3000;
+    return { subtotal, discount, shippingFee, total: subtotal - discount + shippingFee, promotionId };
+  };
+  const promiseFor = (items: OrderItem[], cutoff: Date) => {
+    const allFast = items.every((it) => productById.get(it.productId)!.deliveryType === "fast");
+    const t = addDays(cutoff, allFast ? 1 : 3);
+    t.setHours(21, 0, 0, 0);
+    return t;
+  };
   const me = customers[0];
+  const history = (o: { createdAt: Date; stage: OrderStage }) => {
+    const seq: OrderStage[] = [
+      "new",
+      "confirmed",
+      "picking",
+      "ship_wait",
+      "shipped",
+      "in_transit",
+      "delivered",
+    ];
+    const upto = seq.indexOf(o.stage);
+    return seq.slice(0, upto + 1).map((st, i) => ({
+      at: iso(addHours(o.createdAt, [0, 0.2, 14, 17, 18, 24, 40][i])),
+      stage: st,
+      actor: i === 0 ? "고객" : pick(staff),
+    }));
+  };
+  const scripted = (items: OrderItem[], daysAgo: number, stage: OrderStage) => {
+    const createdAt = addHours(addDays(now, -daysAgo), -3);
+    const price = pricing(items, false);
+    const cutoff = cutoffForCreated(createdAt);
+    const h = history({ createdAt, stage });
+    orders.push({
+      ...base,
+      id: `NX${dayStr(createdAt).replace(/-/g, "").slice(2)}-${String(orderSeq++).padStart(4, "0")}`,
+      createdAt: iso(createdAt),
+      updatedAt: h[h.length - 1].at,
+      customerId: me.id,
+      items,
+      ...price,
+      promotionId: undefined,
+      discount: 0,
+      total: price.subtotal + price.shippingFee,
+      stage,
+      warehouseId: whOf(items[0].productId),
+      promisedAt: iso(promiseFor(items, cutoff)),
+      cutoffAt: iso(cutoff),
+      history: h,
+      channel: "app",
+      isRepeatOrder: daysAgo < 40,
+    });
+  };
   const skuWipe10 = findSku("프리미엄 물티슈 100매", 10);
   const skuDet = findSku("액상 세탁세제 3L", 1);
   const skuPad1 = findSku("반려동물 배변패드 50매", 1);
   const skuKit2 = findSku("주방세제 리필 2L", 2);
-  const skuWater1 = skuWater;
   const skuYog = findSku("그릭요거트 100g 6개", 1);
-  mkOrder({
-    customer: me,
-    items: [itemOf(skuWipe10, 1), itemOf(skuPad1, 2)],
-    stage: "delivered",
-    createdAt: addDays(now, -23),
-  });
-  mkOrder({
-    customer: me,
-    items: [itemOf(skuDet, 1), itemOf(skuKit2, 1)],
-    stage: "delivered",
-    createdAt: addDays(now, -36),
-  });
-  mkOrder({
-    customer: me,
-    items: [itemOf(skuWater1, 2), itemOf(skuYog, 1)],
-    stage: "delivered",
-    createdAt: addDays(now, -15),
-  });
-  mkOrder({
-    customer: me,
-    items: [itemOf(skuWipe10, 1), itemOf(skuWater1, 1)],
-    stage: "delivered",
-    createdAt: addDays(now, -44),
-  });
-  mkOrder({ customer: me, items: [itemOf(skuPad1, 2)], stage: "delivered", createdAt: addDays(now, -41) });
-  mkOrder({ customer: me, items: [itemOf(skuDet, 1)], stage: "delivered", createdAt: addDays(now, -71) });
-  mkOrder({
-    customer: me,
-    items: [itemOf(findSku("드립 커피 40개입", 1), 1)],
-    stage: "in_transit",
-    createdAt: addDays(now, -2),
-    promiseDays: 3,
-  });
+  scripted([itemOf(skuDet, 1)], 71, "delivered");
+  scripted([itemOf(skuWipe10, 1), itemOf(skuWater, 1)], 44, "delivered");
+  scripted([itemOf(skuPad1, 2)], 41, "delivered");
+  scripted([itemOf(skuDet, 1), itemOf(skuKit2, 1)], 36, "delivered");
+  scripted([itemOf(skuWipe10, 1), itemOf(skuPad1, 2)], 23, "delivered");
+  scripted([itemOf(skuWater, 2), itemOf(skuYog, 1)], 15, "delivered");
+  scripted([itemOf(findSku("드립 커피 40개입", 1), 1)], 2, "in_transit");
 
-  // Scenario D — 12 at-risk orders in congested C구역 with promise today
-  for (let i = 0; i < 12; i++) {
-    const cust = customers[(i % 20) + 2];
-    const kitchenSkus = skus.filter((s) =>
-      ["kitchen", "home"].includes(products.find((p) => p.id === s.productId)!.categorySlug),
+  // ---------- orders: 오늘 출고 파이프라인 ----------
+  // 다음 출고마감 기준 28시간 전부터 지금까지 들어온 주문을, 구역별 인원·작업시간으로 처리해 본 상태로 만든다.
+  const nextCut = cutoffOnOrAfter(now);
+  const windowStart = new Date(nextCut.getTime() - 28 * 3600000);
+  const ORDERS_PER_DAY = 270;
+  const meanHourW = HOUR_WEIGHTS.reduce((a, c) => a + c, 0) / 24;
+  const skuVel = skus.map((s) => velocityBySku.get(s.id) ?? 0);
+  const consumerPool = customerBase.filter((c) => !c.scripted && c.kind === "consumer");
+  const businessPool = customerBase.filter((c) => c.kind === "business");
+  const sampleConsumer = makeSampler(
+    consumerPool.map((c) => (c.archetype === "loyal" ? 2 : c.archetype === "regular" ? 1.4 : 1)),
+  );
+  const pickSkuIdx = (exclude: Set<number>, cats?: string[]) => {
+    const w = skuVel.map((v, i) =>
+      exclude.has(i) || (cats && !cats.includes(productById.get(skus[i].productId)!.categorySlug)) ? 0 : v,
     );
-    const items = [itemOf(pick(kitchenSkus), ri(1, 2))];
-    if (rnd() > 0.5) items.push(itemOf(pick(fastSkus), 1));
-    mkOrder({
-      customer: cust,
-      items,
-      stage: pick(["confirmed", "picking_wait", "picking"]),
-      createdAt: addHours(now, -ri(3, 20)),
-      warehouseId: "wh-C",
-      promiseDays: 1,
-      risk: true,
-    });
+    let total = 0;
+    for (const x of w) total += x;
+    let r = rnd() * total;
+    for (let i = 0; i < w.length; i++) {
+      r -= w[i];
+      if (r <= 0) return i;
+    }
+    return w.length - 1;
+  };
+  type Draft = { createdAt: Date; customer: LedgerCustomer; items: OrderItem[]; big?: boolean };
+  const drafts: Draft[] = [];
+  for (let t = windowStart.getTime(); t < now.getTime(); t += 3600000) {
+    const hour = new Date(t).getHours();
+    const expected = (ORDERS_PER_DAY * HOUR_WEIGHTS[hour]) / (meanHourW * 24);
+    const n = Math.max(0, Math.round(expected * rf(0.7, 1.3)));
+    for (let k = 0; k < n; k++) {
+      const createdAt = new Date(Math.min(now.getTime() - 60000, t + rnd() * 3600000));
+      const business = rnd() < 0.02;
+      const customer = business ? pick(businessPool) : consumerPool[sampleConsumer(rnd())];
+      const cats = business ? ["living", "food", "kitchen", "health", "baby"] : undefined;
+      const used = new Set<number>();
+      const lines = 1 + (rnd() < 0.45 ? (rnd() < 0.35 ? 2 : 1) : 0);
+      const items: OrderItem[] = [];
+      for (let l = 0; l < lines; l++) {
+        const i = pickSkuIdx(used, cats);
+        used.add(i);
+        items.push(itemOf(skus[i], business ? ri(6, 18) : rnd() < 0.82 ? 1 : 2));
+      }
+      drafts.push({ createdAt, customer, items });
+    }
   }
-  // other recent orders (last 7 days)
-  for (let i = 0; i < 58; i++) {
-    const cust = customers[ri(1, customers.length - 1)];
-    const n = ri(1, 3);
-    const items: OrderItem[] = [];
-    for (let k = 0; k < n; k++) items.push(itemOf(pick(rnd() > 0.35 ? fastSkus : skus), ri(1, 2)));
-    const ageH = ri(1, 7 * 24);
-    const stage: OrderStage =
-      ageH < 6
-        ? pick(["new", "confirmed"])
-        : ageH < 20
-          ? pick(["picking_wait", "picking", "packing_wait", "ship_wait"])
-          : ageH < 48
-            ? pick(["shipped", "in_transit"])
-            : ageH < 60
-              ? "in_transit"
-              : "delivered";
-    mkOrder({
-      customer: cust,
-      items,
-      stage,
-      createdAt: addHours(now, -ageH),
-      promiseDays: 2,
-      repeat: rnd() > 0.7,
-      promotionId: rnd() > 0.85 ? "promo-02" : undefined,
-    });
-  }
-  // a couple of cancelled / return orders
-  mkOrder({
-    customer: customers[5],
-    items: [itemOf(findSku("LED 스탠드 조명", 1))],
-    stage: "cancelled",
-    createdAt: addDays(now, -3),
+  // 대형주문: 공유오피스 탕비실 일괄 구매 — C구역(주방) 작업량을 크게 차지한다
+  const bigBuyer = businessPool.find((c) => c.name.startsWith("온누리공유오피스"))!;
+  drafts.push({
+    createdAt: new Date(Math.max(nextCut.getTime() - 24 * 3600000 + 40 * 60000, now.getTime() - 150 * 60000)),
+    customer: bigBuyer,
+    items: [
+      itemOf(findSku("위생 지퍼백 대형 50매", 1), 40),
+      itemOf(findSku("실리콘 밀폐용기 6종", 1), 16),
+      itemOf(findSku("주방세제 리필 2L", 1), 30),
+      itemOf(findSku("친환경 종이호일 30m", 1), 20),
+    ],
+    big: true,
   });
-  mkOrder({
-    customer: customers[7],
-    items: [itemOf(findSku("세라믹 프라이팬 28cm", 1))],
-    stage: "return",
-    createdAt: addDays(now, -5),
+  drafts.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  // 구역별 처리 시뮬레이션 (출고 엔진과 같은 모델)
+  const shipStateOf = new Map<Draft, { start: Date | null; finish: Date | null }>();
+  WAREHOUSES.forEach((w) => {
+    let cursor = windowStart;
+    drafts
+      .filter((d) => whOf(d.items[0].productId) === w.id)
+      .forEach((d) => {
+        if (d.items.some((it) => forcedEmpty.has(it.skuId))) {
+          shipStateOf.set(d, { start: null, finish: null }); // 재고 없음 — 작업 시작 안 함
+          return;
+        }
+        const ready = new Date(d.createdAt.getTime() + 10 * 60000);
+        const start = toShift(new Date(Math.max(cursor.getTime(), ready.getTime())));
+        const finish = finishAfterWork(start, workMinutes(d.items, bulkyOf), w.staff);
+        cursor = finish;
+        shipStateOf.set(d, { start, finish });
+      });
+  });
+  drafts.forEach((d) => {
+    const { start, finish } = shipStateOf.get(d)!;
+    const cutoff = cutoffForCreated(d.createdAt);
+    const ageMin = (now.getTime() - d.createdAt.getTime()) / 60000;
+    const who = pick(staff);
+    const h: Order["history"] = [{ at: iso(d.createdAt), stage: "new", actor: "고객" }];
+    let stage: OrderStage;
+    if (ageMin > 8)
+      h.push({ at: iso(new Date(d.createdAt.getTime() + 6 * 60000)), stage: "confirmed", actor: "시스템" });
+    if (!start || !finish || start > now) {
+      stage = ageMin <= 8 ? "new" : ageMin < 50 ? "confirmed" : "picking_wait";
+      if (stage === "picking_wait")
+        h.push({
+          at: iso(new Date(d.createdAt.getTime() + 30 * 60000)),
+          stage: "picking_wait",
+          actor: "시스템",
+        });
+    } else if (finish > now) {
+      const done = (now.getTime() - start.getTime()) / (finish.getTime() - start.getTime());
+      h.push({ at: iso(start), stage: "picking", actor: who });
+      stage = "picking";
+      if (done >= 0.6) {
+        h.push({
+          at: iso(new Date(start.getTime() + 0.6 * (finish.getTime() - start.getTime()))),
+          stage: "packing_wait",
+          actor: who,
+        });
+        stage = "packing_wait";
+      }
+    } else {
+      h.push({ at: iso(start), stage: "picking", actor: who });
+      h.push({ at: iso(finish), stage: "ship_wait", actor: who });
+      const shipAt = cutoffOnOrAfter(finish);
+      if (shipAt <= now) {
+        h.push({ at: iso(shipAt), stage: "shipped", actor: "택배 집하" });
+        stage = "shipped";
+        if (now.getTime() - shipAt.getTime() > 6 * 3600000) {
+          h.push({ at: iso(addHours(shipAt, 6)), stage: "in_transit", actor: "택배" });
+          stage = "in_transit";
+        }
+      } else stage = "ship_wait";
+    }
+    const business = d.customer.kind === "business";
+    const price = pricing(d.items, business);
+    orders.push({
+      ...base,
+      id: `NX${dayStr(d.createdAt).replace(/-/g, "").slice(2)}-${String(orderSeq++).padStart(4, "0")}`,
+      createdAt: iso(d.createdAt),
+      updatedAt: h[h.length - 1].at,
+      customerId: d.customer.id,
+      items: d.items,
+      ...price,
+      stage,
+      warehouseId: whOf(d.items[0].productId),
+      promisedAt: iso(promiseFor(d.items, cutoff)),
+      cutoffAt: iso(cutoff),
+      assignee: h.length > 2 ? who : undefined,
+      history: h,
+      channel: d.customer.channel as Channel,
+      isRepeatOrder: d.customer.archetype !== "light" && rnd() < 0.55,
+    });
   });
   orders.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
-  // ---------- purchase orders ----------
-  const purchaseOrders: PurchaseOrder[] = [
-    {
-      ...base,
-      id: "PO-2609-018",
-      supplierId: supGreen.id,
-      skuId: skuB.id,
-      qty: 240,
-      unitCost: skuB.cost,
-      status: "in_transit",
-      expectedAt: dayStr(addDays(now, 9)),
-      actor: "구매담당 김구매",
-      createdAt: iso(addDays(now, -6)),
-    },
-    {
-      ...base,
-      id: "PO-2609-017",
-      supplierId: suppliers.find((s) => s.name === "청정수원")!.id,
-      skuId: skuWater.id,
-      qty: 600,
-      unitCost: skuWater.cost,
-      status: "confirmed",
-      expectedAt: dayStr(addDays(now, 2)),
-      actor: "구매담당 김구매",
-      createdAt: iso(addDays(now, -2)),
-    },
-    {
-      ...base,
-      id: "PO-2609-016",
-      supplierId: suppliers.find((s) => s.name === "베이비퍼스트")!.id,
-      skuId: skuDiaper.id,
-      qty: 120,
-      unitCost: skuDiaper.cost,
-      status: "in_transit",
-      expectedAt: dayStr(addDays(now, 3)),
-      actor: "구매담당 김구매",
-      createdAt: iso(addDays(now, -3)),
-    },
-    {
-      ...base,
-      id: "PO-2609-015",
-      supplierId: suppliers.find((s) => s.name === "동아위생산업")!.id,
-      skuId: skuMask.id,
-      qty: 300,
-      unitCost: skuMask.cost,
-      status: "in_transit",
-      expectedAt: dayStr(addDays(now, 1)),
-      actor: "구매담당 김구매",
-      createdAt: iso(addDays(now, -2)),
-    },
-    {
-      ...base,
-      id: "PO-2609-011",
-      supplierId: supHanbit.id,
-      skuId: findSku("3겹 롤화장지 30롤", 1).id,
-      qty: 200,
-      unitCost: findSku("3겹 롤화장지 30롤", 1).cost,
-      status: "received",
-      expectedAt: dayStr(addDays(now, -4)),
-      receivedAt: dayStr(addDays(now, -4)),
-      actor: "구매담당 김구매",
-      createdAt: iso(addDays(now, -10)),
-    },
-    {
-      ...base,
-      id: "PO-2609-009",
-      supplierId: suppliers.find((s) => s.name === "펫케어서플라이")!.id,
-      skuId: skuPad.id,
-      qty: 150,
-      unitCost: skuPad.cost,
-      status: "received",
-      expectedAt: dayStr(addDays(now, -8)),
-      receivedAt: dayStr(addDays(now, -7)),
-      actor: "구매담당 김구매",
-      createdAt: iso(addDays(now, -13)),
-    },
-  ];
+  // ---------- 재고: 예약재고 = 미출고 주문 수량 ----------
+  const PRE: OrderStage[] = ["new", "confirmed", "picking_wait", "picking", "packing_wait", "ship_wait"];
+  const reservedBy = new Map<string, number>();
+  orders
+    .filter((o) => PRE.includes(o.stage))
+    .forEach((o) =>
+      o.items.forEach((it) => reservedBy.set(it.skuId, (reservedBy.get(it.skuId) ?? 0) + it.qty)),
+    );
+  inventory.forEach((inv) => {
+    inv.reserved = reservedBy.get(inv.skuId) ?? 0;
+    inv.onHand = forcedEmpty.has(inv.skuId) ? 0 : inv.reserved + (intendedAvailable.get(inv.skuId) ?? 0);
+  });
 
-  // ---------- returns ----------
-  const returns: ReturnRequest[] = [];
-  const reasons: ReturnRequest["reason"][] = [
-    "defect",
-    "damaged",
-    "wrong_item",
-    "delay",
-    "info_mismatch",
-    "missing",
-    "change_mind",
-    "other",
-  ];
-  const reasonWeights = [0.22, 0.18, 0.12, 0.14, 0.1, 0.06, 0.15, 0.03];
-  for (let i = 0; i < 84; i++) {
-    let r = rnd();
-    let ridx = 0;
-    while (r > reasonWeights[ridx] && ridx < reasons.length - 1) {
-      r -= reasonWeights[ridx];
-      ridx++;
+  // ---------- 수요신호: 오늘 접수 수량 · 어제 분 맞춤 ----------
+  const todayKey = dayStr(now);
+  const yesterdayKey = dayStr(addDays(now, -1));
+  const unitsOn = (key: string) => {
+    const m = new Map<string, number>();
+    orders
+      .filter((o) => o.customerId !== me.id && dayStr(new Date(o.createdAt)) === key)
+      .forEach((o) => o.items.forEach((it) => m.set(it.skuId, (m.get(it.skuId) ?? 0) + it.qty)));
+    return m;
+  };
+  const todayUnits = unitsOn(todayKey);
+  const yesterdayUnits = unitsOn(yesterdayKey);
+  demand.forEach((d) => {
+    d.today = todayUnits.get(d.skuId) ?? 0;
+    const y = yesterdayUnits.get(d.skuId) ?? 0;
+    if (d.dailySales[13] < y) d.dailySales[13] = y;
+    d.order7d = d.dailySales.slice(7).reduce((a, c) => a + c, 0);
+    d.orderPrev7d = d.dailySales.slice(0, 7).reduce((a, c) => a + c, 0);
+  });
+
+  // ---------- 90일 주문 원장 ----------
+  const DAYS = 89;
+  const skuIdx = new Map(skus.map((s, i) => [s.id, i]));
+  const units: number[][] = skus.map((s) => {
+    const d = demand.find((x) => x.skuId === s.id)!;
+    const arr = new Array<number>(DAYS + 1).fill(0);
+    for (let dd = 1; dd <= 14; dd++)
+      arr[dd] = Math.max(0, d.dailySales[14 - dd] - (dd === 1 ? (yesterdayUnits.get(s.id) ?? 0) : 0));
+    const baseV = d.dailySales.slice(0, 7).reduce((a, c) => a + c, 0) / 7;
+    for (let dd = 15; dd <= DAYS; dd++) {
+      const dow = addDays(now, -dd).getDay();
+      const f = (dow === 0 || dow === 6 ? 1.15 : 0.95) * (1 - 0.0025 * (dd - 14));
+      arr[dd] = Math.max(0, Math.round(baseV * f * rf(0.65, 1.35)));
     }
-    const sku = pick(skus);
-    returns.push({
-      ...base,
-      id: `RT-${String(i + 1).padStart(4, "0")}`,
-      createdAt: iso(addDays(now, -ri(0, 89))),
-      orderId: pick(orders).id,
-      skuId: sku.id,
-      reason: reasons[ridx],
-      status: pick(["requested", "approved", "received", "refunded", "refunded", "refunded"]),
-      supplierId: sku.primarySupplierId,
-    });
-  }
-  // supplier defect concentration for 그린키친코리아 (scenario B narrative)
-  for (let i = 0; i < 9; i++) {
-    const sku = pick(skus.filter((s) => s.primarySupplierId === supGreen.id));
-    returns.push({
-      ...base,
-      id: `RT-${String(90 + i).padStart(4, "0")}`,
-      createdAt: iso(addDays(now, -ri(0, 40))),
-      orderId: pick(orders).id,
-      skuId: sku.id,
-      reason: "defect",
-      status: "refunded",
-      supplierId: supGreen.id,
-    });
-  }
+    return arr;
+  });
+  const ledger: Ledger = generateLedger({
+    now,
+    days: DAYS,
+    products,
+    skus,
+    suppliers,
+    supplierProducts,
+    customers: customerBase,
+    unitsFor: (skuId, d) => units[skuIdx.get(skuId)!]?.[d] ?? 0,
+    promotions: promoDefs.map((p) => ({
+      id: p.id,
+      skuIds: p.skuIds,
+      startsDaysAgo: -p.start,
+      endsDaysAgo: -p.end,
+      rate: p.rate,
+    })),
+    warehouseOf: (cat) => CAT_WH[cat],
+    bulkyOf,
+    scenario: {
+      defectSupplierId: supGreen.id,
+      contentProductId: products.find((p) => p.name === "무선 물걸레 청소포 40매")!.id,
+      pickingWarehouseId: "wh-C",
+      slowWarehouseId: "wh-C",
+    },
+  });
+  rememberLedger(nowIso, ledger);
+  if (opts.ledgerOnly) return { generatedAt: nowIso } as DemoData; // 원장만 필요할 때 (getLedger)
 
-  // ---------- promotions ----------
-  const mkPromo = (
-    id: string,
-    name: string,
-    skuIds: string[],
-    segment: string,
-    rate: number,
-    start: number,
-    end: number,
-    status: Promotion["status"],
-    mult = 1,
-  ): Promotion => {
-    const impressions = ri(18000, 60000) * mult;
-    const clicks = Math.round(impressions * rf(0.04, 0.09));
-    const carts = Math.round(clicks * rf(0.18, 0.32));
-    const ordersN = Math.round(carts * rf(0.35, 0.55));
-    const avg = skuIds.reduce((a, id) => a + skus.find((s) => s.id === id)!.salePrice, 0) / skuIds.length;
-    const revenue = Math.round(ordersN * avg * (1 - rate));
-    const cogsAvg = skuIds.reduce((a, id) => a + skus.find((s) => s.id === id)!.cost, 0) / skuIds.length;
+  // ---------- 일별·카테고리 매출 = 원장 + 저장 주문 ----------
+  const econOf = (o: {
+    channel?: Channel;
+    items?: OrderItem[];
+    lines?: OrderItem[] | Ledger["orders"][number]["lines"];
+    discount: number;
+    shippingFee: number;
+  }) =>
+    orderEconomics(
+      {
+        channel: o.channel ?? "app",
+        lines: (o.items ?? o.lines)!,
+        discount: o.discount,
+        shippingFee: o.shippingFee,
+      },
+      bulkyOf,
+    );
+  const byDay = new Map<string, DailySalesPoint>();
+  const bump = (key: string, e: ReturnType<typeof econOf>) => {
+    const p = byDay.get(key) ?? {
+      date: key,
+      orders: 0,
+      revenue: 0,
+      grossMargin: 0,
+      discount: 0,
+      shippingCost: 0,
+      returns: 0,
+      cogs: 0,
+    };
+    p.orders += 1;
+    p.revenue += e.net;
+    p.discount += e.discount;
+    p.cogs = (p.cogs ?? 0) + e.cogs;
+    p.shippingCost += e.shipCost - e.shippingFee;
+    p.grossMargin += e.net - e.cogs - (e.shipCost - e.shippingFee);
+    byDay.set(key, p);
+  };
+  ledger.orders.forEach((o) => bump(dayStr(new Date(o.createdAt)), econOf(o)));
+  orders.forEach((o) => bump(dayStr(new Date(o.createdAt)), econOf(o)));
+  ledger.orders.forEach((o) => {
+    if (!o.returned) return;
+    const k = dayStr(new Date(o.returned.at));
+    const p = byDay.get(k);
+    if (p) p.returns += 1;
+  });
+  const dailySales: DailySalesPoint[] = [];
+  for (let d = DAYS; d >= 0; d--) {
+    const key = dayStr(addDays(now, -d));
+    dailySales.push(
+      byDay.get(key) ?? {
+        date: key,
+        orders: 0,
+        revenue: 0,
+        grossMargin: 0,
+        discount: 0,
+        shippingCost: 0,
+        returns: 0,
+        cogs: 0,
+      },
+    );
+  }
+  const catAgg = new Map<CategorySlug, CategorySales>();
+  const addCat = (
+    lines: { productId: string; qty: number; unitPrice: number; unitCost: number }[],
+    discount: number,
+    subtotal: number,
+  ) => {
+    const seen = new Set<CategorySlug>();
+    lines.forEach((l) => {
+      const cat = productById.get(l.productId)!.categorySlug;
+      const share = subtotal > 0 ? (l.unitPrice * l.qty) / subtotal : 0;
+      const rev = l.unitPrice * l.qty - discount * share;
+      const c = catAgg.get(cat) ?? { categorySlug: cat, revenue: 0, orders: 0, margin: 0 };
+      c.revenue += rev;
+      c.margin += rev - l.unitCost * l.qty;
+      if (!seen.has(cat)) c.orders += 1;
+      seen.add(cat);
+      catAgg.set(cat, c);
+    });
+  };
+  ledger.orders.filter((o) => o.day <= 30).forEach((o) => addCat(o.lines, o.discount, o.subtotal));
+  orders.forEach((o) => addCat(o.items, o.discount, o.subtotal));
+  const categorySales: CategorySales[] = CATEGORIES.map(
+    (c) => catAgg.get(c.slug) ?? { categorySlug: c.slug, revenue: 0, orders: 0, margin: 0 },
+  ).map((c) => ({ ...c, revenue: Math.round(c.revenue), margin: Math.round(c.margin) }));
+
+  // ---------- 반품 (최근 14일은 처리 대상으로 저장, 그 이전은 원장에서 분석) ----------
+  const returns: ReturnRequest[] = ledger.orders
+    .filter((o) => o.returned && o.returned.daysAgo <= 14)
+    .map((o, i) => {
+      const r = o.returned!;
+      const sku = skus[skuIdx.get(r.skuId)!];
+      const status: ReturnRequest["status"] =
+        r.daysAgo <= 1 ? "requested" : r.daysAgo <= 3 ? "approved" : r.daysAgo <= 6 ? "received" : "refunded";
+      return {
+        ...base,
+        id: `RT-${String(i + 1).padStart(4, "0")}`,
+        createdAt: r.at,
+        updatedAt: r.at,
+        orderId: o.id,
+        skuId: r.skuId,
+        reason: r.reason,
+        status,
+        supplierId: sku.primarySupplierId,
+      };
+    })
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+  // ---------- 진행 중인 발주 ----------
+  const poNo = (n: number, created: Date) => `PO-${dayStr(created).slice(2, 7).replace("-", "")}-0${n}`;
+  const openPo = (
+    n: number,
+    supplierId: string,
+    sku: SKU,
+    qty: number,
+    status: PurchaseOrder["status"],
+    orderedDaysAgo: number,
+    etaDays: number,
+  ): PurchaseOrder => {
+    const created = addDays(now, -orderedDaysAgo);
     return {
       ...base,
-      id,
-      name,
-      startsAt: dayStr(addDays(now, start)),
-      endsAt: dayStr(addDays(now, end)),
-      skuIds,
-      segment,
-      discountRate: rate,
+      id: poNo(n, created),
+      createdAt: iso(created),
+      updatedAt: iso(created),
+      supplierId,
+      skuId: sku.id,
+      qty,
+      unitCost:
+        supplierProducts.find((sp) => sp.skuId === sku.id && sp.supplierId === supplierId)?.unitCost ??
+        sku.cost,
+      status,
+      expectedAt: dayStr(addDays(now, etaDays)),
+      actor: "구매담당 김구매",
+    };
+  };
+  const supByName = (n: string) => suppliers.find((s) => s.name === n)!;
+  const purchaseOrders: PurchaseOrder[] = [
+    // 원래 예정일(발주 +7일)보다 4일 늦게 통보된 입고 — 시나리오 B
+    { ...openPo(18, supGreen.id, skuB, 240, "in_transit", 6, 9), note: "원 예정일 대비 +4일 지연 통보" },
+    openPo(17, supByName("청정수원").id, skuWater, 600, "confirmed", 2, 2),
+    openPo(16, supByName("베이비퍼스트").id, skuDiaper, 120, "in_transit", 3, 3),
+    openPo(15, supByName("동아위생산업").id, skuMask, 300, "in_transit", 2, 1),
+  ];
+  inventory.forEach((inv) => {
+    const open = purchaseOrders.filter((po) => po.skuId === inv.skuId);
+    inv.inboundExpected = open.reduce((a, po) => a + po.qty, 0);
+    inv.inboundEta = open.map((po) => po.expectedAt).sort()[0];
+  });
+
+  // ---------- 프로모션 성과 = 원장 집계 ----------
+  const promotions: Promotion[] = promoDefs.map((pd) => {
+    const hits = ledger.orders.filter((o) => o.promotionId === pd.id);
+    const live = orders.filter((o) => o.promotionId === pd.id);
+    const ordersN = hits.length + live.length;
+    let revenue = 0;
+    let discountCost = 0;
+    let cogs = 0;
+    let shippingCost = 0;
+    let returnsN = 0;
+    hits.forEach((o) => {
+      const e = econOf(o);
+      revenue += e.net;
+      discountCost += e.discount;
+      cogs += e.cogs;
+      shippingCost += e.shipCost - e.shippingFee;
+      if (o.returned) returnsN++;
+    });
+    live.forEach((o) => {
+      const e = econOf(o);
+      revenue += e.net;
+      discountCost += e.discount;
+      cogs += e.cogs;
+      shippingCost += e.shipCost - e.shippingFee;
+    });
+    const carts = ordersN ? Math.round(ordersN / rf(0.38, 0.52)) : 0;
+    const clicks = carts ? Math.round(carts / rf(0.2, 0.3)) : 0;
+    const impressions = clicks ? Math.round(clicks / rf(0.045, 0.08)) : 0;
+    return {
+      ...base,
+      id: pd.id,
+      name: pd.name,
+      startsAt: dayStr(addDays(now, pd.start)),
+      endsAt: dayStr(addDays(now, pd.end)),
+      skuIds: pd.skuIds,
+      segment: pd.segment,
+      discountRate: pd.rate,
       impressions,
       clicks,
       carts,
       orders: ordersN,
-      revenue,
-      shippingCost: Math.round(ordersN * 2100),
-      discountCost: Math.round(ordersN * avg * rate),
-      cogs: Math.round(ordersN * cogsAvg),
-      returns: Math.round(ordersN * rf(0.02, 0.06)),
-      status,
+      revenue: Math.round(revenue),
+      shippingCost: Math.round(shippingCost),
+      discountCost: Math.round(discountCost),
+      cogs: Math.round(cogs),
+      returns: returnsN,
+      status: pd.start > 0 ? "planned" : pd.end < 0 ? "ended" : "running",
     };
-  };
-  const promotions: Promotion[] = [
-    mkPromo(
-      "promo-01",
-      "가을맞이 생활필수품 기획전",
-      [skuWipe10.id, skuDet.id, findSku("3겹 롤화장지 30롤", 1).id],
-      "전체",
-      0.1,
-      -12,
-      2,
-      "running",
-      1.4,
-    ),
-    mkPromo(
-      "promo-02",
-      "반려 가족 재구매 감사전",
-      [skuPad.id, findSku("고양이 모래 벤토나이트 10kg", 1).id],
-      "반복상품 구매주기 도래",
-      0.12,
-      -7,
-      7,
-      "running",
-    ),
-    mkPromo(
-      "promo-03",
-      "미니가전 재고 정리",
-      [skuC.id, skuHeat.id],
-      "카테고리 충성고객",
-      0.25,
-      -20,
-      -3,
-      "ended",
-      0.6,
-    ),
-    mkPromo(
-      "promo-04",
-      "첫 주문 웰컴 5천원",
-      fastSkus.slice(0, 6).map((s) => s.id),
-      "첫 주문 전환후보",
-      0.08,
-      -30,
-      30,
-      "running",
-    ),
-    mkPromo(
-      "promo-05",
-      "장바구니 복귀 쿠폰",
-      [skuWater.id, findSku("즉석 흰밥 210g 12개", 1).id],
-      "장바구니 이탈",
-      0.05,
-      -14,
-      0,
-      "ended",
-    ),
-    mkPromo(
-      "promo-06",
-      "유아용품 정기 특가",
-      [skuDiaper.id, findSku("아기 물티슈 프리미엄 70매", 10).id],
-      "카테고리 충성고객",
-      0.1,
-      -40,
-      -25,
-      "ended",
-    ),
-    mkPromo(
-      "promo-07",
-      "주방 새단장 위크",
-      [findSku("실리콘 밀폐용기 6종", 1).id, findSku("세라믹 프라이팬 28cm", 1).id],
-      "전체",
-      0.15,
-      3,
-      10,
-      "planned",
-      0.01,
-    ),
-  ];
-  // 미니가전 promo: force margin negative (매출만 높고 실질마진 낮음)
-  const p3 = promotions[2];
-  p3.discountCost = Math.round(p3.revenue * 0.42);
-  p3.shippingCost = Math.round(p3.orders * 3200);
-
-  // ---------- actions ----------
-  const dueIn = (h: number) => iso(addHours(now, h));
-  const ago = (h: number) => iso(addHours(now, -h));
-  const actions: AXAction[] = [];
-  const pushAction = (
-    a: Omit<AXAction, "id" | "createdAt" | "updatedAt" | "source" | "evidenceIds"> & {
-      id: string;
-      createdAt?: string;
-    },
-  ) => {
-    actions.push({ ...base, evidenceIds: [], ...a, createdAt: a.createdAt ?? nowIso });
-  };
-  const supDonga = suppliers.find((s) => s.name === "동아위생산업")!;
-  pushAction({
-    id: "act-001",
-    type: "urgent_po",
-    scenario: "A",
-    title: "프리미엄 물티슈 20팩 긴급발주 검토",
-    summary:
-      "최근 7일 판매속도가 65% 증가했고 가용재고가 84개로 예상 소진일이 2.7일입니다. 기본 공급기간 5일보다 빠릅니다.",
-    trigger: "예상 소진일(2.7일) < 공급 리드타임(5일)",
-    reasons: [
-      "최근 7일 판매속도 65% 증가 (129 → 213개)",
-      "가용재고 84개, 예상 소진 2.7일",
-      "검색 63%·장바구니 70% 증가로 대기수요 존재",
-      "기본 공급사 리드타임 5일",
-    ],
-    expectedImpact: "품절 시 약 5일간 일 31개 판매기회 손실 (추정 약 150개)",
-    caution: "긴급발주 단가가 3% 높은 공급사를 선택하면 마진이 낮아집니다.",
-    urgency: "critical",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(2),
-    dueAt: dueIn(6),
-    stage: "recommended",
-    related: {
-      productId: skuA.productId,
-      skuId: skuA.id,
-      supplierId: supHanbit.id,
-      altSupplierId: supDonga.id,
-    },
-    proposal: { qty: 400, supplierId: supDonga.id, note: "3일 납기 공급사로 400개 발주 시 12일치 확보" },
-  });
-  pushAction({
-    id: "act-002",
-    type: "alt_supplier",
-    scenario: "B",
-    title: "주방세제 리필 2L 공급사 납기지연 대체구매 검토",
-    summary:
-      "그린키친코리아 입고(PO-2609-018)가 4일 지연되어 재고 소진 가능성이 있습니다. 한빛생활유통은 단가 3% 높지만 5일 납기입니다.",
-    trigger: "PO 예정일 초과 + 예상 소진일 < 변경된 입고일",
-    reasons: [
-      "기존 PO 입고예정 4일 지연 (D+9)",
-      "가용재고 48개, 일 8개 판매 → 6일 후 소진",
-      "그린키친코리아 최근 정시납품률 78%",
-      "대체 공급사 5일 납기 가능",
-    ],
-    expectedImpact: "3일간 품절 방지, 반복구매 고객 이탈 방지",
-    caution: "분할발주 시 최소주문수량 40개 조건을 확인하세요.",
-    urgency: "high",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(5),
-    dueAt: dueIn(24),
-    stage: "recommended",
-    related: {
-      productId: skuB.productId,
-      skuId: skuB.id,
-      supplierId: supGreen.id,
-      altSupplierId: supHanbit.id,
-      poId: "PO-2609-018",
-    },
-    proposal: { qty: 120, supplierId: supHanbit.id, note: "부족분 120개만 대체발주, 기존 PO 유지" },
-  });
-  pushAction({
-    id: "act-003",
-    type: "stop_po",
-    scenario: "C",
-    title: "무선 미니가습기 발주중단·프로모션 조정 검토",
-    summary:
-      "재고일수가 465일이고 최근 4주 판매가 감소했습니다. 직전 25% 할인 프로모션은 매출 대비 실질마진이 마이너스였습니다.",
-    trigger: "재고일수 > 180일 그리고 판매량 4주 연속 감소",
-    reasons: [
-      "가용재고 185개, 일 0.4개 판매 → 465일치",
-      "상세조회 31% 감소, 검색 32% 감소",
-      "미니가전 재고정리 프로모션 실질마진 -18%",
-      "계절성 상품(가을~겨울)으로 11월 이후 수요 회복 가능",
-    ],
-    expectedImpact: "추가 발주 보류로 약 280만원 재고자금 절감",
-    caution: "완전 단종보다는 11월 재평가를 권장합니다.",
-    urgency: "mid",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(30),
-    dueAt: dueIn(72),
-    stage: "reviewing",
-    related: { productId: skuC.productId, skuId: skuC.id, promotionId: "promo-03" },
-    proposal: { note: "발주 보류 + 묶음구성(가습기+온열매트) 프로모션 검토" },
-  });
-  const riskOrderIds = orders.filter((o) => o.riskFlag).map((o) => o.id);
-  pushAction({
-    id: "act-004",
-    type: "priority_order",
-    scenario: "D",
-    title: "C구역 마감임박 배송약속 주문 12건 우선처리",
-    summary:
-      "오후 3시 출고마감까지 C구역 피킹 적체율 82%입니다. 오늘 배송약속이 있는 주문 12건이 피킹 대기 중입니다.",
-    trigger: "출고마감 3시간 전 그리고 구역 적체 > 70% 그리고 배송약속 주문 존재",
-    reasons: [
-      "C구역 피킹 적체율 82% (평균 40%)",
-      "배송약속 오늘인 주문 12건이 피킹 이전 단계",
-      "동일 시간대 평균 처리량 대비 38% 부족",
-      "지연 시 고객 사전안내 필요",
-    ],
-    expectedImpact: "정시출고율 하락 방지, 배송지연 VOC 예방",
-    urgency: "critical",
-    owner: "ops",
-    assignee: "박운영",
-    recommendedAt: ago(1),
-    dueAt: iso(cutoffToday),
-    stage: "recommended",
-    related: { orderIds: riskOrderIds },
-    proposal: { note: "A구역 피커 2명을 C구역으로 임시 배치, 12건 우선 피킹" },
-  });
-  pushAction({
-    id: "act-005",
-    type: "delay_notice",
-    scenario: "D",
-    title: "배송지연 가능 고객 사전안내",
-    summary: "우선처리 후에도 마감을 넘길 가능성이 있는 주문 4건은 고객에게 미리 안내합니다.",
-    trigger: "우선처리 후 예상 출고시각 > 마감",
-    reasons: [
-      "C구역 적체가 해소되지 않으면 4건은 익일 출고",
-      "사전안내 시 배송지연 VOC 60% 감소(업계 통상 경험치, 검증 필요)",
-    ],
-    expectedImpact: "VOC 감소, 고객 신뢰 유지",
-    urgency: "high",
-    owner: "cs",
-    assignee: "이CS",
-    recommendedAt: ago(1),
-    dueAt: dueIn(3),
-    stage: "recommended",
-    related: { orderIds: riskOrderIds.slice(8) },
-  });
-  pushAction({
-    id: "act-006",
-    type: "repeat_expose",
-    scenario: "E",
-    title: "재구매 주기 도래 고객 42명 다시 구매 노출",
-    summary: "물티슈·세제·반려패드 평균 구매주기가 도래한 고객 42명에게 '다시 구매'를 노출합니다.",
-    trigger: "마지막 구매일 + 평균 구매주기 ≤ 오늘 + 3일",
-    reasons: [
-      "반복상품 구매고객 42명이 주기 도래",
-      "해당 상품 현재 재고 보유(물티슈 20팩 제외)",
-      "지난달 다시 구매 전환율 31% (시연 집계)",
-    ],
-    expectedImpact: "재구매 주문 약 13건 예상 (시연 시뮬레이션)",
-    caution: "물티슈 20팩은 품절위험이라 10팩으로 대체 노출합니다.",
-    urgency: "mid",
-    owner: "owner",
-    assignee: "대표",
-    recommendedAt: ago(8),
-    dueAt: dueIn(48),
-    stage: "recommended",
-    related: { customerIds: customers.slice(0, 8).map((c) => c.id), skuId: skuWipe10.id },
-  });
-  pushAction({
-    id: "act-007",
-    type: "promo_adjust",
-    scenario: "C",
-    title: "가을맞이 기획전 물티슈 10팩 할인율 조정",
-    summary:
-      "기획전 매출은 높지만 물티슈 10팩은 할인 후 마진율이 9%로 낮습니다. 할인율을 10%→5%로 조정 검토합니다.",
-    trigger: "프로모션 상품 할인 후 마진율 < 12%",
-    reasons: [
-      "물티슈 10팩 할인 후 마진율 9%",
-      "프로모션 없이도 판매속도 상승 중",
-      "할인이 기존 구매를 대체한 비율 추정 40%",
-    ],
-    expectedImpact: "기획전 실질마진 약 +6%p",
-    urgency: "mid",
-    owner: "owner",
-    assignee: "대표",
-    recommendedAt: ago(20),
-    dueAt: dueIn(48),
-    stage: "recommended",
-    related: { promotionId: "promo-01", skuId: skuWipe10.id },
-  });
-  pushAction({
-    id: "act-008",
-    type: "urgent_po",
-    title: "KF94 마스크 50매 품절 — 입고 D+1 확인 및 예약판매 전환",
-    summary: "현재 품절 상태이며 300개가 내일 입고 예정입니다. 상품 상세를 예약배송으로 전환합니다.",
-    trigger: "가용재고 0 그리고 입고예정 존재",
-    reasons: ["가용재고 0", "PO-2609-015 내일 입고 300개", "최근 7일 검색 유지"],
-    expectedImpact: "품절 이탈 대신 예약주문 확보",
-    urgency: "high",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(12),
-    dueAt: dueIn(12),
-    stage: "in_progress",
-    related: { productId: skuMask.productId, skuId: skuMask.id, poId: "PO-2609-015" },
-  });
-  pushAction({
-    id: "act-009",
-    type: "urgent_po",
-    title: "블루투스 스피커 미니 안전재고 미달 발주 검토",
-    summary: "가용재고 7개로 안전재고(15개)를 밑돕니다. 리드타임 8일을 감안해 발주를 검토합니다.",
-    trigger: "가용재고 < 안전재고",
-    reasons: ["가용재고 7개", "일 1.3개 판매 → 5.4일치", "루미전자유통 리드타임 8일"],
-    expectedImpact: "약 3일 품절 방지",
-    urgency: "mid",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(26),
-    dueAt: dueIn(36),
-    stage: "recommended",
-    related: {
-      productId: skuSpeaker.productId,
-      skuId: skuSpeaker.id,
-      supplierId: skuSpeaker.primarySupplierId,
-    },
-    proposal: { qty: 40, supplierId: skuSpeaker.primarySupplierId },
-  });
-  pushAction({
-    id: "act-010",
-    type: "stop_po",
-    title: "전기 방석 온열매트 저회전 발주 보류",
-    summary: "재고일수 280일. 11월 성수기 전까지 발주를 보류합니다.",
-    trigger: "재고일수 > 180일",
-    reasons: ["가용재고 140개, 일 0.5개 판매", "계절상품, 11월 수요 회복 예상"],
-    expectedImpact: "재고자금 약 260만원 보류",
-    urgency: "low",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(70),
-    dueAt: dueIn(120),
-    stage: "held",
-    holdReason: "11월 1일 재평가",
-    related: { productId: skuHeat.productId, skuId: skuHeat.id },
-  });
-  pushAction({
-    id: "act-011",
-    type: "alt_supplier",
-    title: "그린키친코리아 불량·납기 복합위험 — 공급사 평가 갱신",
-    summary:
-      "최근 40일 불량 반품 9건과 납기지연 2회가 겹쳤습니다. 주방 카테고리 대체 공급사 비중 확대를 검토합니다.",
-    trigger: "공급사 불량률 > 1% 그리고 정시납품률 < 80%",
-    reasons: ["불량 반품 9건 (동일 공급사)", "정시납품률 78%", "리빙앤홈·한빛생활유통 대체 가능"],
-    expectedImpact: "반품비용·품절위험 동시 감소",
-    urgency: "mid",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(40),
-    dueAt: dueIn(96),
-    stage: "reviewing",
-    related: { supplierId: supGreen.id, altSupplierId: suppliers.find((s) => s.name === "리빙앤홈")!.id },
-  });
-  pushAction({
-    id: "act-012",
-    type: "repeat_expose",
-    title: "장바구니 이탈 고객 18명 복귀 안내",
-    summary: "생수·즉석밥을 장바구니에 담고 48시간 내 주문하지 않은 고객에게 안내합니다.",
-    trigger: "장바구니 담기 후 48시간 미주문",
-    reasons: ["장바구니 이탈 18명", "해당 상품 재고 정상", "복귀 쿠폰 프로모션 전환율 22% (시연)"],
-    expectedImpact: "약 4건 주문 회복 (추정)",
-    urgency: "low",
-    owner: "cs",
-    assignee: "이CS",
-    recommendedAt: ago(15),
-    dueAt: dueIn(30),
-    stage: "recommended",
-    related: { customerIds: customers.slice(8, 14).map((c) => c.id) },
-  });
-  // completed history (for evidence)
-  pushAction({
-    id: "act-013",
-    type: "urgent_po",
-    title: "3겹 롤화장지 30롤 긴급발주",
-    summary: "판매 급증으로 200개 긴급발주 후 입고 완료. 품절 없이 판매 유지.",
-    trigger: "예상 소진일 < 리드타임",
-    reasons: ["일 17개 판매, 가용재고 40개", "한빛생활유통 5일 납기"],
-    expectedImpact: "품절 0일 유지",
-    urgency: "high",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(24 * 10),
-    dueAt: ago(24 * 8),
-    stage: "done",
-    related: { skuId: findSku("3겹 롤화장지 30롤", 1).id, supplierId: supHanbit.id, poId: "PO-2609-011" },
-    result: "입고 완료 (D-4). 발주~입고 5일, 품절 0일.",
-    createdAt: ago(24 * 10),
-  });
-  pushAction({
-    id: "act-014",
-    type: "urgent_po",
-    title: "반려동물 배변패드 2개 묶음 발주",
-    summary: "재구매 주기 도래 고객 증가 대응 150개 발주. 입고 완료.",
-    trigger: "재구매 예상수요 > 가용재고",
-    reasons: ["재구매 예상 고객 31명", "가용재고 22개"],
-    expectedImpact: "재구매 품절 방지",
-    urgency: "mid",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(24 * 13),
-    dueAt: ago(24 * 11),
-    stage: "done",
-    related: {
-      skuId: skuPad.id,
-      supplierId: suppliers.find((s) => s.name === "펫케어서플라이")!.id,
-      poId: "PO-2609-009",
-    },
-    result: "입고 완료 (D-7). 이후 7일간 재구매 주문 27건 처리.",
-    createdAt: ago(24 * 13),
-  });
-  pushAction({
-    id: "act-015",
-    type: "priority_order",
-    title: "B구역 냉장식품 주문 우선출고",
-    summary: "냉장 상품 배송약속 주문 9건 우선처리 완료.",
-    trigger: "냉장상품 + 마감임박",
-    reasons: ["냉장 9건 피킹 대기", "마감 2시간 전"],
-    expectedImpact: "정시출고율 유지",
-    urgency: "high",
-    owner: "ops",
-    assignee: "박운영",
-    recommendedAt: ago(24 * 2 + 5),
-    dueAt: ago(24 * 2),
-    stage: "done",
-    related: {},
-    result: "9건 마감 전 출고 완료. 정시출고율 97% 유지.",
-    createdAt: ago(24 * 2 + 5),
-  });
-  pushAction({
-    id: "act-016",
-    type: "promo_adjust",
-    title: "장바구니 복귀 쿠폰 종료 및 결과 정리",
-    summary: "복귀 쿠폰 2주 운영 종료. 전환율 22%, 실질마진 양호.",
-    trigger: "프로모션 종료",
-    reasons: ["전환 22%", "할인비용 대비 마진 +"],
-    expectedImpact: "재운영 시 동일 구조 적용",
-    urgency: "low",
-    owner: "owner",
-    assignee: "대표",
-    recommendedAt: ago(24 * 1),
-    dueAt: ago(2),
-    stage: "done",
-    related: { promotionId: "promo-05" },
-    result: "종료. 결과를 성과 기록으로 기록.",
-    createdAt: ago(24 * 1),
-  });
-  pushAction({
-    id: "act-017",
-    type: "stop_po",
-    title: "아기 욕조 접이식 발주 보류",
-    summary: "재고일수 80일 → 발주 보류.",
-    trigger: "재고일수 > 60일 (저회전 카테고리)",
-    reasons: ["가용재고 64개", "일 0.8개 판매"],
-    expectedImpact: "재고자금 절감",
-    urgency: "low",
-    owner: "buyer",
-    assignee: "김구매",
-    recommendedAt: ago(24 * 5),
-    dueAt: dueIn(24 * 20),
-    stage: "dismissed",
-    holdReason: "유아 카테고리 시즌 프로모션 예정으로 유지",
-    related: { skuId: skuBath.id },
   });
 
-  // ---------- evidence ----------
-  const evidence: EvidenceLog[] = [
-    {
-      ...base,
-      id: "ev-001",
-      createdAt: ago(24 * 14),
-      type: "BASELINE",
-      title: "재고·발주 기준값 측정 시작",
-      detail:
-        "주간 재고분석 소요시간, 긴급발주 비중, 품절률 기준값은 실운영 데이터로 측정 예정. 시연 값은 시뮬레이션입니다.",
-      actor: "AX 책임자",
-      dataSource: "시연 데이터",
-      mode: "실증 준비",
-    },
-    {
-      ...base,
-      id: "ev-002",
-      createdAt: ago(24 * 10),
-      type: "ACTION",
-      title: "롤화장지 긴급발주 승인",
-      detail: "예상 소진일 2.4일 < 리드타임 5일. 한빛생활유통 200개 발주 승인.",
-      actor: "김구매",
-      actionId: "act-013",
-      skuId: findSku("3겹 롤화장지 30롤", 1).id,
-      supplierId: supHanbit.id,
-      dataSource: "수요신호 + 재고",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-003",
-      createdAt: ago(24 * 4),
-      type: "RESULT",
-      title: "롤화장지 입고 완료 · 품절 0일",
-      detail: "PO-2609-011 200개 입고. 발주~입고 5일. 해당 기간 품절 0일.",
-      actor: "박운영",
-      actionId: "act-013",
-      skuId: findSku("3겹 롤화장지 30롤", 1).id,
-      kpiDelta: "품절일수 0 / 긴급발주 1건",
-      dataSource: "입고 + 재고",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-004",
-      createdAt: ago(24 * 13),
-      type: "ACTION",
-      title: "배변패드 2개 묶음 150개 발주",
-      detail: "재구매 예상 고객 31명 대비 가용재고 22개.",
-      actor: "김구매",
-      actionId: "act-014",
-      skuId: skuPad.id,
-      dataSource: "재구매 예측 + 재고",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-005",
-      createdAt: ago(24 * 7),
-      type: "REVENUE",
-      title: "배변패드 입고 후 7일간 재구매 27건",
-      detail: "다시 구매 노출 고객 중 27건 주문. 품절 없이 처리.",
-      actor: "시스템",
-      actionId: "act-014",
-      skuId: skuPad.id,
-      kpiDelta: "재구매 주문 27건 (시연)",
-      dataSource: "주문",
-      mode: "Simulation",
-    },
-    {
-      ...base,
-      id: "ev-006",
-      createdAt: ago(24 * 2),
-      type: "EFFICIENCY",
-      title: "B구역 냉장 9건 마감 전 출고",
-      detail: "우선처리 실행 후 9건 모두 마감 전 출고. 정시출고율 97%.",
-      actor: "박운영",
-      actionId: "act-015",
-      kpiDelta: "정시출고율 97%",
-      dataSource: "주문·출고",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-007",
-      createdAt: ago(3),
-      type: "RISK",
-      title: "그린키친코리아 납기지연 감지",
-      detail: "PO-2609-018 예정일 초과. 주방세제 리필 2L 품절 위험 상승.",
-      actor: "시스템",
-      actionId: "act-002",
-      supplierId: supGreen.id,
-      skuId: skuB.id,
-      dataSource: "발주서",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-008",
-      createdAt: ago(2),
-      type: "RISK",
-      title: "프리미엄 물티슈 20팩 품절위험 감지",
-      detail: "판매속도 65% 증가, 예상 소진 2.7일.",
-      actor: "시스템",
-      actionId: "act-001",
-      skuId: skuA.id,
-      dataSource: "수요신호",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-009",
-      createdAt: ago(24),
-      type: "CUSTOMER",
-      title: "장바구니 복귀 쿠폰 결과",
-      detail: "노출 18명 중 4명 주문 (22%). 할인비용 대비 마진 양호.",
-      actor: "이CS",
-      actionId: "act-016",
-      kpiDelta: "전환율 22%",
-      dataSource: "프로모션 이벤트",
-      mode: "Simulation",
-    },
-    {
-      ...base,
-      id: "ev-010",
-      createdAt: ago(24 * 6),
-      type: "ADOPTION",
-      title: "주간 AX 사용 집계",
-      detail: "대표 5일, 구매담당 5일, 운영담당 5일 접속. 실행 12건 중 9건 처리.",
-      actor: "시스템",
-      kpiDelta: "실행 실행률 75%",
-      dataSource: "앱 사용 기록",
-      mode: "Simulation",
-    },
-    {
-      ...base,
-      id: "ev-011",
-      createdAt: ago(24 * 1),
-      type: "EXCEPTION",
-      title: "C구역 피킹 적체 82%",
-      detail: "동시간대 평균 40% 대비 2배. 인력 재배치 필요.",
-      actor: "시스템",
-      actionId: "act-004",
-      dataSource: "주문·출고",
-      mode: "Demo Evidence",
-    },
-    {
-      ...base,
-      id: "ev-012",
-      createdAt: ago(24 * 20),
-      type: "SCALE",
-      title: "구매담당 1인당 관리 SKU",
-      detail: "구매담당 1명이 관리하는 SKU 수를 측정지점으로 정의. 실측은 실증에서.",
-      actor: "AX 책임자",
-      kpiDelta: "측정지점 정의",
-      dataSource: "상품 마스터",
-      mode: "실증 준비",
-    },
-  ];
-  actions.forEach((a) => {
-    a.evidenceIds = evidence.filter((e) => e.actionId === a.id).map((e) => e.id);
-  });
+  // ---------- 집계 ----------
+  const allCustomerOrders = new Map<string, number>();
+  ledger.orders.forEach((o) =>
+    allCustomerOrders.set(o.customerId, (allCustomerOrders.get(o.customerId) ?? 0) + 1),
+  );
+  orders.forEach((o) => allCustomerOrders.set(o.customerId, (allCustomerOrders.get(o.customerId) ?? 0) + 1));
+  const recent30 = new Set<string>();
+  ledger.orders.filter((o) => o.day <= 30).forEach((o) => recent30.add(o.customerId));
+  orders.forEach((o) => recent30.add(o.customerId));
+  const customerCount = allCustomerOrders.size;
+  const repeaters = Array.from(allCustomerOrders.values()).filter((n) => n >= 2).length;
 
-  const orderCount90d = dailySales.reduce((a, c) => a + c.orders, 0);
-  const returnCount90d = dailySales.reduce((a, c) => a + c.returns, 0);
-
-  return {
+  const data: DemoData = {
     generatedAt: nowIso,
     categories: CATEGORIES,
     brands: BRANDS,
@@ -2225,7 +1846,7 @@ export function generateDemoData(now = new Date()): DemoData {
     skus,
     suppliers,
     supplierProducts,
-    warehouses: WAREHOUSES,
+    warehouses: WAREHOUSES.map((w) => ({ ...w })),
     inventory,
     purchaseOrders,
     customers,
@@ -2235,8 +1856,8 @@ export function generateDemoData(now = new Date()): DemoData {
     orders,
     returns,
     promotions,
-    actions,
-    evidence,
+    actions: [],
+    evidence: [],
     notifications: [
       {
         ...base,
@@ -2248,13 +1869,30 @@ export function generateDemoData(now = new Date()): DemoData {
       },
     ],
     aggregates: {
-      customerCount: 612,
-      orderCount90d,
-      returnCount90d,
-      repeatCustomerRate: 0.38,
-      detailVisitors30d: 18420,
-      cartEntrants30d: 4110,
-      orderers30d: 1730,
+      customerCount,
+      orderCount90d: dailySales.reduce((a, c) => a + c.orders, 0),
+      returnCount90d: dailySales.reduce((a, c) => a + c.returns, 0),
+      repeatCustomerRate: customerCount ? repeaters / customerCount : 0,
+      // 방문·장바구니는 행동 로그 집계 (시연: 주문 고객 수 기준 전환율 가정)
+      detailVisitors30d: Math.round(recent30.size / 0.094),
+      cartEntrants30d: Math.round(recent30.size / 0.41),
+      orderers30d: recent30.size,
     },
   };
+
+  // 구역 부하 (생성 시점) — 화면은 출고 시뮬레이션으로 실시간 재계산
+  const forecast = forecastShipments(data, now, { bulkyOf });
+  data.warehouses = data.warehouses.map((w) => ({
+    ...w,
+    congestion:
+      Math.round(Math.min(1.5, forecast.zones.find((z) => z.warehouse.id === w.id)?.utilization ?? 0) * 100) /
+      100,
+  }));
+
+  // 시스템이 계산한 초기 실행 추천 + 근거 기록
+  const seeded = buildSeedActions(data, ledger, now);
+  data.actions = seeded.actions;
+  data.evidence = seeded.evidence;
+  data.baseline = opsSnapshot(data, ledger, now);
+  return data;
 }

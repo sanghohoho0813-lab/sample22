@@ -66,3 +66,15 @@ export const RISK_LEVEL_LABEL: Record<string, string> = {
   MID: "중간",
   HIGH: "높음",
 };
+
+/** 반품 사유 */
+export const RETURN_REASON_LABEL: Record<string, string> = {
+  defect: "상품불량",
+  damaged: "파손",
+  wrong_item: "오배송",
+  delay: "배송지연",
+  info_mismatch: "상품정보 차이",
+  missing: "구성 누락",
+  change_mind: "단순 변심",
+  other: "기타",
+};

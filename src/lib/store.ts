@@ -2,8 +2,9 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { generateDemoData } from "./seed";
-import { assessOrderRisks, buildSkuInsights, compareSuppliers } from "./engines";
+import { buildSkuInsights } from "./engines";
 import type {
+  ActivityEntry,
   AXAction,
   ActionStage,
   CartItem,
@@ -17,6 +18,13 @@ import type {
 import { DEFAULT_THEME } from "./themes";
 import { STAGE_LABEL } from "./labels";
 import { dateKey } from "./format";
+import { getLedger } from "./dataset";
+import { cutoffOnOrAfter, forecastShipments, isPreShip } from "./fulfillment";
+import { DEFAULT_COST_MODEL, orderEconomics, type CostModel } from "./costs";
+import type { OpsException } from "./control";
+import { draftFromException, quickContext } from "./actionFactory";
+import { measureAction } from "./lifecycle";
+import { returnSignals } from "./returns";
 
 export type FontScale = "normal" | "large";
 export type DeviceMode = "desktop" | "mobile";
@@ -62,12 +70,13 @@ export const CUSTOMER_STAGE_LABEL: Record<OrderStage, string> = {
 };
 export const ACTION_STAGE_LABEL: Record<ActionStage, string> = {
   recommended: "추천됨",
-  reviewing: "검토중",
+  reviewing: "담당자 확인",
   approved: "승인",
-  requested: "발주요청",
+  requested: "실행중 · 입고 대기",
   in_progress: "실행중",
   done: "완료",
-  dismissed: "보류해제",
+  measured: "성과 측정",
+  dismissed: "기각",
   held: "보류",
 };
 
@@ -118,6 +127,8 @@ export interface UiState {
   compact: boolean;
   aiConnected: boolean;
   pilot: PilotState;
+  /** 비용 기준 (이익 분석) — 회사가 입력 */
+  costModel: CostModel;
 }
 
 export interface BaselineEntry {
@@ -239,6 +250,8 @@ export interface StoreState {
   setTutorialDone: (v: boolean) => void;
   setCompact: (v: boolean) => void;
   setHydrated: () => void;
+  /** 시연 데이터 교체 (재수화·새 시연일) */
+  replaceData: (data: DemoData) => void;
   // customer
   addToCart: (skuId: string, qty?: number) => void;
   updateCartQty: (skuId: string, qty: number) => void;
@@ -262,12 +275,18 @@ export interface StoreState {
     stage: ActionStage,
     opts?: { reason?: string; actor?: string; qty?: number; supplierId?: string },
   ) => void;
-  advanceOrder: (orderId: string, stage: OrderStage, actor?: string) => void;
+  /** 재고가 모자라 출고할 수 없으면 false */
+  advanceOrder: (orderId: string, stage: OrderStage, actor?: string) => boolean;
   notifyCustomer: (orderId: string, body: string) => void;
   receiveInbound: (poId: string) => void;
   addEvidence: (e: Omit<EvidenceLog, "id" | "createdAt" | "updatedAt" | "source">) => string;
   createActionFromSku: (skuId: string) => string | null;
   createPriorityAction: (orderIds: string[]) => string | null;
+  /** 컨트롤 타워 예외 → 실행 (이미 연결된 실행이 있으면 그 id) */
+  createActionFromException: (ex: OpsException) => string | null;
+  setCostModel: (patch: Partial<CostModel>) => void;
+  /** 고객 재입고 알림 신청 → 수요신호 */
+  requestRestock: (skuId: string) => void;
   setPilot: (patch: Partial<PilotState>) => void;
   setBaseline: (key: string, entry: BaselineEntry) => void;
   setStage: (stage: UiState["stage"]) => void;
@@ -288,15 +307,62 @@ const initialUi = (): UiState => ({
   compact: false,
   aiConnected: false,
   pilot: { baselines: {}, checklist: {} },
+  costModel: DEFAULT_COST_MODEL,
 });
+
+/**
+ * 저장된 시연 데이터가 있으면 그대로 쓰고, 없을 때만 새로 만든다 (첫 방문 외에는 시드 계산 생략).
+ * 서버 렌더·하이드레이션 전에는 빈 데이터 — 화면은 ClientGate가 자리표시로 가린다.
+ */
+const EMPTY_DATA: DemoData = {
+  generatedAt: "",
+  categories: [],
+  brands: [],
+  products: [],
+  skus: [],
+  suppliers: [],
+  supplierProducts: [],
+  warehouses: [],
+  inventory: [],
+  purchaseOrders: [],
+  customers: [],
+  demand: [],
+  dailySales: [],
+  categorySales: [],
+  orders: [],
+  returns: [],
+  promotions: [],
+  actions: [],
+  evidence: [],
+  notifications: [],
+  aggregates: {
+    customerCount: 0,
+    orderCount90d: 0,
+    returnCount90d: 0,
+    repeatCustomerRate: 0,
+    detailVisitors30d: 0,
+    cartEntrants30d: 0,
+    orderers30d: 0,
+  },
+};
+
+/** 시연 데이터가 오늘 만든 것이 아니면 새 시연일로 갱신 (출고마감·배송약속이 '오늘' 기준이므로) */
+export const isStaleData = (d: DemoData, now = new Date()) =>
+  !d.generatedAt || dateKey(new Date(d.generatedAt)) !== dateKey(now);
+
+const bulkyOfData = (data: DemoData) => {
+  const m = new Map(data.products.map((p) => [p.id, !!p.bulky]));
+  return (pid: string) => m.get(pid) ?? false;
+};
 
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
-      data: generateDemoData(),
+      data: EMPTY_DATA,
       ui: initialUi(),
       hydrated: false,
       setHydrated: () => set({ hydrated: true }),
+      replaceData: (data) => set({ data }),
       setRole: (role) => set((s) => ({ ui: { ...s.ui, role } })),
       setTheme: (theme) => set((s) => ({ ui: { ...s.ui, theme } })),
       setFontScale: (fontScale) => set((s) => ({ ui: { ...s.ui, fontScale } })),
@@ -388,15 +454,19 @@ export const useStore = create<StoreState>()(
           };
         });
         const subtotal = items.reduce((a, it) => a + it.unitPrice * it.qty, 0);
-        const shippingFee = subtotal >= 30000 ? 0 : 3000;
+        const cm = s.ui.costModel ?? DEFAULT_COST_MODEL;
+        const shippingFee = subtotal >= cm.freeShippingThreshold ? 0 : cm.shippingFee;
         const now = new Date();
         const d = dateKey(now).slice(2).replace(/-/g, "");
-        const id = `NX${d}-${String(s.data.orders.length + 1).padStart(4, "0")}`;
-        const cutoff = new Date(now);
-        cutoff.setHours(15, 0, 0, 0);
-        if (now > cutoff) cutoff.setDate(cutoff.getDate() + 1);
+        // 같은 날 주문번호 중 가장 큰 번호 + 1 (시드 주문과 겹치지 않게)
+        const maxSeq = s.data.orders
+          .filter((o) => o.id.startsWith(`NX${d}-`))
+          .reduce((m, o) => Math.max(m, Number(o.id.split("-")[1]) || 0), 0);
+        const id = `NX${d}-${String(maxSeq + 1).padStart(4, "0")}`;
+        const cutoff = cutoffOnOrAfter(now);
         const anyStandard = items.some((it) => prodById.get(it.productId)!.deliveryType !== "fast");
-        const promised = new Date(now.getTime() + (anyStandard ? 3 : now.getHours() < 15 ? 1 : 2) * 86400000);
+        const promised = new Date(cutoff.getTime() + (anyStandard ? 3 : 1) * 86400000);
+        promised.setHours(21, 0, 0, 0);
         const firstCat = prodById.get(items[0].productId)!.categorySlug;
         const whMap: Record<string, string> = {
           living: "wh-A",
@@ -425,30 +495,33 @@ export const useStore = create<StoreState>()(
           cutoffAt: cutoff.toISOString(),
           history: [{ at: now.toISOString(), stage: "new", actor: "고객", note: addressNote }],
           isRepeatOrder: isRepeat,
+          channel: "app",
         };
         // reserve inventory + demand signal
         const inventory = s.data.inventory.map((inv) => {
           const it = items.find((x) => x.skuId === inv.skuId);
           return it ? { ...inv, reserved: inv.reserved + it.qty, updatedAt: now.toISOString() } : inv;
         });
+        // 오늘 접수 수량에 더한다 (일평균 판매속도는 완료된 날 기준이라 바뀌지 않음 — 대신 예약재고가 늘어 가용재고가 준다)
         const demand = s.data.demand.map((dm) => {
           const it = items.find((x) => x.skuId === dm.skuId);
-          if (!it) return dm;
-          const daily = [...dm.dailySales];
-          daily[daily.length - 1] += it.qty;
-          return { ...dm, order7d: dm.order7d + it.qty, dailySales: daily };
+          return it ? { ...dm, today: (dm.today ?? 0) + it.qty } : dm;
         });
         const todayKey = dateKey(now);
+        const econ = orderEconomics(
+          { channel: "app", lines: items, discount: 0, shippingFee },
+          bulkyOfData(s.data),
+          cm,
+        );
         const dailySales = s.data.dailySales.map((p) =>
           p.date === todayKey
             ? {
                 ...p,
                 orders: p.orders + 1,
-                revenue: p.revenue + order.total,
-                grossMargin:
-                  p.grossMargin +
-                  items.reduce((a, it) => a + (it.unitPrice - it.unitCost) * it.qty, 0) -
-                  shippingFee,
+                revenue: p.revenue + econ.net,
+                cogs: (p.cogs ?? 0) + econ.cogs,
+                shippingCost: p.shippingCost + econ.shipCost - econ.shippingFee,
+                grossMargin: p.grossMargin + econ.net - econ.cogs - (econ.shipCost - econ.shippingFee),
               }
             : p,
         );
@@ -549,12 +622,10 @@ export const useStore = create<StoreState>()(
         const a = s.data.actions.find((x) => x.id === id);
         if (!a) return;
         const actor = opts?.actor ?? ROLE_PERSON[s.ui.role];
-        const t = nowIso();
-        let purchaseOrders = s.data.purchaseOrders;
-        let inventory = s.data.inventory;
-        let orders = s.data.orders;
-        let warehouses = s.data.warehouses;
-        let promotions = s.data.promotions;
+        const now = new Date();
+        const t = now.toISOString();
+        const bulkyOf = bulkyOfData(s.data);
+        let { purchaseOrders, inventory, orders, warehouses, promotions, notifications, suppliers } = s.data;
         const newEvidence: EvidenceLog[] = [];
         const push = (type: EvidenceType, title: string, detail: string, extra: Partial<EvidenceLog> = {}) =>
           newEvidence.push({
@@ -573,137 +644,229 @@ export const useStore = create<StoreState>()(
             supplierId: a.related.supplierId,
             ...extra,
           });
-        const patch: Partial<AXAction> = { stage, updatedAt: t };
+        const patch: Partial<AXAction> = { updatedAt: t };
+        const steps: ActivityEntry[] = [];
+        const step = (to: ActionStage, note: string, from: ActionStage = steps.at(-1)?.to ?? a.stage) =>
+          steps.push({ at: t, actor, from, to, note });
+        /** 출고 시뮬레이션으로 대상 주문 중 마감 초과(이월·재고부족 포함) 예상 건수 */
+        const missed = (d: DemoData, ids?: Set<string>, zone?: string) =>
+          forecastShipments(d, now, { bulkyOf }).orders.filter(
+            (p) =>
+              ["late", "overdue", "blocked"].includes(p.status) &&
+              (!ids || ids.has(p.order.id)) &&
+              (!zone || p.warehouseId === zone),
+          ).length;
 
-        if (stage === "approved" && (a.type === "urgent_po" || a.type === "alt_supplier")) {
-          const qty = opts?.qty ?? a.proposal?.qty ?? 0;
-          const supplierId = opts?.supplierId ?? a.proposal?.supplierId ?? a.related.supplierId!;
-          const sp = s.data.supplierProducts.find(
-            (x) => x.skuId === a.related.skuId && x.supplierId === supplierId,
-          );
-          const sup = s.data.suppliers.find((x) => x.id === supplierId)!;
-          const lead = sp?.leadTimeDays ?? sup.leadTimeDays;
-          const eta = dateKey(new Date(Date.now() + lead * 86400000));
-          const poId = `PO-${dateKey().slice(2, 7).replace("-", "")}-${String(purchaseOrders.length + 19).padStart(3, "0")}`;
-          purchaseOrders = [
-            {
-              id: poId,
-              createdAt: t,
-              updatedAt: t,
-              source: "demo",
-              supplierId,
-              skuId: a.related.skuId!,
-              qty,
-              unitCost: sp?.unitCost ?? 0,
-              status: "requested",
-              expectedAt: eta,
-              actionId: id,
-              actor,
-            },
-            ...purchaseOrders,
-          ];
-          inventory = inventory.map((inv) =>
-            inv.skuId === a.related.skuId
-              ? { ...inv, inboundExpected: inv.inboundExpected + qty, inboundEta: eta, updatedAt: t }
-              : inv,
-          );
-          patch.stage = "requested";
-          patch.related = { ...a.related, poId };
-          patch.proposal = { ...a.proposal, qty, supplierId };
-          patch.result = `${sup.name}에 ${qty}개 발주 요청 (입고예정 ${eta})`;
-          push(
-            "ACTION",
-            `${a.title} — 승인·발주요청`,
-            `${sup.name} ${qty}개, 예상 입고 ${eta}. 상품 상세 배송예정에 입고일 반영.`,
-            { kpiDelta: `입고예정 +${qty}` },
-          );
-        } else if (stage === "approved" && a.type === "priority_order") {
-          const ids = new Set(a.related.orderIds ?? []);
-          orders = orders.map((o) =>
-            ids.has(o.id) && ["new", "confirmed", "picking_wait"].includes(o.stage)
-              ? {
-                  ...o,
-                  stage: "picking" as OrderStage,
-                  assignee: "박운영",
-                  updatedAt: t,
-                  history: [...o.history, { at: t, stage: "picking" as OrderStage, actor, note: "우선처리" }],
-                }
-              : o,
-          );
-          warehouses = warehouses.map((w) => (w.id === "wh-C" ? { ...w, congestion: 0.48 } : w));
-          patch.stage = "in_progress";
-          patch.result = `${ids.size}건 우선 피킹 시작, C구역 인력 재배치`;
-          push(
-            "ACTION",
-            `${a.title} — 우선처리 시작`,
-            `${ids.size}건 피킹 단계로 전환. C구역 적체 82% → 48%.`,
-            { kpiDelta: "C구역 적체 -34%p" },
-          );
-        } else if (stage === "approved" && a.type === "delay_notice") {
-          const ids = new Set(a.related.orderIds ?? []);
-          orders = orders.map((o) => (ids.has(o.id) ? { ...o, customerNotified: true, updatedAt: t } : o));
-          patch.stage = "done";
-          patch.result = `${ids.size}건 고객 사전안내 발송`;
-          push("CUSTOMER", `${a.title} — 발송`, `${ids.size}명에게 배송지연 사전안내. 마이페이지 알림 반영.`);
-        } else if (stage === "approved" && a.type === "repeat_expose") {
-          patch.stage = "done";
-          patch.result = "다시 구매 노출 시작 (고객 홈 '다시 구매할 때' 섹션)";
-          push(
-            "CUSTOMER",
-            `${a.title} — 노출`,
-            "재구매 주기 도래 고객에게 다시 구매 노출. 전환 결과는 주문 성과 기록으로 누적.",
-          );
-        } else if (stage === "approved" && a.type === "promo_adjust") {
-          promotions = promotions.map((p) =>
-            p.id === a.related.promotionId
-              ? { ...p, discountRate: Math.max(0.05, p.discountRate - 0.05), updatedAt: t }
-              : p,
-          );
-          patch.stage = "done";
-          patch.result = "할인율 조정 적용";
-          push(
-            "REVENUE",
-            `${a.title} — 적용`,
-            "프로모션 할인율 5%p 하향. 실질마진 변화는 프로모션 화면에서 추적.",
-          );
-        } else if (stage === "approved" && a.type === "stop_po") {
-          patch.stage = "done";
-          patch.result = "발주 보류 확정, 재평가 일정 기록";
-          push("EFFICIENCY", `${a.title} — 발주 보류`, "추가 발주 보류. 재고자금 절감 효과는 실증에서 실측.");
-        } else if (stage === "done") {
-          if (a.type === "priority_order") {
+        if (stage === "reviewing") {
+          step("reviewing", opts?.reason || "담당자 확인 — 근거·대상 검토");
+          push("ADOPTION", `${a.title} — 담당자 확인`, `${actor} 확인 시작.`);
+        } else if (stage === "approved") {
+          step("approved", "승인");
+          if (a.type === "urgent_po" || a.type === "alt_supplier") {
+            const qty = opts?.qty ?? a.proposal?.qty ?? 0;
+            const supplierId = opts?.supplierId ?? a.proposal?.supplierId ?? a.related.supplierId!;
+            const sp = s.data.supplierProducts.find(
+              (x) => x.skuId === a.related.skuId && x.supplierId === supplierId,
+            );
+            const sup = s.data.suppliers.find((x) => x.id === supplierId)!;
+            const lead = sp?.leadTimeDays ?? sup.leadTimeDays;
+            const eta = dateKey(new Date(now.getTime() + lead * 86400000));
+            const ym = dateKey(now).slice(2, 7).replace("-", "");
+            const seq = purchaseOrders
+              .filter((p) => p.id.startsWith(`PO-${ym}-`))
+              .reduce((m, p) => Math.max(m, Number(p.id.split("-")[2]) || 0), 0);
+            const poId = `PO-${ym}-${String(Math.max(seq, 0) + 1).padStart(3, "0")}`;
+            purchaseOrders = [
+              {
+                id: poId,
+                createdAt: t,
+                updatedAt: t,
+                source: "demo",
+                supplierId,
+                skuId: a.related.skuId!,
+                qty,
+                unitCost: sp?.unitCost ?? 0,
+                status: "requested",
+                expectedAt: eta,
+                actionId: id,
+                actor,
+              },
+              ...purchaseOrders,
+            ];
+            inventory = inventory.map((inv) =>
+              inv.skuId === a.related.skuId
+                ? {
+                    ...inv,
+                    inboundExpected: inv.inboundExpected + qty,
+                    inboundEta: inv.inboundEta && inv.inboundEta < eta ? inv.inboundEta : eta,
+                    updatedAt: t,
+                  }
+                : inv,
+            );
+            step("requested", `${sup.name}에 ${poId} 발주 요청 (${qty}개, 입고예정 ${eta})`);
+            patch.related = { ...a.related, poId };
+            patch.proposal = { ...a.proposal, qty, supplierId };
+            patch.result = `${sup.name} ${qty}개 발주 요청 — 입고예정 ${eta}`;
+            push(
+              "ACTION",
+              `${a.title} — 승인·발주요청`,
+              `${sup.name} ${qty}개 (${poId}), 예상 입고 ${eta}. 고객 상품 상세의 배송예정에 입고일 반영.`,
+              {
+                kpiDelta: `입고예정 +${qty}`,
+              },
+            );
+          } else if (a.type === "priority_order") {
             const ids = new Set(a.related.orderIds ?? []);
+            const before = missed(s.data, ids);
             orders = orders.map((o) =>
-              ids.has(o.id) && !["shipped", "in_transit", "delivered", "cancelled"].includes(o.stage)
+              ids.has(o.id) && isPreShip(o.stage)
                 ? {
                     ...o,
-                    stage: "shipped" as OrderStage,
+                    priority: true,
                     updatedAt: t,
-                    history: [...o.history, { at: t, stage: "shipped" as OrderStage, actor }],
+                    history: [...o.history, { at: t, stage: o.stage, actor, note: "우선처리 지정" }],
                   }
                 : o,
             );
-            patch.result = `${ids.size}건 출고 완료. 고객 배송상태 반영.`;
-            push(
-              "RESULT",
-              `${a.title} — 출고 완료`,
-              `${ids.size}건 마감 전 출고. 고객 마이페이지 '출고완료' 반영.`,
-              { kpiDelta: "정시출고 +12건" },
+            const after = missed({ ...s.data, orders }, ids);
+            step("in_progress", `우선처리 ${ids.size}건 지정 — 출고 대기열 재계산`);
+            patch.result = `우선처리 ${ids.size}건 — 대상 주문 마감 초과 예상 ${before}건 → ${after}건 (시뮬레이션)`;
+            push("ACTION", `${a.title} — 우선처리 지정`, patch.result, {
+              kpiDelta: `마감 초과 예상 ${before}→${after}건`,
+            });
+          } else if (a.type === "staff_rebalance" && a.detail?.staffMove) {
+            const mv = a.detail.staffMove;
+            const before = missed(s.data, undefined, mv.to);
+            warehouses = warehouses.map((w) =>
+              w.id === mv.from
+                ? { ...w, staff: Math.max(0, w.staff - mv.n) }
+                : w.id === mv.to
+                  ? { ...w, staff: w.staff + mv.n }
+                  : w,
             );
+            const after = missed({ ...s.data, warehouses }, undefined, mv.to);
+            const fromName = warehouses.find((w) => w.id === mv.from)?.name.split(" ")[0];
+            const toName = warehouses.find((w) => w.id === mv.to)?.name.split(" ")[0];
+            step("in_progress", `${fromName} ${mv.n}명 → ${toName} 이동`);
+            patch.result = `${fromName} ${mv.n}명 → ${toName} — ${toName} 마감 초과 예상 ${before}건 → ${after}건 (시뮬레이션)`;
+            push("ACTION", `${a.title} — 재배치 시작`, patch.result, {
+              kpiDelta: `마감 초과 예상 ${before}→${after}건`,
+            });
+          } else if (a.type === "delay_notice") {
+            const ids = new Set(a.related.orderIds ?? []);
+            const f = forecastShipments(s.data, now, { bulkyOf });
+            const newNotes: typeof notifications = [];
+            orders = orders.map((o) => {
+              if (!ids.has(o.id)) return o;
+              const pred = f.orders.find((p) => p.order.id === o.id);
+              const ship = pred?.shipAt ?? new Date(now.getTime() + 86400000);
+              const eta = new Date(ship.getTime() + 86400000);
+              newNotes.push({
+                id: uid("n"),
+                createdAt: t,
+                updatedAt: t,
+                source: "demo",
+                customerId: o.customerId,
+                title: `주문 ${o.id} 출고 지연 안내`,
+                body: `${pred?.shortSkus.length ? "일부 상품 입고 대기로" : "주문 집중으로"} 출고가 늦어집니다. 새 도착 예정 ${eta.getMonth() + 1}/${eta.getDate()}.`,
+                read: false,
+              });
+              return { ...o, customerNotified: true, updatedAt: t };
+            });
+            notifications = [...newNotes, ...notifications];
+            step("in_progress", "안내 발송");
+            step("done", `${ids.size}명 고객 사전 안내 완료`);
+            patch.result = `${ids.size}명에게 지연 사유·새 도착 예정일 안내 — 고객 마이페이지 알림 반영`;
+            push("CUSTOMER", `${a.title} — 발송`, patch.result, { kpiDelta: `사전 안내 ${ids.size}건` });
+          } else if (a.type === "repeat_expose") {
+            const cids = new Set(a.related.customerIds ?? []);
+            const pname = s.data.products.find((p) => p.id === a.related.productId)?.name ?? "자주 사는 상품";
+            // 알림은 시연 상세 고객(저장 고객)에게만 저장 — 나머지는 노출 대상 명단으로 관리
+            const named = s.data.customers.filter((c) => cids.has(c.id));
+            notifications = [
+              ...named.map((c) => ({
+                id: uid("n"),
+                createdAt: t,
+                updatedAt: t,
+                source: "demo" as const,
+                customerId: c.id,
+                title: `${pname} 다시 살 때예요`,
+                body: "평소 구매 주기가 돌아왔어요. 지난번과 같은 구성으로 한 번에 담을 수 있어요.",
+                read: false,
+              })),
+              ...notifications,
+            ];
+            step("in_progress", `다시 구매 노출 시작 — 대상 ${cids.size}명`);
+            patch.result = `대상 ${cids.size}명 노출 중 (고객 홈 '다시 살 때' + 알림)`;
+            push("CUSTOMER", `${a.title} — 노출 시작`, `${patch.result}. 전환은 실제 주문 기록으로 측정.`);
+          } else if (a.type === "promo_adjust") {
+            const pr = promotions.find((p) => p.id === a.related.promotionId);
+            const next = pr ? Math.max(0.05, Math.round((pr.discountRate - 0.05) * 100) / 100) : 0;
+            promotions = promotions.map((p) =>
+              p.id === a.related.promotionId ? { ...p, discountRate: next, updatedAt: t } : p,
+            );
+            step(
+              "in_progress",
+              `할인율 ${Math.round((pr?.discountRate ?? 0) * 100)}% → ${Math.round(next * 100)}% 적용`,
+            );
+            step("done", "적용 완료");
+            patch.result = `할인율 ${Math.round(next * 100)}% 적용 — 이후 주문부터 이익 반영`;
+            push("REVENUE", `${a.title} — 적용`, patch.result);
+          } else if (a.type === "stop_po") {
+            step("in_progress", "추가 발주 보류 시작");
+            patch.result = "추가 발주 보류 중 — 보류 이후 발주 건수로 측정";
+            push("EFFICIENCY", `${a.title} — 발주 보류`, patch.result);
+          } else if (a.type === "quality_issue") {
+            const route = a.detail?.route;
+            if (route === "supplier" && a.related.supplierId) {
+              suppliers = suppliers.map((x) =>
+                x.id === a.related.supplierId
+                  ? {
+                      ...x,
+                      contractStatus: "review" as const,
+                      note: `품질 클레임 진행${a.related.poId ? ` (${a.related.poId} 로트)` : ""}`,
+                      updatedAt: t,
+                    }
+                  : x,
+              );
+            }
+            step(
+              "in_progress",
+              route === "supplier"
+                ? `공급사 품질 클레임 접수${a.related.poId ? ` · ${a.related.poId} 로트 잔량 검수` : ""}`
+                : route === "content"
+                  ? "상세페이지 수정 요청"
+                  : "출고 전 검수 강화",
+            );
+            patch.result = a.proposal?.note ?? "조치 진행 중";
+            push("ACTION", `${a.title} — 조치 시작`, `${patch.result}. 효과는 2~4주 반품률로 측정.`);
           } else {
-            patch.result = a.result ?? "완료";
-            push("RESULT", `${a.title} — 완료`, opts?.reason ?? "실행 완료 처리.");
+            step("in_progress", "실행 시작");
           }
+        } else if (stage === "in_progress") {
+          step("in_progress", opts?.reason || "실행 재개");
+        } else if (stage === "done") {
+          step("done", opts?.reason || "완료");
+          patch.result = a.result ?? "완료";
+          push("RESULT", `${a.title} — 완료`, opts?.reason ?? patch.result);
+        } else if (stage === "measured") {
+          const m = measureAction(a, s.data, getLedger(s.data), now);
+          patch.measurement = m;
+          step("measured", `성과 측정: ${m.metric} ${m.before} → ${m.after}`);
+          push("RESULT", `${a.title} — 성과 측정`, `${m.metric}: ${m.before} → ${m.after}. ${m.note}`, {
+            kpiDelta: `${m.before} → ${m.after}`,
+          });
         } else if (stage === "held" || stage === "dismissed") {
+          step(stage, `${stage === "held" ? "보류" : "기각"} — ${opts?.reason || "사유 미기록"}`);
           patch.holdReason = opts?.reason;
           push(
             "EXCEPTION",
-            `${a.title} — ${stage === "held" ? "보류" : "무시"}`,
+            `${a.title} — ${stage === "held" ? "보류" : "기각"}`,
             opts?.reason ?? "사유 미기록",
           );
-        } else if (stage === "reviewing") {
-          push("ADOPTION", `${a.title} — 검토 시작`, `${actor} 확인.`);
         }
+        patch.stage = steps.at(-1)?.to ?? stage;
+        patch.activity = [...(a.activity ?? []), ...steps];
         const actions = s.data.actions.map((x) =>
           x.id === id
             ? { ...x, ...patch, evidenceIds: [...x.evidenceIds, ...newEvidence.map((e) => e.id)] }
@@ -718,6 +881,8 @@ export const useStore = create<StoreState>()(
             orders,
             warehouses,
             promotions,
+            notifications,
+            suppliers,
             evidence: [...newEvidence, ...s.data.evidence],
           },
         });
@@ -726,10 +891,17 @@ export const useStore = create<StoreState>()(
       advanceOrder: (orderId, stage, actor) => {
         const s = get();
         const o = s.data.orders.find((x) => x.id === orderId);
-        if (!o) return;
+        if (!o) return false;
         const t = nowIso();
         const who = actor ?? ROLE_PERSON[s.ui.role];
         let inventory = s.data.inventory;
+        // 보유재고가 모자라면 출고할 수 없다 (예약재고는 이 주문 몫이 이미 포함)
+        if (stage === "shipped" || stage === "picking") {
+          const short = o.items.some(
+            (it) => (s.data.inventory.find((i) => i.skuId === it.skuId)?.onHand ?? 0) < it.qty,
+          );
+          if (short) return false;
+        }
         if (stage === "shipped") {
           inventory = inventory.map((inv) => {
             const it = o.items.find((x) => x.skuId === inv.skuId);
@@ -788,6 +960,7 @@ export const useStore = create<StoreState>()(
             ]
           : s.data.notifications;
         set({ data: { ...s.data, orders, inventory, evidence: [ev, ...s.data.evidence], notifications } });
+        return true;
       },
       notifyCustomer: (orderId, body) =>
         set((s) => {
@@ -833,9 +1006,19 @@ export const useStore = create<StoreState>()(
         const purchaseOrders = s.data.purchaseOrders.map((p) =>
           p.id === poId ? { ...p, status: "received" as const, receivedAt: t.slice(0, 10), updatedAt: t } : p,
         );
+        const actor = ROLE_PERSON[s.ui.role];
         const actions = s.data.actions.map((a) =>
-          a.related.poId === poId
-            ? { ...a, stage: "done" as ActionStage, result: `${po.qty}개 입고 완료`, updatedAt: t }
+          a.related.poId === poId && !["done", "measured", "dismissed"].includes(a.stage)
+            ? {
+                ...a,
+                stage: "done" as ActionStage,
+                result: `${po.id} ${po.qty}개 입고 완료 — 성과 측정 가능`,
+                updatedAt: t,
+                activity: [
+                  ...(a.activity ?? []),
+                  { at: t, actor, from: a.stage, to: "done" as ActionStage, note: `입고 완료 ${po.qty}개` },
+                ],
+              }
             : a,
         );
         const ev: EvidenceLog = {
@@ -867,159 +1050,147 @@ export const useStore = create<StoreState>()(
         }));
         return id;
       },
-      createActionFromSku: (skuId) => {
+      createActionFromException: (ex) => {
+        if (ex.action) return ex.action.id;
         const s = get();
-        if (s.data.actions.some((a) => a.related.skuId === skuId && !["done", "dismissed"].includes(a.stage)))
-          return null;
-        const ins = buildSkuInsights(s.data).find((i) => i.sku.id === skuId);
-        if (!ins) return null;
-        const t = nowIso();
+        const now = new Date();
+        const ledger = getLedger(s.data);
+        const insights = buildSkuInsights(s.data, now);
+        const ctx = quickContext(s.data, ledger, now, insights, returnSignals(s.data, ledger, now));
+        const draft = draftFromException(ex, ctx);
+        if (!draft) return null;
+        const t = now.toISOString();
         const id = uid("act");
         const actor = ROLE_PERSON[s.ui.role];
-        const isLow = ["urgent", "stockout", "low", "rising"].includes(ins.status) && ins.recommendedQty > 0;
-        const isSlow = ["slow", "overstock"].includes(ins.status);
-        if (!isLow && !isSlow) return null;
-        const urgent = ["urgent", "stockout"].includes(ins.status);
-        const options = compareSuppliers(s.data, skuId, urgent ? "urgent" : isSlow ? "overstock" : "normal");
-        const best = options.find((o) => o.recommended);
-        const days = ins.daysOfStock === Infinity ? "-" : ins.daysOfStock.toFixed(1);
-        const action: AXAction = isLow
-          ? {
-              id,
-              createdAt: t,
-              updatedAt: t,
-              source: "demo",
-              type: "urgent_po",
-              title: `${ins.product.name} ${ins.sku.name} ${urgent ? "긴급발주" : "발주"} 검토`,
-              summary: `가용재고 ${ins.available}개, 예상 소진 ${days}일. 공급 리드타임 ${ins.leadTimeDays}일 기준 ${ins.recommendedQty}개 발주 검토가 필요합니다.`,
-              trigger: urgent
-                ? `예상 소진일(${days}일) < 공급 리드타임(${ins.leadTimeDays}일)`
-                : `안전재고 미달 또는 수요 증가`,
-              reasons: ins.reasons.slice(0, 4),
-              expectedImpact: `품절 방지 · 약 ${ins.leadTimeDays + 7}일치 재고 확보`,
-              caution:
-                best && best.costDiffPct > 0
-                  ? `추천 공급사 단가가 최저가 대비 +${best.costDiffPct}%입니다.`
-                  : undefined,
-              urgency: urgent ? "critical" : ins.status === "low" ? "high" : "mid",
-              owner: "buyer",
-              assignee: "김구매",
-              recommendedAt: t,
-              dueAt: new Date(Date.now() + (urgent ? 6 : 48) * 3600000).toISOString(),
-              stage: "recommended",
-              related: {
-                productId: ins.product.id,
-                skuId,
-                supplierId: ins.sku.primarySupplierId,
-                altSupplierId: best?.supplier.id,
-              },
-              proposal: {
-                qty: ins.recommendedQty,
-                supplierId: best?.supplier.id ?? ins.sku.primarySupplierId,
-                note: `레이더 계산 · ${actor} 생성`,
-              },
-              evidenceIds: [],
-            }
-          : {
-              id,
-              createdAt: t,
-              updatedAt: t,
-              source: "demo",
-              type: "stop_po",
-              title: `${ins.product.name} ${ins.sku.name} 저회전 발주 보류 검토`,
-              summary: `재고일수 ${days}일, 재고금액 ${Math.round(ins.stockValue).toLocaleString()}원. 추가 발주를 보류하고 프로모션·묶음 구성을 검토합니다.`,
-              trigger: `재고일수 > ${ins.status === "slow" ? 180 : 75}일`,
-              reasons: ins.reasons.slice(0, 4),
-              expectedImpact: `재고자금 약 ${Math.round(ins.stockValue / 10000).toLocaleString()}만원 보류`,
-              urgency: "low",
-              owner: "buyer",
-              assignee: "김구매",
-              recommendedAt: t,
-              dueAt: new Date(Date.now() + 120 * 3600000).toISOString(),
-              stage: "recommended",
-              related: { productId: ins.product.id, skuId },
-              proposal: { note: `레이더 계산 · ${actor} 생성` },
-              evidenceIds: [],
-            };
         const ev: EvidenceLog = {
           id: uid("ev"),
           createdAt: t,
           updatedAt: t,
           source: "demo",
-          type: "RISK",
-          title: `${action.title} — 레이더에서 실행 생성`,
-          detail: `${actor}가 재고·발주 레이더 계산 결과로 실행을 생성. 근거: ${ins.reasons[0]}`,
+          type: ex.severity === "critical" ? "RISK" : "EXCEPTION",
+          title: `${draft.title} — 실행 생성`,
+          detail: `${actor}가 '${ex.title}' 예외에서 실행을 만들었습니다. 근거: ${ex.evidence[0] ?? ""}`,
           actor,
           actionId: id,
-          skuId,
-          dataSource: "수요신호 + 재고",
+          skuId: draft.related.skuId,
+          supplierId: draft.related.supplierId,
+          dataSource: "컨트롤 타워",
           mode: "Demo Evidence",
         };
-        action.evidenceIds = [ev.id];
+        const action: AXAction = {
+          ...draft,
+          id,
+          createdAt: t,
+          updatedAt: t,
+          source: "demo",
+          evidenceIds: [ev.id],
+          activity: [{ at: t, actor, to: "recommended", note: `시스템 추천 · ${actor} 실행 생성` }],
+        };
         set({
           data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] },
         });
         return id;
+      },
+      createActionFromSku: (skuId) => {
+        const s = get();
+        const open = s.data.actions.find(
+          (a) => a.related.skuId === skuId && !["done", "measured", "dismissed"].includes(a.stage),
+        );
+        if (open) return null;
+        const now = new Date();
+        const ins = buildSkuInsights(s.data, now).find((i) => i.sku.id === skuId);
+        if (!ins) return null;
+        const isLow = ["urgent", "stockout", "low", "rising"].includes(ins.status) && ins.recommendedQty > 0;
+        const isSlow = ["slow", "overstock"].includes(ins.status);
+        if (!isLow && !isSlow) return null;
+        // 레이더에서 바로 만든 실행도 컨트롤 타워와 같은 경로(예외 → 실행)를 탄다
+        const ex: OpsException = {
+          id: `ex-manual-${skuId}`,
+          kind: isLow ? "stockout" : "overstock",
+          severity: ["urgent", "stockout"].includes(ins.status) ? "critical" : isLow ? "high" : "low",
+          title: `${ins.product.name} ${ins.sku.name}`,
+          subject: "",
+          evidence: ins.reasons,
+          impact: isLow
+            ? {
+                value: ins.calc.lostRevenue,
+                unit: "원",
+                label: "지금 발주해도 비는 기간 판매",
+                basis: "발주량 계산식",
+              }
+            : {
+                value: ins.excessValue,
+                unit: "원",
+                label: "60일 판매분을 넘는 재고 원가",
+                basis: "재고 원가",
+              },
+          weight: 0,
+          owner: "buyer",
+          href: `/ax/inventory?sku=${skuId}`,
+          actionType: isLow ? "urgent_po" : "stop_po",
+          related: { skuId, productId: ins.product.id, supplierId: ins.sku.primarySupplierId },
+        };
+        return get().createActionFromException(ex);
       },
       createPriorityAction: (orderIds) => {
         const s = get();
         const covered = new Set(
           s.data.actions
-            .filter((a) => a.type === "priority_order" && !["done", "dismissed"].includes(a.stage))
+            .filter(
+              (a) => a.type === "priority_order" && !["done", "measured", "dismissed"].includes(a.stage),
+            )
             .flatMap((a) => a.related.orderIds ?? []),
         );
         const ids = orderIds.filter((o) => !covered.has(o));
         if (!ids.length) return null;
-        const risks = assessOrderRisks(s.data).filter((r) => ids.includes(r.order.id));
-        const t = nowIso();
-        const id = uid("act");
-        const actor = ROLE_PERSON[s.ui.role];
-        const zones = Array.from(
-          new Set(
-            risks.map((r) => s.data.warehouses.find((w) => w.id === r.order.warehouseId)?.name.split(" ")[0]),
-          ),
-        ).join("·");
-        const causes = Array.from(new Set(risks.flatMap((r) => r.causes))).slice(0, 4);
-        const action: AXAction = {
-          id,
-          createdAt: t,
-          updatedAt: t,
-          source: "demo",
-          type: "priority_order",
-          title: `${zones} 지연위험 주문 ${ids.length}건 우선처리`,
-          summary: `배송약속·출고마감·구역 적체 기준으로 지연위험이 감지된 주문 ${ids.length}건을 마감 전 우선 피킹합니다.`,
-          trigger: "배송 지연 위험 점수 ≥ 60",
-          reasons: causes.length ? causes : ["지연위험 점수 상위 주문"],
-          expectedImpact: "정시출고율 하락 방지, 배송지연 VOC 예방",
-          urgency: "critical",
+        const ex: OpsException = {
+          id: `ex-manual-priority`,
+          kind: "ship_risk",
+          severity: "critical",
+          title: `지연위험 주문 ${ids.length}건`,
+          subject: "",
+          evidence: ["출고 시뮬레이션상 마감 초과 또는 경과"],
+          impact: { value: ids.length, unit: "건", label: "대상 주문", basis: "출고 시뮬레이션" },
+          weight: 0,
           owner: "ops",
-          assignee: "박운영",
-          recommendedAt: t,
-          dueAt: risks[0]?.order.cutoffAt ?? t,
-          stage: "recommended",
+          href: "/ax/fulfillment?tab=forecast",
+          actionType: "priority_order",
           related: { orderIds: ids },
-          proposal: { note: `출고 관제 계산 · ${actor} 생성` },
-          evidenceIds: [],
         };
-        const ev: EvidenceLog = {
-          id: uid("ev"),
-          createdAt: t,
-          updatedAt: t,
-          source: "demo",
-          type: "EXCEPTION",
-          title: `${action.title} — 출고 관제에서 실행 생성`,
-          detail: `${actor}가 지연위험 ${ids.length}건에 대해 우선처리 실행 생성. ${causes[0] ?? ""}`,
-          actor,
-          actionId: id,
-          dataSource: "배송 지연 위험",
-          mode: "Demo Evidence",
-        };
-        action.evidenceIds = [ev.id];
-        set({
-          data: { ...s.data, actions: [action, ...s.data.actions], evidence: [ev, ...s.data.evidence] },
-        });
-        return id;
+        return get().createActionFromException(ex);
       },
+      setCostModel: (patch) =>
+        set((s) => ({ ui: { ...s.ui, costModel: { ...(s.ui.costModel ?? DEFAULT_COST_MODEL), ...patch } } })),
+      requestRestock: (skuId) =>
+        set((s) => {
+          const t = nowIso();
+          const sku = s.data.skus.find((k) => k.id === skuId);
+          const p = sku ? s.data.products.find((x) => x.id === sku.productId) : undefined;
+          return {
+            data: {
+              ...s.data,
+              demand: s.data.demand.map((d) =>
+                d.skuId === skuId ? { ...d, restockRequests: (d.restockRequests ?? 0) + 1 } : d,
+              ),
+              evidence: [
+                {
+                  id: uid("ev"),
+                  createdAt: t,
+                  updatedAt: t,
+                  source: "demo",
+                  type: "CUSTOMER",
+                  title: `${p?.name ?? skuId} 재입고 알림 신청`,
+                  detail: "품절 상품에 고객이 재입고 알림을 신청 — 재고·발주 레이더의 수요신호에 반영",
+                  actor: "고객",
+                  skuId,
+                  dataSource: "고객 플랫폼 → 공유 저장소",
+                  mode: "Demo Evidence",
+                },
+                ...s.data.evidence,
+              ],
+            },
+          };
+        }),
       setPilot: (patch) => set((s) => ({ ui: { ...s.ui, pilot: { ...s.ui.pilot, ...patch } } })),
       setBaseline: (key, entry) =>
         set((s) => ({
@@ -1066,18 +1237,19 @@ export const useStore = create<StoreState>()(
             theme: s.ui.theme,
             fontScale: s.ui.fontScale,
             tutorialDone: s.ui.tutorialDone,
+            costModel: s.ui.costModel ?? DEFAULT_COST_MODEL,
             demoResetAt: nowIso(),
           },
         })),
     }),
     {
       name: "nexmart-demo-v1",
-      // v2: 화면 문구 한글화(시드 데이터 포함) — 이전 방문자의 저장 데이터는 새 시드로 교체하고 설정(테마·글자·역할)은 유지
-      version: 3,
+      // v2: 화면 문구 한글화 · v3: 일자 키 로컬 기준 · v4: 90일 주문 원장·출고 시뮬레이션 기반 데이터
+      // — 구조가 바뀌면 시연 데이터만 새로 만들고 설정(테마·글자·역할·비용 기준)은 유지
+      version: 4,
       migrate: (persisted, version) => {
         const p = (persisted ?? {}) as Partial<StoreState>;
-        // v3: 일자 키를 UTC → 로컬 기준으로 바꿨으므로 시연 데이터를 다시 만든다
-        return (version < 3 ? { ...p, data: generateDemoData() } : p) as StoreState;
+        return (version < 4 ? { ...p, data: undefined } : p) as StoreState;
       },
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ data: s.data, ui: s.ui }),
@@ -1086,6 +1258,7 @@ export const useStore = create<StoreState>()(
         return {
           ...current,
           ...p,
+          data: p.data ?? current.data,
           ui: {
             ...initialUi(),
             ...(p.ui ?? {}),
@@ -1094,7 +1267,38 @@ export const useStore = create<StoreState>()(
         };
       },
       onRehydrateStorage: () => (state) => {
-        state?.setHydrated();
+        // 서버 렌더에서는 만들지 않는다 (화면은 하이드레이션 후 ClientGate가 연다)
+        if (!state || typeof window === "undefined") return;
+        // 첫 방문이거나 다른 날 만든 시연 데이터면 오늘 기준으로 새로 만든다
+        // (이 콜백은 스토어 생성 중에 동기로 불릴 수 있어 useStore 대신 state의 액션을 쓴다)
+        if (isStaleData(state.data)) {
+          const fresh = generateDemoData();
+          const hadData = !!state.data.generatedAt;
+          state.replaceData(
+            hadData
+              ? {
+                  ...fresh,
+                  evidence: [
+                    {
+                      id: uid("ev"),
+                      createdAt: fresh.generatedAt,
+                      updatedAt: fresh.generatedAt,
+                      source: "demo",
+                      type: "BASELINE",
+                      title: "새 시연일 — 운영 데이터 갱신",
+                      detail:
+                        "출고마감·배송약속이 오늘 기준이 되도록 시연 데이터를 새로 만들었습니다. 설정은 유지됩니다.",
+                      actor: "시스템",
+                      dataSource: "시연 데이터",
+                      mode: "Demo Evidence",
+                    },
+                    ...fresh.evidence,
+                  ],
+                }
+              : fresh,
+          );
+        }
+        state.setHydrated();
       },
     },
   ),

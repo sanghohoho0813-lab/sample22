@@ -65,7 +65,7 @@ export default function OrderCalcPanel({ ins }: { ins: SkuInsight }) {
                     {r.note && <span className="block text-[12px] text-muted">{r.note}</span>}
                   </td>
                   <td
-                    className={`whitespace-nowrap py-1.5 pr-2 text-right tabular-nums ${r.strong ? "text-[16px] font-black" : "font-semibold"}`}
+                    className={`whitespace-nowrap py-1.5 pr-2 text-right tabular-nums ${r.strong ? "text-[16px] font-bold" : "font-semibold"}`}
                   >
                     {r.v}
                   </td>

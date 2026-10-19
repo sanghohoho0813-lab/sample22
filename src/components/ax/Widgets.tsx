@@ -86,7 +86,7 @@ export function KpiCard({
         {(href || onClick) && <ChevronRight size={16} className="text-muted" />}
       </div>
       <div
-        className={`mt-1.5 whitespace-nowrap font-black tabular-nums leading-tight tracking-tight ${big ? "text-[clamp(1.5rem,7vw,2.25rem)]" : "text-[clamp(1.375rem,6vw,1.875rem)]"}`}
+        className={`mt-1.5 whitespace-nowrap font-bold tabular-nums leading-tight tracking-tight ${big ? "text-[clamp(1.5rem,7vw,2.25rem)]" : "text-[clamp(1.375rem,6vw,1.875rem)]"}`}
       >
         {typeof value === "string" || typeof value === "number" ? <CountUp text={String(value)} /> : value}
       </div>
@@ -146,11 +146,11 @@ export function Panel({
         <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="min-w-0 flex-1 basis-[15rem]">
             {title && (
-              <h2 className="text-lg font-bold leading-snug [&>span.inline-flex>svg]:mt-[3px] [&>span.inline-flex>svg]:shrink-0 [&>span.inline-flex]:items-start">
+              <h2 className="text-[18px] font-bold leading-snug tracking-tight [&>span.inline-flex>svg]:mt-[3px] [&>span.inline-flex>svg]:shrink-0 [&>span.inline-flex]:items-start">
                 {title}
               </h2>
             )}
-            {sub && <p className="mt-0.5 text-sm leading-relaxed text-muted">{sub}</p>}
+            {sub && <p className="mt-0.5 text-[14px] leading-relaxed text-muted">{sub}</p>}
           </div>
           {right && <div className="flex shrink-0 flex-wrap items-center gap-2">{right}</div>}
         </div>

@@ -139,7 +139,7 @@ export default function ActionsView() {
               onClick={() => setStageFilter("all")}
             >
               <div className="text-[12px] font-semibold text-muted">전체</div>
-              <div className="text-[20px] font-black tabular-nums">{counts.all}</div>
+              <div className="text-[20px] font-bold tabular-nums">{counts.all}</div>
             </button>
           </li>
           {LIFECYCLE.map((s, i) => {
@@ -160,7 +160,7 @@ export default function ActionsView() {
                   <div className="text-[12px] font-semibold text-muted">
                     {i + 1}. {s.stage === "in_progress" ? "승인 · 실행중" : s.label}
                   </div>
-                  <div className="text-[20px] font-black tabular-nums">{n}</div>
+                  <div className="text-[20px] font-bold tabular-nums">{n}</div>
                 </button>
               </li>
             );
@@ -174,7 +174,7 @@ export default function ActionsView() {
                 onClick={() => setStageFilter(k)}
               >
                 <div className="text-[12px] font-semibold text-muted">{ACTION_STAGE_LABEL[k]}</div>
-                <div className="text-[20px] font-black tabular-nums text-muted">{counts[k] ?? 0}</div>
+                <div className="text-[20px] font-bold tabular-nums text-muted">{counts[k] ?? 0}</div>
               </button>
             ))}
           </li>

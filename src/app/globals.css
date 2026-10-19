@@ -95,6 +95,10 @@ main:focus {
 }
 
 @layer components {
+  /* 업무 화면(AX)은 그림자를 거의 없애고 테두리로 구획 — 데이터가 주인공인 엔터프라이즈 톤 */
+  .ax-surface .card {
+    box-shadow: 0 1px 2px rgba(16, 36, 62, 0.04);
+  }
   .card {
     @apply rounded-2xl border border-line bg-white shadow-card;
   }
@@ -446,10 +450,12 @@ main:focus {
 }
 /* 이미지 호버 확대(소폭) */
 .zoom-hover img,
+.zoom-hover svg[role="img"],
 .zoom-hover > .zoom-target {
   transition: transform 220ms ease-out;
 }
 .zoom-hover:hover img,
+.zoom-hover:hover svg[role="img"],
 .zoom-hover:hover > .zoom-target {
   transform: scale(1.03);
 }

@@ -432,8 +432,9 @@ export default function CustomerShell({
                 DEMO <ChevronRight size={13} />
               </button>
             )}
+            {/* 홈은 본문 첫 화면에 큰 검색창이 있으므로 상단 검색창을 두지 않는다 (검색창 중복 방지) */}
             <div className="hidden max-w-2xl flex-1 md:block">
-              <SearchBox label="상단 상품 검색" />
+              {pathname !== "/" && <SearchBox label="상단 상품 검색" />}
             </div>
             <div className="flex-1 md:hidden" />
             <nav className="-mr-1.5 flex shrink-0 items-center gap-0.5 sm:mr-0 sm:gap-2">
@@ -621,7 +622,7 @@ export default function CustomerShell({
 
       {!hideBottomNav && (
         <nav
-          className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-line bg-white md:hidden"
+          className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-white/95 shadow-[0_-4px_18px_rgba(16,36,62,0.05)] backdrop-blur-md md:hidden"
           aria-label="모바일 메뉴"
         >
           <ul className="grid h-16 grid-cols-5">
@@ -637,9 +638,16 @@ export default function CustomerShell({
                 <li key={n.href}>
                   <Link
                     href={n.href}
-                    className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[13px] font-semibold ${on ? "text-primary" : "text-muted"}`}
+                    aria-current={on ? "page" : undefined}
+                    className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[12px] ${on ? "font-bold text-primary" : "font-medium text-muted"}`}
                   >
-                    <n.icon size={22} strokeWidth={on ? 2.4 : 2} />
+                    {on && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute top-0 h-[3px] w-7 rounded-b-full bg-primary"
+                      />
+                    )}
+                    <n.icon size={23} strokeWidth={on ? 2.3 : 1.8} />
                     {n.label}
                     {hydrated && n.count ? (
                       <span className="absolute right-1/2 top-1.5 flex h-[18px] min-w-[18px] translate-x-4 items-center justify-center rounded-full bg-orange-strong px-1 text-[12px] font-bold tabular-nums text-white">

@@ -128,7 +128,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-4 sm:py-6">
-      <nav className="mb-3 flex items-center gap-1 text-xs text-muted" aria-label="경로">
+      <nav className="mb-3 hidden items-center gap-1 text-xs text-muted sm:flex" aria-label="경로">
         <Link href="/" className="hover:text-ink">
           홈
         </Link>
@@ -140,16 +140,17 @@ export default function ProductDetailView({ productId }: { productId: string }) 
         <span className="truncate">{product.name}</span>
       </nav>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:gap-10">
-        {/* gallery */}
-        <div>
+      <div className="grid gap-5 lg:grid-cols-[1fr_1fr] lg:gap-12">
+        {/* gallery — 휴대폰은 화면 폭을 꽉 채운 정사각 상품컷, 데스크톱은 스크롤해도 따라오는 고정 이미지 */}
+        <div className="-mx-4 -mt-4 sm:mx-0 sm:mt-0 lg:sticky lg:top-32 lg:self-start">
           <AssetImage
             assetKey={`product/${product.id}`}
             category={product.categorySlug}
             label={product.name}
+            brand={brandById.get(product.brandId)?.name}
             seed={parseInt(product.id.slice(2), 10)}
-            className="rounded-3xl"
-            ratio="aspect-[4/3] sm:aspect-square"
+            className="sm:rounded-3xl"
+            ratio="aspect-square"
           />
           {hasAsset(`product/${product.id}`) && (
             <div className="mt-2 grid grid-cols-4 gap-2">
@@ -169,10 +170,13 @@ export default function ProductDetailView({ productId }: { productId: string }) 
 
         {/* buy box */}
         <div>
-          <div className="text-sm text-muted">
-            {brandById.get(product.brandId)?.name} · {categoryBySlug.get(product.categorySlug)?.name}
+          <div className="text-[15px] text-muted">
+            <span className="font-semibold text-ink">{brandById.get(product.brandId)?.name}</span> ·{" "}
+            {categoryBySlug.get(product.categorySlug)?.name}
           </div>
-          <h1 className="mt-1 text-balance text-2xl font-bold leading-tight sm:text-3xl">{product.name}</h1>
+          <h1 className="mt-1 text-balance text-[24px] font-bold leading-snug tracking-tight sm:text-[30px]">
+            {product.name}
+          </h1>
           <div className="mt-2 flex items-center gap-2 text-sm">
             <span className="inline-flex items-center gap-1 font-semibold">
               <Star size={15} className="fill-highlight text-highlight" />
@@ -184,8 +188,10 @@ export default function ProductDetailView({ productId }: { productId: string }) 
           </div>
 
           <div className="mt-4 flex flex-wrap items-baseline gap-2">
-            {discount > 0 && <span className="text-2xl font-bold text-orange">{discount}%</span>}
-            <span className="text-3xl font-black tabular-nums">{won(sku.salePrice)}</span>
+            {discount > 0 && <span className="text-[26px] font-bold text-accent">{discount}%</span>}
+            <span className="text-[30px] font-extrabold tabular-nums tracking-tight">
+              {won(sku.salePrice)}
+            </span>
             {discount > 0 && (
               <span className="tabular-nums text-muted line-through">{won(sku.listPrice)}</span>
             )}
@@ -193,18 +199,16 @@ export default function ProductDetailView({ productId }: { productId: string }) 
           {unit && <div className="mt-0.5 text-sm text-muted">{unit}</div>}
 
           {/* delivery promise — 언제 받는가 */}
-          <div
-            className={`mt-4 rounded-2xl border p-4 ${promise.kind === "fast" ? "border-teal/40 bg-teal/5" : promise.kind === "reserve" ? "border-orange/40 bg-orange/5" : promise.kind === "soldout" ? "border-danger/30 bg-danger/5" : "border-line bg-mist"}`}
-          >
-            <div className="flex items-center gap-2 text-[19px] font-bold">
-              {promise.kind === "fast" ? (
-                <Zap size={18} className="fill-teal text-teal" />
-              ) : (
-                <Truck size={18} className="text-muted" />
-              )}
+          <div className="mt-5 rounded-2xl bg-mist p-4">
+            <div className="flex items-center gap-2.5 text-[18px] font-bold">
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${promise.kind === "fast" ? "bg-teal-strong text-white" : promise.kind === "reserve" ? "bg-orange-strong text-white" : promise.kind === "soldout" ? "bg-danger text-white" : "bg-white text-muted"}`}
+              >
+                {promise.kind === "fast" ? <Zap size={16} className="fill-current" /> : <Truck size={16} />}
+              </span>
               {promise.text}
             </div>
-            <div className="mt-1 text-sm text-muted">
+            <div className="mt-1 pl-[42px] text-sm text-muted">
               {promise.kind === "fast" && promise.note}
               {promise.kind === "standard" && "일반배송 · 출고 후 2~3일"}
               {promise.kind === "reserve" &&
@@ -213,12 +217,12 @@ export default function ProductDetailView({ productId }: { productId: string }) 
             </div>
             {(promise.kind === "soldout" || promise.kind === "reserve") &&
               (alerts?.some((x) => x.skuId === sku.id && x.customerId === myId) ? (
-                <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                <p className="mt-2 inline-flex items-center gap-1.5 pl-[42px] text-sm font-semibold text-primary">
                   <Bell size={15} /> 재입고 알림 신청됨 — 입고되면 알림으로 알려드려요
                 </p>
               ) : (
                 <button
-                  className="btn-outline btn-sm mt-2"
+                  className="btn-outline btn-sm ml-[42px] mt-2"
                   onClick={() => {
                     requestRestock(sku.id);
                     toast({
@@ -231,7 +235,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
                   <Bell size={15} /> 재입고 알림 신청
                 </button>
               ))}
-            <div className="mt-2 inline-flex items-center gap-1 text-xs text-muted">
+            <div className="mt-2 inline-flex items-center gap-1 pl-[42px] text-xs text-muted">
               <PackageCheck size={13} />
               {available > 0 ? (available <= 20 ? `남은 재고 ${available}개` : "재고 충분") : "재고 없음"} ·
               배송비{" "}
@@ -243,7 +247,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
 
           {/* options */}
           <div className="mt-4">
-            <div className="mb-2 text-sm font-semibold">구성 선택</div>
+            <div className="mb-2 text-[15px] font-bold">구성 선택</div>
             <div className="grid grid-cols-1 gap-2">
               {summary.skus.map((s) => {
                 const i = invBySku.get(s.id);
@@ -279,7 +283,7 @@ export default function ProductDetailView({ productId }: { productId: string }) 
                     <div className="text-right">
                       <div className="font-bold tabular-nums">{won(s.salePrice)}</div>
                       {s.listPrice > s.salePrice && (
-                        <div className="text-xs font-semibold text-orange">
+                        <div className="text-xs font-semibold text-accent">
                           {Math.round((1 - s.salePrice / s.listPrice) * 100)}% 할인
                         </div>
                       )}
@@ -459,16 +463,16 @@ export default function ProductDetailView({ productId }: { productId: string }) 
         </div>
       </div>
 
-      <section className="mt-4">
-        <h2 className="section-title mb-3">같은 카테고리 인기상품</h2>
+      <section className="mt-6 border-t border-line pt-8">
+        <h2 className="mb-4 text-[21px] font-bold tracking-tight">같은 카테고리 인기상품</h2>
         <ProductRail>
           {related.map((s) => (
             <ProductCard key={s.product.id} s={s} />
           ))}
         </ProductRail>
       </section>
-      <section className="mt-9">
-        <h2 className="section-title mb-3">함께 구매한 상품</h2>
+      <section className="mt-10">
+        <h2 className="mb-4 text-[21px] font-bold tracking-tight">함께 구매한 상품</h2>
         <ProductRail>
           {together.map((s) => (
             <ProductCard key={s.product.id} s={s} />

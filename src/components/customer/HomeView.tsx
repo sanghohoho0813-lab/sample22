@@ -1,27 +1,28 @@
 "use client";
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, Zap, RotateCcw, ShieldCheck, Truck, Undo2, Headset } from "lucide-react";
-import { useData, useNow } from "@/lib/hooks";
+import {
+  ArrowRight,
+  ChevronRight,
+  MapPin,
+  Plus,
+  RotateCcw,
+  ShieldCheck,
+  Truck,
+  Undo2,
+  Headset,
+  Zap,
+} from "lucide-react";
+import { useData, useLookups, useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { searchProducts } from "@/lib/catalog";
 import { repeatItemsForCustomer } from "@/lib/engines";
 import { SearchBox } from "./CustomerShell";
 import ProductCard, { ProductRail } from "./ProductCard";
 import AssetImage from "@/components/shared/AssetImage";
-import { shipCutdown, todayLabel, won } from "@/lib/format";
+import ProductArt, { shortName } from "@/components/shared/ProductArt";
+import { shipCutdown, won } from "@/lib/format";
 import { useToast } from "@/components/shared/Toast";
-
-const CAT_ICON: Record<string, string> = {
-  food: "🍚",
-  living: "🧻",
-  kitchen: "🧽",
-  home: "🛋️",
-  digital: "🔌",
-  pet: "🐾",
-  baby: "🍼",
-  health: "💊",
-};
 
 function Section({
   title,
@@ -30,6 +31,7 @@ function Section({
   more,
   children,
   id,
+  className = "",
 }: {
   title: string;
   sub?: string;
@@ -37,20 +39,21 @@ function Section({
   more?: string;
   children: React.ReactNode;
   id?: string;
+  className?: string;
 }) {
   return (
-    <section id={id} className="mx-auto mt-9 max-w-[1280px] px-4 sm:mt-14">
-      <div className="mb-3 flex items-end justify-between gap-3 sm:mb-4">
+    <section id={id} className={`mx-auto mt-10 max-w-[1280px] px-4 sm:mt-14 ${className}`}>
+      <div className="mb-3.5 flex items-end justify-between gap-3 sm:mb-5">
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
-          {sub && <p className="mt-0.5 text-sm text-muted">{sub}</p>}
+          <h2 className="text-[21px] font-bold tracking-tight sm:text-2xl">{title}</h2>
+          {sub && <p className="mt-0.5 text-[15px] text-muted">{sub}</p>}
         </div>
         {href && (
           <Link
             href={href}
-            className="inline-flex min-h-[40px] shrink-0 items-center gap-1 text-[15px] font-semibold text-primary hover:underline"
+            className="inline-flex min-h-[40px] shrink-0 items-center gap-0.5 text-[15px] font-semibold text-muted hover:text-ink"
           >
-            {more ?? "전체보기"} <ArrowRight size={15} />
+            {more ?? "전체보기"} <ChevronRight size={17} />
           </Link>
         )}
       </div>
@@ -61,6 +64,7 @@ function Section({
 
 export default function HomeView() {
   const data = useData();
+  const { brandById } = useLookups();
   const customerId = useStore((s) => s.ui.customerId);
   const addToCart = useStore((s) => s.addToCart);
   const toast = useToast();
@@ -70,7 +74,15 @@ export default function HomeView() {
     () => searchProducts(data, { discountOnly: true, sort: "discount" }).slice(0, 8),
     [data],
   );
-  const repeat = useMemo(() => repeatItemsForCustomer(data, customerId).slice(0, 4), [data, customerId]);
+  // 카테고리 타일: 그 카테고리에서 가장 많이 팔리는 상품의 이미지로 (사진이 들어오면 category/<slug> 사진 우선)
+  const catLead = useMemo(() => {
+    const m = new Map<string, string>();
+    searchProducts(data, { sort: "popular" }).forEach((s) => {
+      if (!m.has(s.product.categorySlug)) m.set(s.product.categorySlug, s.product.name);
+    });
+    return m;
+  }, [data]);
+  const repeat = useMemo(() => repeatItemsForCustomer(data, customerId).slice(0, 6), [data, customerId]);
   const together = useMemo(() => {
     const cats = new Set(repeat.map((r) => r.product.categorySlug));
     return searchProducts(data, { sort: "popular" })
@@ -79,197 +91,192 @@ export default function HomeView() {
   }, [data, repeat]);
   const me = data.customers.find((c) => c.id === customerId);
   const now = useNow(30000);
-  const cut = useMemo(() => (now ? { ...shipCutdown(now), now } : null), [now]);
+  const cut = useMemo(() => (now ? shipCutdown(now) : null), [now]);
+  const bestDeal = deals[0];
+  const dueCount = repeat.filter((r) => r.dueInDays <= 3).length;
 
   return (
     <div className="pb-6">
-      {/* Hero + Search */}
-      <section className="bg-navy text-white">
-        <div className="mx-auto grid max-w-[1280px] items-center gap-8 px-4 pb-12 pt-7 sm:pb-14 sm:pt-12 lg:grid-cols-[1.15fr_1fr]">
-          <div>
-            <p className="text-sm font-semibold tracking-wide text-teal-bright">
-              생활에 필요한 모든 것, 한 번에
-            </p>
-            <h1 className="mt-2 text-balance text-[32px] font-black leading-[1.2] tracking-tight sm:text-[54px]">
-              찾고, 배송일 확인하고,
-              <br className="hidden sm:block" /> 오늘 바로 주문하세요
-            </h1>
-            <p className="mt-3 max-w-xl text-[17px] text-white/75 sm:text-[19px]">
-              재고와 도착일을 구매 전에 확인하고, 자주 쓰는 상품은 한 번에 다시 담으세요.
-            </p>
-            <div className="mt-6 max-w-2xl text-ink">
-              <SearchBox size="lg" label="메인 상품 검색" />
-            </div>
-            <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/80">
-              <li className="inline-flex items-center gap-1.5 lg:hidden">
-                <Zap size={15} className="fill-teal text-teal-bright" />
-                {cut
-                  ? cut.beforeCutoff
-                    ? `오늘 15:00까지 ${cut.remain} 남음 · ${cut.arriveLabel} 도착`
-                    : `지금 주문 시 ${cut.arriveLabel} 도착`
-                  : "15:00 전 주문 시 내일 도착"}
-              </li>
-              <li className="inline-flex items-center gap-1.5">
-                <Truck size={15} className="text-teal-bright" />
-                3만원 이상 무료배송
-              </li>
-              <li className="hidden items-center gap-1.5 sm:inline-flex">
-                <RotateCcw size={15} className="text-teal-bright" />
-                다시 구매 한 번에 담기
-              </li>
-            </ul>
-          </div>
-          <div className="relative hidden lg:block">
-            <AssetImage
-              assetKey="hero-01"
-              category="living"
-              variant="hero"
-              ratio="aspect-[4/3.6] sm:aspect-[4/3]"
-              className="rounded-3xl border border-white/10 bg-white/10"
-            />
-            {/* 사진 자산이 들어오기 전에도 비어 보이지 않도록: 실시간 배송 현황 오버레이 */}
-            <div className="absolute left-4 right-4 top-4">
-              <div className="rounded-2xl bg-white/95 px-4 py-3 text-ink shadow-card">
-                <div className="text-[13px] font-semibold text-muted">
-                  {cut ? todayLabel(cut.now, false) : "오늘"} 빠른배송
-                </div>
-                {cut?.beforeCutoff ? (
-                  <div className="mt-0.5 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-black tabular-nums text-navy sm:text-3xl">
-                      {cut.remain}
-                    </span>
-                    <span className="text-sm font-semibold text-muted">남음</span>
-                  </div>
-                ) : (
-                  <div className="mt-0.5 text-xl font-black text-navy">오늘 마감</div>
-                )}
-                <div className="mt-0.5 text-xs text-muted">
-                  지금 주문 시 <b className="text-teal">{cut?.arriveLabel ?? "-"}</b> 도착 예정
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 gap-2">
-              {[
-                ["카테고리 8", "생활 필수품 중심"],
-                ["배송예정", "구매 전 확인"],
-                ["재구매 추천", "구매주기 기반"],
-              ].map(([a, b]) => (
-                <div key={a} className="rounded-xl bg-white/95 px-2.5 py-2 text-ink">
-                  <div className="whitespace-nowrap text-[15px] font-bold sm:text-sm">{a}</div>
-                  <div className="mt-0.5 text-[12px] leading-tight text-muted sm:text-[13px]">{b}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Category quick action */}
-      <section className="mx-auto -mt-6 max-w-[1280px] px-4">
-        <div className="card-raised stagger grid grid-cols-4 gap-1 p-3 sm:grid-cols-8 sm:gap-2 sm:p-4">
-          {data.categories.map((c) => (
+      {/* 첫 화면: 누구에게 · 어디로 · 언제 도착 → 검색 (행동 중심) */}
+      <section className="border-b border-line/70 bg-white">
+        <div className="mx-auto max-w-[1280px] px-4 pb-5 pt-4 sm:pb-7 sm:pt-7">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <Link
-              key={c.slug}
-              href={`/category/${c.slug}`}
-              className="flex flex-col items-center gap-1.5 rounded-xl py-2.5 transition-[background-color,transform] duration-150 hover:-translate-y-0.5 hover:bg-mist"
+              href="/my"
+              className="inline-flex min-h-[36px] min-w-0 items-center gap-1.5 text-[15px] text-muted hover:text-ink"
             >
-              <span
-                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-soft text-2xl"
-                aria-hidden
-              >
-                {CAT_ICON[c.slug]}
+              <MapPin size={16} className="shrink-0 text-primary" />
+              <span className="truncate">
+                {me?.address.label ?? "우리집"} · {me?.address.line1 ?? "배송지 설정"}
               </span>
-              <span className="text-sm font-semibold">{c.name}</span>
+              <ChevronRight size={15} className="shrink-0" />
             </Link>
-          ))}
+            <span className="hidden text-[14px] text-muted sm:inline">
+              3만원 이상 무료배송 · 7일 이내 교환·반품
+            </span>
+          </div>
+          <h1 className="mt-2 text-[26px] font-bold leading-[1.3] tracking-tight sm:text-[34px]">
+            {me ? `${me.name}님, ` : ""}
+            {cut ? (
+              cut.beforeCutoff ? (
+                <>
+                  지금 주문하면 <span className="text-primary">{cut.arriveLabel}</span> 도착
+                </>
+              ) : (
+                <>
+                  오늘 마감 · <span className="text-primary">{cut.arriveLabel}</span> 도착
+                </>
+              )
+            ) : (
+              "필요한 생활상품, 한 번에"
+            )}
+          </h1>
+          <div className="mt-4 max-w-3xl">
+            <SearchBox size="lg" label="메인 상품 검색" />
+          </div>
         </div>
       </section>
 
-      <Section title="빠른배송 상품" sub="오늘 15:00 전 주문하면 내일 도착" href="/fast">
+      {/* 프로모션 — 모바일은 옆으로 넘기기, 태블릿 이상은 한 줄 3칸 */}
+      <section aria-label="오늘의 혜택" className="mx-auto mt-5 max-w-[1280px] sm:mt-7 sm:px-4">
+        <div className="hide-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0">
+          <Promo
+            href="/fast"
+            tone="primary"
+            eyebrow={
+              <>
+                <Zap size={14} className="fill-current" /> 빠른배송
+              </>
+            }
+            title={
+              cut?.beforeCutoff ? `${cut.remain} 안에 주문하면 내일 도착` : "15:00 전 주문하면 내일 도착"
+            }
+            sub={`빠른배송 상품 ${fast.length}종 이상`}
+            arts={fast.slice(0, 3).map((s) => s.product.name)}
+          />
+          <Promo
+            href="/deals"
+            tone="accent"
+            eyebrow="이번 주 특가"
+            title={
+              bestDeal
+                ? `${shortName(bestDeal.product.name)} 최대 ${Math.max(bestDeal.bestDiscount, bestDeal.discountRate)}% 할인`
+                : "묶음 구성 할인"
+            }
+            sub="묶음 구성 할인 포함"
+            arts={deals.slice(0, 3).map((s) => s.product.name)}
+          />
+          <Promo
+            href="/my/repeat"
+            tone="shell"
+            eyebrow={
+              <>
+                <RotateCcw size={14} /> 다시 구매
+              </>
+            }
+            title={dueCount ? `다시 살 때가 된 상품 ${dueCount}개` : "자주 사는 상품 한 번에 담기"}
+            sub="구매주기에 맞춰 수량까지 추천"
+            arts={repeat.slice(0, 3).map((r) => r.product.name)}
+          />
+        </div>
+      </section>
+
+      {/* 카테고리 — 글자 아이콘 대신 대표 상품 이미지 */}
+      <section aria-label="카테고리" className="mx-auto mt-7 max-w-[1280px] px-4 sm:mt-10">
+        <ul className="grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-8 sm:gap-x-4">
+          {data.categories.map((c) => (
+            <li key={c.slug}>
+              <Link href={`/category/${c.slug}`} className="group flex flex-col items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="block w-full max-w-[84px] overflow-hidden rounded-[22px] transition-transform duration-150 group-hover:-translate-y-0.5"
+                >
+                  <AssetImage assetKey={`category/${c.slug}`} category={c.slug} label={catLead.get(c.slug)} />
+                </span>
+                <span className="text-[15px] font-medium">{c.name}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {repeat.length > 0 && (
+        <Section
+          title="다시 살 때예요"
+          sub={`${me?.name ?? "고객"}님의 구매주기 기준`}
+          href="/my/repeat"
+          more="한 번에 담기"
+        >
+          <div className="hide-scrollbar -mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
+            {repeat.map((r) => {
+              const sku = r.altSku ?? r.sku;
+              const due = r.dueInDays <= 0 ? "지금 살 때" : `${r.dueInDays}일 후`;
+              return (
+                <div
+                  key={r.product.id}
+                  className="flex w-[82%] shrink-0 snap-start items-center gap-3 rounded-2xl border border-line bg-white p-3 xs:w-[300px] lg:w-auto"
+                >
+                  <Link
+                    href={`/product/${r.product.id}`}
+                    className="shrink-0"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  >
+                    <AssetImage
+                      assetKey={`product/${r.product.id}`}
+                      category={r.product.categorySlug}
+                      label={r.product.name}
+                      brand={brandById.get(r.product.brandId)?.name}
+                      className="h-[72px] w-[72px] rounded-xl"
+                      ratio=""
+                    />
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={`text-[13px] font-semibold ${r.dueInDays <= 0 ? "text-accent" : "text-muted"}`}
+                    >
+                      {due} · {r.avgCycleDays}일 주기
+                    </span>
+                    <Link
+                      href={`/product/${r.product.id}`}
+                      className="line-clamp-1 text-[16px] font-semibold"
+                    >
+                      {r.product.name}
+                    </Link>
+                    <div className="text-[14px] text-muted">
+                      {sku.name} · <b className="tabular-nums text-ink">{won(sku.salePrice)}</b>
+                      {r.altSku && <span className="text-accent"> · 대체구성</span>}
+                    </div>
+                  </div>
+                  <button
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-soft text-primary transition-colors hover:bg-primary hover:text-white"
+                    aria-label={`${r.product.name} 다시 담기`}
+                    onClick={() => {
+                      addToCart(sku.id, r.suggestedQty);
+                      toast({
+                        title: "다시 담았습니다",
+                        body: `${r.product.name} ×${r.suggestedQty}`,
+                        tone: "success",
+                        action: { label: "장바구니 보기", href: "/cart" },
+                      });
+                    }}
+                  >
+                    <Plus size={20} strokeWidth={2.4} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      <Section title="내일 도착 빠른배송" sub="오늘 15:00 전 주문 시" href="/fast">
         <ProductRail>
           {fast.slice(0, 8).map((s) => (
             <ProductCard key={s.product.id} s={s} />
           ))}
         </ProductRail>
       </Section>
-
-      {repeat.length > 0 && (
-        <Section
-          title="다시 구매할 때"
-          sub={`${me?.name ?? "고객"}님의 구매주기에 맞춘 상품`}
-          href="/my/repeat"
-          more="한 번에 담기"
-        >
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="card divide-y divide-line">
-              {repeat.map((r) => {
-                const sku = r.altSku ?? r.sku;
-                const due = r.dueInDays <= 0 ? "지금 주문할 때" : `${r.dueInDays}일 후 필요`;
-                return (
-                  <div key={r.product.id} className="flex items-center gap-3 p-3">
-                    <Link href={`/product/${r.product.id}`} className="shrink-0">
-                      <AssetImage
-                        assetKey={`product/${r.product.id}`}
-                        category={r.product.categorySlug}
-                        label={r.product.name}
-                        className="h-16 w-16 rounded-xl"
-                        ratio=""
-                      />
-                    </Link>
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/product/${r.product.id}`}
-                        className="line-clamp-1 text-[17px] font-semibold"
-                      >
-                        {r.product.name}
-                      </Link>
-                      <div className="mt-0.5 line-clamp-1 text-[13px] text-muted">
-                        {sku.name} ·{" "}
-                        <span className={r.dueInDays <= 0 ? "font-semibold text-orange" : ""}>{due}</span>
-                        {r.altSku && <span className="text-orange"> · 대체구성</span>}
-                      </div>
-                      <div className="mt-0.5 font-bold tabular-nums">{won(sku.salePrice)}</div>
-                    </div>
-                    <button
-                      className="btn-outline btn-sm"
-                      onClick={() => {
-                        addToCart(sku.id, r.suggestedQty);
-                        toast({
-                          title: "다시 담았습니다",
-                          body: `${r.product.name} ×${r.suggestedQty}`,
-                          tone: "success",
-                          action: { label: "장바구니 보기", href: "/cart" },
-                        });
-                      }}
-                    >
-                      다시 담기
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            <Link
-              href="/my/repeat"
-              className="hidden flex-col justify-between rounded-2xl bg-shell p-5 text-white transition hover:brightness-110 lg:flex"
-            >
-              <div>
-                <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-highlight">
-                  <RotateCcw size={16} />
-                  다시 구매
-                </div>
-                <div className="mt-2 text-xl font-bold leading-snug">
-                  자주 사는 {repeat.length}개 상품,
-                  <br />한 번에 다시 담기
-                </div>
-                <p className="mt-2 text-sm text-white/70">구매주기와 현재 재고를 확인해 수량을 추천합니다.</p>
-              </div>
-              <div className="mt-4 inline-flex items-center gap-1 font-semibold">
-                바로 가기 <ArrowRight size={16} />
-              </div>
-            </Link>
-          </div>
-        </Section>
-      )}
 
       <Section title="지금 많이 찾는 상품" sub="최근 7일 주문 기준" href="/search?q=">
         <ProductRail>
@@ -278,6 +285,22 @@ export default function HomeView() {
           ))}
         </ProductRail>
       </Section>
+
+      {/* 특가는 띠 배경으로 구분 — 스크롤 중 섹션 리듬 */}
+      <div className="mt-10 bg-accent/[0.07] pb-8 pt-1 sm:mt-14 sm:pb-12">
+        <Section
+          title="이번 주 특가"
+          sub="할인율 높은 순 · 묶음 구성 포함"
+          href="/deals"
+          className="!mt-6 sm:!mt-9"
+        >
+          <ProductRail>
+            {deals.slice(0, 8).map((s) => (
+              <ProductCard key={s.product.id} s={s} />
+            ))}
+          </ProductRail>
+        </Section>
+      </div>
 
       {together.length > 0 && (
         <Section title="함께 사면 좋은 상품" sub="자주 구매한 카테고리에서 골랐습니다">
@@ -289,39 +312,73 @@ export default function HomeView() {
         </Section>
       )}
 
-      <Section title="이번 주 특가" sub="할인율 높은 순" href="/deals">
-        <ProductRail>
-          {deals.slice(0, 8).map((s) => (
-            <ProductCard key={s.product.id} s={s} />
-          ))}
-        </ProductRail>
-      </Section>
-
-      {/* Trust */}
-      <section id="trust" className="mx-auto mt-10 max-w-[1280px] px-4 sm:mt-14">
+      {/* 신뢰 — 한 줄 안내 */}
+      <section id="trust" className="mx-auto mt-12 max-w-[1280px] px-4 sm:mt-16">
         <h2 className="sr-only">배송·교환 안내</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-x-4 gap-y-5 border-t border-line pt-6 md:grid-cols-4">
           {[
-            { icon: Truck, t: "배송예정 사전 안내", d: "구매 전 도착 예정일 표시, 지연 시 사전 알림" },
-            { icon: Undo2, t: "7일 이내 교환·반품", d: "단순 변심 포함, 마이페이지에서 바로 신청" },
-            { icon: ShieldCheck, t: "정품·검수 상품", d: "계약 공급사 상품만 취급, 입고 시 검수" },
+            { icon: Truck, t: "도착일 미리 안내", d: "구매 전 도착 예정일, 지연 시 사전 알림" },
+            { icon: Undo2, t: "7일 이내 교환·반품", d: "마이페이지에서 바로 신청" },
+            { icon: ShieldCheck, t: "계약 공급사 상품", d: "입고 시 검수 후 출고" },
             { icon: Headset, t: "고객센터 09~18시", d: "주문·배송·반품 문의 (시연용)" },
           ].map((x) => (
-            <div
-              key={x.t}
-              className="flex flex-col gap-2 rounded-2xl bg-mist p-3.5 sm:flex-row sm:gap-3 sm:p-4"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-primary">
-                <x.icon size={19} />
-              </span>
+            <li key={x.t} className="flex gap-2.5">
+              <x.icon size={20} className="mt-0.5 shrink-0 text-primary" />
               <div className="min-w-0">
                 <div className="text-[15px] font-semibold">{x.t}</div>
                 <div className="mt-0.5 text-[13px] leading-snug text-muted">{x.d}</div>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
     </div>
+  );
+}
+
+/** 프로모션 배너 — 브랜드 색 면 + 실제 상품 이미지 3개 */
+function Promo({
+  href,
+  tone,
+  eyebrow,
+  title,
+  sub,
+  arts,
+}: {
+  href: string;
+  tone: "primary" | "accent" | "shell";
+  eyebrow: React.ReactNode;
+  title: string;
+  sub: string;
+  arts: string[];
+}) {
+  const bg = { primary: "bg-primary-strong", accent: "bg-accent-strong", shell: "bg-shell" }[tone];
+  return (
+    <Link
+      href={href}
+      className={`group relative flex h-[168px] w-[84%] shrink-0 snap-start flex-col overflow-hidden rounded-[22px] p-5 text-white xs:w-[340px] sm:h-[184px] sm:w-auto ${bg}`}
+    >
+      <span className="inline-flex items-center gap-1 text-[14px] font-semibold text-white">{eyebrow}</span>
+      <span className="mt-1.5 max-w-[60%] text-[19px] font-bold leading-snug tracking-tight sm:max-w-[64%] sm:text-[21px]">
+        {title}
+      </span>
+      <span className="mt-auto inline-flex items-center gap-1 text-[14px] text-white">
+        {sub} <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+      </span>
+      <span aria-hidden="true" className="absolute bottom-0 right-0 h-full w-[40%]">
+        {arts.slice(0, 2).map((n, i) => (
+          <span
+            key={n}
+            className={`absolute rounded-full bg-white/95 shadow-[0_6px_18px_rgba(0,0,0,0.18)] ${
+              i === 0
+                ? "bottom-4 right-4 h-[88px] w-[88px]"
+                : "right-3 top-4 h-[56px] w-[56px] sm:right-24 sm:top-6"
+            }`}
+          >
+            <ProductArt name={n} className="h-full w-full" />
+          </span>
+        ))}
+      </span>
+    </Link>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo } from "react";
-import { Minus, Plus, Trash2, Heart, ShoppingCart, ArrowRight } from "lucide-react";
+import { Minus, Plus, Trash2, Heart, ShoppingCart, ArrowRight, Truck } from "lucide-react";
 import { useData, useLookups, useShippingRule } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { deliveryPromise, won } from "@/lib/format";
@@ -15,7 +15,7 @@ import ProductCard, { ProductRail } from "./ProductCard";
 export default function CartView() {
   const ship = useShippingRule();
   const data = useData();
-  const { skuById, productById, invBySku } = useLookups();
+  const { skuById, productById, invBySku, brandById } = useLookups();
   const cart = useStore((s) => s.ui.cart);
   const updateQty = useStore((s) => s.updateCartQty);
   const remove = useStore((s) => s.removeFromCart);
@@ -102,6 +102,37 @@ export default function CartView() {
                 선택 삭제
               </button>
             </div>
+            {subtotal > 0 && (
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2 text-[14px]">
+                  {subtotal >= ship.threshold ? (
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-teal">
+                      <Truck size={15} /> 무료배송 조건을 채웠어요
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Truck size={15} className="text-primary" />
+                      <b className="tabular-nums text-primary">{won(ship.threshold - subtotal)}</b> 더 담으면
+                      무료배송
+                    </span>
+                  )}
+                  <span className="tabular-nums text-muted">{won(ship.threshold)} 기준</span>
+                </div>
+                <div
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist"
+                  role="progressbar"
+                  aria-label="무료배송까지"
+                  aria-valuemin={0}
+                  aria-valuemax={ship.threshold}
+                  aria-valuenow={Math.min(subtotal, ship.threshold)}
+                >
+                  <div
+                    className={`h-full rounded-full transition-[width] duration-300 ${subtotal >= ship.threshold ? "bg-teal" : "bg-primary"}`}
+                    style={{ width: `${Math.min(100, (subtotal / ship.threshold) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
             {rows.map(({ c, sku, product, available, promise }) => (
               <div key={c.skuId} className="flex gap-3 p-4">
                 <input
@@ -116,6 +147,7 @@ export default function CartView() {
                     assetKey={`product/${product.id}`}
                     category={product.categorySlug}
                     label={product.name}
+                    brand={brandById.get(product.brandId)?.name}
                     className="h-20 w-20 rounded-xl sm:h-24 sm:w-24"
                     ratio=""
                   />

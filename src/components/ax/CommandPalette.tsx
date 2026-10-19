@@ -16,16 +16,18 @@ type Hit = { group: string; label: string; sub?: string; href: string };
 const LIMIT = 5;
 
 export function CommandButton({ onOpen }: { onOpen: () => void }) {
+  // 넓은 화면: 입력창 모양(업무 시스템 관례) · 좁은 화면: 아이콘 버튼
   return (
     <button
       onClick={onOpen}
-      className="btn-ghost btn-sm !px-2 text-muted sm:!px-3"
+      className="btn-ghost btn-sm !px-2 text-muted sm:!px-3 xl:w-64 xl:justify-start xl:border xl:border-line xl:bg-mist/70 xl:hover:bg-white"
       title="검색 (Ctrl+K)"
       aria-keyshortcuts="Control+K Meta+K"
     >
       <Search size={18} aria-hidden="true" />
-      <span className="sr-only text-[14px] xl:not-sr-only">검색</span>
-      <span className="kbd hidden xl:inline-flex" aria-hidden="true">
+      <span className="sr-only text-[14px] font-normal xl:not-sr-only">검색</span>
+      <span className="hidden text-[13px] font-normal text-muted xl:inline">상품·주문·고객·실행</span>
+      <span className="kbd ml-auto hidden xl:inline-flex" aria-hidden="true">
         ⌘K
       </span>
     </button>

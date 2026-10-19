@@ -259,10 +259,16 @@ export function LineChart({
             strokeDasharray="3 4"
           />
         ))}
+        <defs>
+          <linearGradient id={`${id.replace(/[^\w-]/g, "")}-area`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={color} stopOpacity={0.16} />
+            <stop offset="1" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        {/* 면 채움 — opacity가 아닌 그라데이션 투명도로 (등장 애니메이션이 opacity를 1로 덮어써 선을 가리던 문제) */}
         <path
           d={`${path("value")} L${x(n - 1)},${H - padB} L${x(0)},${H - padB} Z`}
-          fill={color}
-          opacity={0.08}
+          fill={`url(#${id.replace(/[^\w-]/g, "")}-area)`}
           className="fade-in"
         />
         <path
@@ -314,6 +320,18 @@ export function LineChart({
         <div className="card-raised pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-xs">
           <b>{data[hover].label}</b> · {label1} {format(data[hover].value)}
           {label2 ? ` · ${label2} ${format(data[hover].value2 ?? 0)}` : ""}
+        </div>
+      )}
+      {label2 && (
+        <div className="mt-1 flex justify-end gap-4 text-xs text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <i className="inline-block h-0.5 w-4 rounded" style={{ background: color }} />
+            {label1}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="inline-block h-0.5 w-4 rounded" style={{ background: color2 }} />
+            {label2}
+          </span>
         </div>
       )}
     </div>

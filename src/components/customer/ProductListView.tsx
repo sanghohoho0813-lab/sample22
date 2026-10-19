@@ -351,7 +351,7 @@ export default function ProductListView({
               />
               <div className="px-4 pb-4">
                 <div className="mb-2 text-sm font-semibold">지금 많이 찾는 상품</div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
                   {searchProducts(data, { sort: "popular" })
                     .slice(0, 4)
                     .map((s) => (
@@ -361,7 +361,7 @@ export default function ProductListView({
               </div>
             </div>
           ) : (
-            <div className="fade-up mt-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="fade-up mt-4 grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-4 sm:gap-y-9 md:grid-cols-3 xl:grid-cols-4">
               {results.map((s) => (
                 <ProductCard key={s.product.id} s={s} />
               ))}

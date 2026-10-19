@@ -32,7 +32,7 @@ src/lib/        데이터: rng(결정적 난수) · ledger(90일 주문 원장) 
                 기타: store(공유 저장소·실행 부수효과) · hooks · labels · brand · types · themes(9) · catalog · format
 src/components/ shared(Overlay·MobileDrawer·Charts·Badge·Toast·AssetImage·Bits·SampleBridgeCTA) · customer(Shell·Home·List·Detail·Cart·Checkout·Orders) · ax(Shell·CommandPalette·OpsUi·ActionDrawer·ExceptionDrawer·14 View)
 src/app/        Customer 14 routes · /ax 14 routes
-public/assets/  사진 자산 슬롯 (README 참조 — 파일 추가만으로 반영)
+public/assets/  사진 자산 슬롯 (README 참조 — 파일 추가만으로 반영, 없으면 shared/ProductArt가 패키지 일러스트로 대신 그림)
 ```
 
 ## 개발

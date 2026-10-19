@@ -615,7 +615,7 @@ export default function AxShell({
   );
 
   return (
-    <div className="flex min-h-screen bg-mist">
+    <div className="ax-surface flex min-h-screen bg-mist">
       <a href="#main" className="skip-link">
         본문 바로가기
       </a>

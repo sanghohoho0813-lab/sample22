@@ -38,7 +38,11 @@ export function Impact({
   return (
     <span className="inline-flex flex-col items-end leading-tight">
       <span className={`tabular-nums ${strong ? "font-bold text-ink" : ""}`}>{text}</span>
-      {label && <span className="text-[12px] text-muted">{label}</span>}
+      {label && (
+        <span className="max-w-[150px] whitespace-normal text-right text-[12px] leading-snug text-muted">
+          {label}
+        </span>
+      )}
       {basis && <span className="sr-only">계산식: {basis}</span>}
     </span>
   );
@@ -332,7 +336,7 @@ export function StatusCell({
     <>
       <div className="text-[13px] font-semibold text-muted">{label}</div>
       <div
-        className={`mt-0.5 whitespace-nowrap text-[22px] font-black tabular-nums leading-tight tracking-tight ${t}`}
+        className={`mt-0.5 whitespace-nowrap text-[22px] font-bold tabular-nums leading-tight tracking-tight ${t}`}
       >
         {value}
       </div>

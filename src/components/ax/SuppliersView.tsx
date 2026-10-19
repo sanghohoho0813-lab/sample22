@@ -371,7 +371,7 @@ export default function SuppliersView() {
                     {cmp.map((o) => (
                       <td
                         key={o.supplier.id}
-                        className={`text-[16px] font-black tabular-nums ${o.recommended ? "bg-soft/40 text-primary" : ""}`}
+                        className={`text-[16px] font-bold tabular-nums ${o.recommended ? "bg-soft/40 text-primary" : ""}`}
                       >
                         {won(o.totalCost)}
                       </td>

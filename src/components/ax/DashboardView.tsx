@@ -504,7 +504,7 @@ export default function DashboardView() {
                   href={`/ax/actions?stage=${p.stage}`}
                   className="block rounded-xl bg-mist px-2 py-2.5 text-center hover:bg-soft"
                 >
-                  <div className="text-[22px] font-black tabular-nums">{p.count}</div>
+                  <div className="text-[22px] font-bold tabular-nums">{p.count}</div>
                   <div className="text-[12px] font-semibold text-muted">{p.label}</div>
                 </Link>
               </li>

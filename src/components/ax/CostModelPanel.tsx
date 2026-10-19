@@ -140,7 +140,7 @@ export default function CostModelPanel() {
             ))}
             <div className="flex items-baseline justify-between gap-2 border-t border-line pt-2">
               <dt className="font-bold">공헌이익</dt>
-              <dd className="text-[18px] font-black tabular-nums">
+              <dd className="text-[18px] font-bold tabular-nums">
                 {money(cur.contribution)}{" "}
                 <span className="text-[13px] font-semibold text-muted">{pctText(cur.marginRate)}</span>
               </dd>

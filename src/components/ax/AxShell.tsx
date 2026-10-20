@@ -23,7 +23,6 @@ import {
   Smartphone,
   ChevronDown,
   HelpCircle,
-  Bell,
   RotateCcw,
   ExternalLink,
   ArrowRight,
@@ -38,6 +37,7 @@ import { Freshness } from "@/components/shared/Bits";
 import Overlay from "@/components/shared/Overlay";
 import { THEMES } from "@/lib/themes";
 import Tutorial from "./Tutorial";
+import AxBell from "./AxBell";
 import CommandPalette, { CommandButton, useCommandHotkey } from "./CommandPalette";
 import SampleBridgeCTA, { SidebarBridgeCTA } from "@/components/shared/SampleBridgeCTA";
 import { useToast } from "@/components/shared/Toast";
@@ -803,16 +803,7 @@ export default function AxShell({
                   </div>
                 )}
               </div>
-              <Link
-                href="/ax/actions"
-                className="relative hidden h-11 w-11 items-center justify-center rounded-xl hover:bg-mist sm:inline-flex"
-                aria-label="알림"
-              >
-                <Bell size={20} />
-                {hydrated && openActions > 0 && (
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />
-                )}
-              </Link>
+              <AxBell />
               {!inIframe && (
                 <button
                   onClick={() => setTutorial(true)}

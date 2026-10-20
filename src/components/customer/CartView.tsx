@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo } from "react";
-import { Minus, Plus, Trash2, Heart, ShoppingCart, ArrowRight, Truck } from "lucide-react";
+import { Minus, Plus, Trash2, Heart, ArrowRight, Truck, Zap } from "lucide-react";
 import { useData, useLookups, useShippingRule } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { deliveryPromise, won } from "@/lib/format";
@@ -44,6 +44,27 @@ export default function CartView() {
   const subtotal = selected.reduce((a, r) => a + r.sku.salePrice * r.c.qty, 0);
   const shipping = ship.feeFor(subtotal);
   const allSelected = rows.length > 0 && rows.every((r) => r.c.selected);
+  const groups = [
+    {
+      key: "fast",
+      label: `빠른배송 · ${rows.find((r) => r.promise.kind === "fast")?.promise.text.replace(/ 예정$/, "") ?? "내일 도착"}`,
+      items: rows.filter((r) => r.promise.kind === "fast"),
+    },
+    { key: "rest", label: "일반배송 · 예약배송", items: rows.filter((r) => r.promise.kind !== "fast") },
+  ];
+  // 무료배송까지 남은 금액을 채우는 상품 — 남은 금액 이상 중 가장 가까운 가격 순 (장바구니에 없는 인기 상품)
+  const remaining = subtotal > 0 ? ship.threshold - subtotal : 0;
+  const fillers =
+    remaining > 0
+      ? searchProducts(data, { sort: "popular" })
+          .filter((s) => !s.soldOut && !cart.some((c) => skuById.get(c.skuId)?.productId === s.product.id))
+          .sort(
+            (a, b) =>
+              (a.defaultSku.salePrice >= remaining ? 0 : 1) - (b.defaultSku.salePrice >= remaining ? 0 : 1) ||
+              Math.abs(a.defaultSku.salePrice - remaining) - Math.abs(b.defaultSku.salePrice - remaining),
+          )
+          .slice(0, 4)
+      : [];
   const suggestions = searchProducts(data, { sort: "popular" })
     .filter((s) => !cart.some((c) => c.skuId === s.defaultSku.id))
     .slice(0, 4);
@@ -54,7 +75,7 @@ export default function CartView() {
       {rows.length === 0 ? (
         <div className="card mt-4">
           <EmptyState
-            icon={<ShoppingCart size={22} />}
+            art="cart"
             title="장바구니가 비어 있습니다"
             body="자주 쓰는 생활상품을 담아보세요. 3만원 이상이면 배송비가 무료입니다."
             action={
@@ -133,90 +154,124 @@ export default function CartView() {
                 </div>
               </div>
             )}
-            {rows.map(({ c, sku, product, available, promise }) => (
-              <div key={c.skuId} className="flex gap-3 p-4">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-5 w-5 shrink-0 accent-[var(--t-primary)]"
-                  checked={c.selected}
-                  onChange={() => toggleSelect(c.skuId)}
-                  aria-label={`${product.name} 선택`}
-                />
-                <Link href={`/product/${product.id}`} className="shrink-0">
-                  <AssetImage
-                    assetKey={`product/${product.id}`}
-                    category={product.categorySlug}
-                    label={product.name}
-                    brand={brandById.get(product.brandId)?.name}
-                    className="h-20 w-20 rounded-xl sm:h-24 sm:w-24"
-                    ratio=""
-                  />
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <Link href={`/product/${product.id}`} className="line-clamp-2 font-semibold leading-snug">
-                    {product.name}
-                  </Link>
-                  <div className="mt-0.5 text-[14px] text-muted">{sku.name}</div>
-                  <div className="mt-1">
-                    <DeliveryBadge promise={promise} compact />
+            {/* 배송 유형별로 묶어 "언제 오는지"를 먼저 보여준다 */}
+            {groups.map((g) =>
+              g.items.length ? (
+                <div key={g.key} className="divide-y divide-line">
+                  <div className="flex items-center gap-1.5 bg-mist/60 px-4 py-2 text-[13px] font-bold">
+                    {g.key === "fast" ? (
+                      <Zap size={13} className="fill-teal text-teal" />
+                    ) : (
+                      <Truck size={13} className="text-muted" />
+                    )}
+                    {g.label}
+                    <span className="font-normal text-muted">· {g.items.length}개</span>
                   </div>
-                  {available < c.qty && (
-                    <div className="mt-1 text-[13px] text-danger">
-                      재고 {available}개 — 수량을 조정하거나 입고 후 예약됩니다
+                  {g.items.map(({ c, sku, product, available, promise }) => (
+                    <div key={c.skuId} className="flex gap-3 p-4">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-5 w-5 shrink-0 accent-[var(--t-primary)]"
+                        checked={c.selected}
+                        onChange={() => toggleSelect(c.skuId)}
+                        aria-label={`${product.name} 선택`}
+                      />
+                      <Link href={`/product/${product.id}`} className="shrink-0">
+                        <AssetImage
+                          assetKey={`product/${product.id}`}
+                          category={product.categorySlug}
+                          label={product.name}
+                          brand={brandById.get(product.brandId)?.name}
+                          className="h-20 w-20 rounded-xl sm:h-24 sm:w-24"
+                          ratio=""
+                        />
+                      </Link>
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/product/${product.id}`}
+                          className="line-clamp-2 font-semibold leading-snug"
+                        >
+                          {product.name}
+                        </Link>
+                        <div className="mt-0.5 text-[14px] text-muted">{sku.name}</div>
+                        <div className="mt-1">
+                          <DeliveryBadge promise={promise} compact />
+                        </div>
+                        {available < c.qty && (
+                          <div className="mt-1 text-[13px] text-danger">
+                            재고 {available}개 — 수량을 조정하거나 입고 후 예약됩니다
+                          </div>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="inline-flex items-center rounded-lg border border-line">
+                            <button
+                              className="flex h-10 w-10 items-center justify-center rounded-l-lg hover:bg-mist disabled:opacity-40"
+                              aria-label="수량 감소"
+                              disabled={c.qty <= 1}
+                              onClick={() => updateQty(c.skuId, c.qty - 1)}
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className="w-9 text-center text-sm font-bold tabular-nums">{c.qty}</span>
+                            <button
+                              className="flex h-10 w-10 items-center justify-center rounded-r-lg hover:bg-mist disabled:opacity-40"
+                              aria-label="수량 증가"
+                              disabled={c.qty >= 99}
+                              onClick={() => updateQty(c.skuId, c.qty + 1)}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold tabular-nums">{won(sku.salePrice * c.qty)}</div>
+                            {sku.listPrice > sku.salePrice && (
+                              <div className="text-xs text-muted line-through">
+                                {won(sku.listPrice * c.qty)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-1 flex gap-4 text-[14px] text-muted">
+                          <button
+                            className="inline-flex min-h-[36px] items-center gap-1 hover:text-ink"
+                            onClick={() => {
+                              toggleWishlist(product.id);
+                              remove(c.skuId);
+                              toast({ title: "찜 목록으로 옮겼습니다", tone: "info" });
+                            }}
+                          >
+                            <Heart size={14} />
+                            찜으로 이동
+                          </button>
+                          <button
+                            className="inline-flex min-h-[36px] items-center gap-1 hover:text-danger"
+                            onClick={() => remove(c.skuId)}
+                          >
+                            <Trash2 size={14} />
+                            삭제
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="inline-flex items-center rounded-lg border border-line">
-                      <button
-                        className="flex h-10 w-10 items-center justify-center rounded-l-lg hover:bg-mist disabled:opacity-40"
-                        aria-label="수량 감소"
-                        disabled={c.qty <= 1}
-                        onClick={() => updateQty(c.skuId, c.qty - 1)}
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="w-9 text-center text-sm font-bold tabular-nums">{c.qty}</span>
-                      <button
-                        className="flex h-10 w-10 items-center justify-center rounded-r-lg hover:bg-mist disabled:opacity-40"
-                        aria-label="수량 증가"
-                        disabled={c.qty >= 99}
-                        onClick={() => updateQty(c.skuId, c.qty + 1)}
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold tabular-nums">{won(sku.salePrice * c.qty)}</div>
-                      {sku.listPrice > sku.salePrice && (
-                        <div className="text-xs text-muted line-through">{won(sku.listPrice * c.qty)}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-1 flex gap-4 text-[14px] text-muted">
-                    <button
-                      className="inline-flex min-h-[36px] items-center gap-1 hover:text-ink"
-                      onClick={() => {
-                        toggleWishlist(product.id);
-                        remove(c.skuId);
-                        toast({ title: "찜 목록으로 옮겼습니다", tone: "info" });
-                      }}
-                    >
-                      <Heart size={14} />
-                      찜으로 이동
-                    </button>
-                    <button
-                      className="inline-flex min-h-[36px] items-center gap-1 hover:text-danger"
-                      onClick={() => remove(c.skuId)}
-                    >
-                      <Trash2 size={14} />
-                      삭제
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              ) : null,
+            )}
           </div>
-          <aside className="card hidden p-5 lg:sticky lg:top-32 lg:block">
+          {fillers.length > 0 && (
+            <section aria-labelledby="fill-title" className="lg:col-start-1">
+              <h2 id="fill-title" className="text-[18px] font-bold tracking-tight">
+                <span className="tabular-nums text-primary">{won(remaining)}</span> 더 담으면 무료배송
+              </h2>
+              <p className="mt-0.5 text-[14px] text-muted">하나만 더하면 배송비 {won(ship.fee)}이 사라져요</p>
+              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4">
+                {fillers.map((s) => (
+                  <ProductCard key={s.product.id} s={s} size="sm" />
+                ))}
+              </div>
+            </section>
+          )}
+          <aside className="card hidden p-5 lg:sticky lg:top-32 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block">
             <div className="text-lg font-bold">주문 예상금액</div>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between">
@@ -227,11 +282,7 @@ export default function CartView() {
                 <dt className="text-muted">배송비</dt>
                 <dd className="tabular-nums">{shipping === 0 ? "무료" : won(shipping)}</dd>
               </div>
-              {subtotal > 0 && subtotal < ship.threshold && (
-                <div className="rounded-lg bg-soft px-2.5 py-1.5 text-xs text-primary">
-                  {won(ship.threshold - subtotal)} 더 담으면 무료배송
-                </div>
-              )}
+
               <div className="flex justify-between border-t border-line pt-3 text-base">
                 <dt className="font-semibold">결제 예정금액</dt>
                 <dd className="text-xl font-black tabular-nums">{won(subtotal + shipping)}</dd>

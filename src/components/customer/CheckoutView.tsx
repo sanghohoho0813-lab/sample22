@@ -82,6 +82,7 @@ export default function CheckoutView() {
         <h1 className="sr-only">주문·결제</h1>
         <div className="card">
           <EmptyState
+            art="cart"
             title="주문할 상품이 없습니다"
             body="장바구니에서 상품을 선택해 주세요."
             action={

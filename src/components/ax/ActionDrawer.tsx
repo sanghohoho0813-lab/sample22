@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -13,6 +13,8 @@ import {
   PlayCircle,
   Users,
   XCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { AXAction, Order } from "@/lib/types";
 import {
@@ -53,11 +55,14 @@ export function ActionDrawer({
   onClose,
   onOpenSku,
   onOpenOrder,
+  nav,
 }: {
   action: AXAction | null;
   onClose: () => void;
   onOpenSku?: (skuId: string) => void;
   onOpenOrder?: (orderId: string) => void;
+  /** 목록에서 연 경우 — 닫지 않고 이전·다음 실행으로 넘겨 보며 연속 처리 */
+  nav?: { index: number; total: number; onPrev: () => void; onNext: () => void };
 }) {
   const data = useData();
   const ledger = useLedger();
@@ -74,6 +79,27 @@ export function ActionDrawer({
   const [reason, setReason] = useState("");
   const [qty, setQty] = useState<number | null>(null);
   const [supId, setSupId] = useState<string | null>(null);
+  // 다른 실행을 열면 앞 실행에서 고친 수량·공급사·보류 사유가 따라오지 않도록 초기화
+  const [openedId, setOpenedId] = useState(action?.id);
+  if (action?.id !== openedId) {
+    setOpenedId(action?.id);
+    setHold(null);
+    setReason("");
+    setQty(null);
+    setSupId(null);
+  }
+  // J/K 로 다음·이전 (입력 중이거나 사유 입력 창이 열려 있으면 무시)
+  useEffect(() => {
+    if (!action || !nav || hold) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (e.key === "j" || e.key === "J") nav.onNext();
+      else if (e.key === "k" || e.key === "K") nav.onPrev();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [action, nav, hold]);
   const a = action ? (data.actions.find((x) => x.id === action.id) ?? action) : null;
   const isPo = a?.type === "urgent_po" || a?.type === "alt_supplier";
   const editable = !!a && ["recommended", "reviewing", "held"].includes(a.stage);
@@ -141,6 +167,37 @@ export function ActionDrawer({
       variant="drawer"
       size="lg"
       title={a.title}
+      headerActions={
+        nav && nav.total > 1 ? (
+          <div className="flex items-center gap-0.5" aria-label="실행 이동">
+            <span className="mr-1 hidden text-[13px] tabular-nums text-muted sm:inline">
+              {nav.index + 1} / {nav.total}
+            </span>
+            <button
+              type="button"
+              className="btn-ghost btn-sm !min-h-[40px] !px-2 disabled:opacity-35"
+              onClick={nav.onPrev}
+              disabled={nav.index <= 0}
+              aria-label="이전 실행"
+              title="이전 실행 (K)"
+              aria-keyshortcuts="K"
+            >
+              <ChevronUp size={19} />
+            </button>
+            <button
+              type="button"
+              className="btn-ghost btn-sm !min-h-[40px] !px-2 disabled:opacity-35"
+              onClick={nav.onNext}
+              disabled={nav.index >= nav.total - 1}
+              aria-label="다음 실행"
+              title="다음 실행 (J)"
+              aria-keyshortcuts="J"
+            >
+              <ChevronDown size={19} />
+            </button>
+          </div>
+        ) : null
+      }
       subtitle={
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <SeverityTag s={a.urgency} />

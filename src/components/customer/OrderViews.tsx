@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   PackageSearch,
@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Truck,
   Bell,
-  Heart,
   Clock3,
   MapPin,
   User,
@@ -97,6 +96,7 @@ export function OrderCompleteView({ orderId }: { orderId: string }) {
     return (
       <div className="mx-auto max-w-[900px] px-4 py-8">
         <EmptyState
+          art="box"
           title="주문을 찾을 수 없습니다"
           action={
             <Link href="/my" className="btn-primary btn-sm">
@@ -395,6 +395,7 @@ export function MyPageView() {
             ) : (
               <div className="card">
                 <EmptyState
+                  art="box"
                   title="주문내역이 없습니다"
                   action={
                     <Link href="/" className="btn-primary btn-sm">
@@ -418,7 +419,7 @@ export function MyPageView() {
             ) : (
               <div className="card">
                 <EmptyState
-                  icon={<Heart size={22} />}
+                  art="heart"
                   title="찜한 상품이 없습니다"
                   body="상품 카드의 하트를 누르면 여기에 모입니다."
                 />
@@ -458,7 +459,7 @@ export function MyPageView() {
             ) : (
               <div className="card">
                 <EmptyState
-                  icon={<Bell size={22} />}
+                  art="bell"
                   title="알림이 없습니다"
                   body="출고·배송 상태가 바뀌면 여기에 표시됩니다."
                 />
@@ -545,6 +546,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
     return (
       <div className="mx-auto max-w-[900px] px-4 py-8">
         <EmptyState
+          art="box"
           title="주문을 찾을 수 없습니다"
           action={
             <Link href="/my" className="btn-primary btn-sm">
@@ -891,6 +893,7 @@ export function RepeatBasketView() {
       ) : items.length === 0 ? (
         <div className="card mt-5">
           <EmptyState
+            art="cart"
             title="아직 반복구매 이력이 없습니다"
             body="생활용품을 두 번 이상 구매하면 여기에 구매주기와 함께 표시됩니다."
             action={
@@ -1093,91 +1096,193 @@ export function RepeatBasketView() {
   );
 }
 
+/** 배송조회 카드 — 무엇이 · 지금 어디 · 언제 오는지를 한 장에 */
+function TrackCard({
+  order,
+  autoFocus = false,
+  highlight = false,
+}: {
+  order: Order;
+  autoFocus?: boolean;
+  highlight?: boolean;
+}) {
+  const { productById } = useLookups();
+  const last = order.history[order.history.length - 1];
+  const ref = useRef<HTMLElement>(null);
+  // 조회 결과는 화면 아래에 나타나므로 포커스를 옮겨 바로 읽히고 보이게 한다 (key로 새 결과마다 1회)
+  useEffect(() => {
+    if (autoFocus) ref.current?.focus();
+  }, [autoFocus]);
+  return (
+    <article
+      ref={ref}
+      className={`card overflow-hidden outline-none transition-shadow ${highlight ? "ring-2 ring-primary" : ""}`}
+      tabIndex={autoFocus ? -1 : undefined}
+      aria-label={`주문 ${order.id}`}
+    >
+      <div className="flex items-start gap-3 p-4 sm:p-5">
+        <div className="flex shrink-0 -space-x-3">
+          {order.items.slice(0, 2).map((it) => {
+            const p = productById.get(it.productId);
+            return p ? (
+              <AssetImage
+                key={it.skuId}
+                assetKey={`product/${p.id}`}
+                category={p.categorySlug}
+                label={p.name}
+                className="h-14 w-14 rounded-xl ring-2 ring-white sm:h-16 sm:w-16"
+                ratio=""
+              />
+            ) : null;
+          })}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <StageChip stage={order.stage} />
+            <span className="text-[14px] font-semibold">{deliveryNote(order)}</span>
+          </div>
+          <div className="mt-1 line-clamp-1 text-[16px] font-semibold">
+            {order.items[0].name}
+            {order.items.length > 1 ? ` 외 ${order.items.length - 1}건` : ""}
+          </div>
+          <div className="mt-0.5 text-[13px] text-muted">
+            <span className="tabular-nums">{order.id}</span> · {fmtDate(order.createdAt, "md")} 주문
+          </div>
+        </div>
+        <Link
+          href={`/my/orders/${order.id}`}
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-0.5 text-[14px] font-semibold text-primary"
+        >
+          상세
+          <ChevronRight size={15} />
+        </Link>
+      </div>
+      <div className="border-t border-line px-3 py-4 sm:px-5">
+        <OrderProgress order={order} />
+      </div>
+      {last && (
+        <div className="flex items-center gap-1.5 bg-mist/60 px-4 py-2.5 text-[13px] text-muted sm:px-5">
+          <Clock3 size={13} aria-hidden="true" />
+          최근 업데이트 {relTime(last.at)} · {CUSTOMER_STAGE_LABEL[last.stage]}
+        </div>
+      )}
+    </article>
+  );
+}
+
 export function TrackView() {
   const data = useData();
   const customerId = useStore((s) => s.ui.customerId);
   const [q, setQ] = useState("");
   const [result, setResult] = useState<Order | null | undefined>(undefined);
   const [emptyQ, setEmptyQ] = useState(false);
-  const mine = data.orders.filter(
-    (o) => o.customerId === customerId && !["delivered", "cancelled", "return"].includes(o.stage),
-  );
+  const mineAll = data.orders
+    .filter((o) => o.customerId === customerId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const mine = mineAll.filter((o) => !["delivered", "cancelled", "return"].includes(o.stage));
+  const inList = !!result && mine.some((o) => o.id === result.id);
+  const lookup = (id: string) => {
+    if (!id.trim()) {
+      setEmptyQ(true);
+      setResult(undefined);
+      return;
+    }
+    setEmptyQ(false);
+    const o = data.orders.find((x) => x.id.toLowerCase() === id.trim().toLowerCase());
+    setResult(o ?? null);
+  };
   return (
     <div className="mx-auto max-w-[900px] px-4 py-5">
-      <h1 className="inline-flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-        <PackageSearch className="text-primary" />
-        주문·배송조회
-      </h1>
+      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">주문·배송조회</h1>
+      <p className="mt-1 text-[15px] text-muted">주문번호로 지금 어디쯤 왔는지 확인하세요.</p>
       <form
-        className="card mt-4 flex gap-2 p-4"
+        className="card mt-4 p-4 sm:p-5"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!q.trim()) {
-            setEmptyQ(true);
-            setResult(undefined);
-            return;
-          }
-          setEmptyQ(false);
-          const o = data.orders.find((x) => x.id.toLowerCase() === q.trim().toLowerCase());
-          setResult(o ?? null);
+          lookup(q);
         }}
         noValidate
       >
-        <input
-          className={`input ${emptyQ ? "!border-danger" : ""}`}
-          placeholder="주문번호 입력 (예: NX260908-0001)"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            if (emptyQ) setEmptyQ(false);
-          }}
-          aria-label="주문번호"
-          aria-invalid={emptyQ}
-        />
-        <button className="btn-primary shrink-0">조회</button>
+        <div className="flex gap-2">
+          <label className="relative block flex-1">
+            <PackageSearch
+              size={18}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            />
+            <input
+              className={`input !min-h-[48px] pl-11 text-[16px] ${emptyQ ? "!border-danger" : ""}`}
+              placeholder="주문번호 입력 (예: NX260908-0001)"
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                if (emptyQ) setEmptyQ(false);
+              }}
+              aria-label="주문번호"
+              aria-invalid={emptyQ}
+              aria-describedby={emptyQ ? "track-err" : undefined}
+            />
+          </label>
+          <button className="btn-primary !min-h-[48px] shrink-0 px-5">조회</button>
+        </div>
+        {emptyQ && (
+          <p id="track-err" className="mt-2 text-[14px] text-danger">
+            주문번호를 입력해 주세요.
+          </p>
+        )}
+        {mineAll.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-0.5 text-[13px] text-muted">내 최근 주문</span>
+            {mineAll.slice(0, 3).map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="chip !min-h-[32px] text-[13px] tabular-nums"
+                onClick={() => {
+                  setQ(o.id);
+                  lookup(o.id);
+                }}
+              >
+                {o.id}
+              </button>
+            ))}
+          </div>
+        )}
       </form>
-      {emptyQ && <p className="mt-2 text-[14px] text-danger">주문번호를 입력해 주세요.</p>}
       {result === null && (
         <div className="card mt-3">
           <EmptyState
+            art="search"
             title="주문을 찾을 수 없습니다"
             body="주문번호를 다시 확인해 주세요. 로그인 상태에서는 아래 진행 중 주문에서 바로 확인할 수 있습니다."
           />
         </div>
       )}
-      {result && (
-        <div className="card mt-3 p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="font-bold">{result.id}</div>
-            <Link href={`/my/orders/${result.id}`} className="text-sm font-semibold text-primary">
-              상세보기
-            </Link>
-          </div>
-          <OrderProgress order={result} />
+      {/* 조회한 주문이 아래 진행 중 목록에 있으면 같은 카드를 두 번 그리지 않고 그 카드를 강조한다 */}
+      {result && !inList && (
+        <div className="mt-3">
+          <TrackCard key={result.id} order={result} autoFocus />
         </div>
       )}
-      <h2 className="section-title mb-3 mt-8">진행 중인 주문</h2>
+      <h2 className="section-title mb-3 mt-8">
+        진행 중인 주문 {mine.length > 0 && <span className="text-primary">{mine.length}</span>}
+      </h2>
       {mine.length ? (
         <ul className="space-y-3">
           {mine.map((o) => (
-            <li key={o.id} className="card p-4">
-              <div className="mb-3 flex items-center justify-between text-sm">
-                <div>
-                  <b>{o.items[0].name}</b>
-                  {o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}
-                  <span className="text-muted"> · {o.id}</span>
-                </div>
-                <Link href={`/my/orders/${o.id}`} className="font-semibold text-primary">
-                  상세
-                </Link>
-              </div>
-              <OrderProgress order={o} />
+            <li key={o.id}>
+              <TrackCard
+                key={inList && result?.id === o.id ? `hit-${o.id}` : o.id}
+                order={o}
+                highlight={inList && result?.id === o.id}
+                autoFocus={inList && result?.id === o.id}
+              />
             </li>
           ))}
         </ul>
       ) : (
         <div className="card">
-          <EmptyState title="진행 중인 주문이 없습니다" />
+          <EmptyState art="box" title="진행 중인 주문이 없습니다" />
         </div>
       )}
     </div>

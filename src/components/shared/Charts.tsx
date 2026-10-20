@@ -206,6 +206,14 @@ export function BarChart({
   );
 }
 
+/** 눈금 상한을 1·2·2.5·5·10 단위로 올림 — 축 숫자가 읽기 쉬운 값이 되도록 */
+function niceCeil(v: number) {
+  if (v <= 0) return 1;
+  const p = 10 ** Math.floor(Math.log10(v));
+  const m = v / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+}
+
 export function LineChart({
   data,
   height = 200,
@@ -229,106 +237,165 @@ export function LineChart({
   const id = useId();
   const W = 600,
     H = height,
-    padL = 8,
-    padR = 8,
-    padB = 24,
-    padT = 12;
-  const max = Math.max(...data.map((d) => Math.max(d.value, d.value2 ?? 0)), 1);
+    padL = 6,
+    padR = 6,
+    padB = 6,
+    padT = 10;
+  const max = niceCeil(Math.max(...data.map((d) => Math.max(d.value, d.value2 ?? 0)), 1));
   const min = 0;
   const n = data.length;
   const x = (i: number) => padL + ((W - padL - padR) * i) / Math.max(1, n - 1);
   const y = (v: number) => padT + (H - padT - padB) * (1 - (v - min) / (max - min || 1));
   const path = (key: "value" | "value2") =>
     data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d[key] ?? 0).toFixed(1)}`).join(" ");
+  const pctX = (i: number) => `${(x(i) / W) * 100}%`;
+  const pctY = (v: number) => `${(y(v) / H) * 100}%`;
+  const h = hover !== null ? data[hover] : null;
+  // 툴팁은 가리키는 점 바로 위에 — 양 끝에서는 화면 밖으로 나가지 않게 기준점을 옮긴다
+  const tipShift = hover === null ? 0 : hover < n * 0.18 ? -8 : hover > n * 0.82 ? -92 : -50;
   return (
-    <div className="relative w-full">
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="h-auto w-full"
-        role="img"
-        aria-labelledby={id}
-        onMouseLeave={() => setHover(null)}
-      >
-        <title id={id}>
-          {label1}
-          {label2 ? ` / ${label2}` : ""} 추이
-        </title>
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line
-            key={f}
-            x1={padL}
-            x2={W - padR}
-            y1={y(max * f)}
-            y2={y(max * f)}
-            stroke="#E6EBEF"
-            strokeDasharray="3 4"
-          />
-        ))}
-        <defs>
-          <linearGradient id={`${id.replace(/[^\w-]/g, "")}-area`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={color} stopOpacity={0.16} />
-            <stop offset="1" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        {/* 면 채움 — opacity가 아닌 그라데이션 투명도로 (등장 애니메이션이 opacity를 1로 덮어써 선을 가리던 문제) */}
-        <path
-          d={`${path("value")} L${x(n - 1)},${H - padB} L${x(0)},${H - padB} Z`}
-          fill={`url(#${id.replace(/[^\w-]/g, "")}-area)`}
-          className="fade-in"
-        />
-        <path
-          d={path("value")}
-          fill="none"
-          stroke={color}
-          strokeWidth={2.5}
-          strokeLinejoin="round"
-          className="draw-line"
-          style={{ ["--len" as string]: 1400 }}
-        />
-        {label2 && (
-          <path
-            d={path("value2")}
-            fill="none"
-            stroke={color2}
-            strokeWidth={2.5}
-            strokeLinejoin="round"
-            className="draw-line"
-            style={{ ["--len" as string]: 1400, animationDelay: "150ms", opacity: 0.85 }}
-          />
-        )}
-        {data.map((d, i) => (
-          <g key={i}>
-            <rect
-              x={x(i) - W / n / 2}
-              y={padT}
-              width={W / n}
-              height={H - padT - padB}
-              fill="transparent"
-              onMouseEnter={() => setHover(i)}
-              onTouchStart={() => setHover(i)}
-            />
-            {hover === i && (
-              <>
-                <line x1={x(i)} x2={x(i)} y1={padT} y2={H - padB} stroke="#B8C2CC" />
-                <circle cx={x(i)} cy={y(d.value)} r={4} fill={color} />
-              </>
-            )}
-            {i % showEvery === 0 && (
-              <text x={x(i)} y={H - 6} textAnchor="middle" fontSize={11} fill="#66727F">
-                {d.label}
-              </text>
-            )}
-          </g>
-        ))}
-      </svg>
-      {hover !== null && (
-        <div className="card-raised pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-xs">
-          <b>{data[hover].label}</b> · {label1} {format(data[hover].value)}
-          {label2 ? ` · ${label2} ${format(data[hover].value2 ?? 0)}` : ""}
+    <div className="w-full">
+      <div className="relative pl-12">
+        {/* y축 눈금 — HTML 글자라 차트가 작아져도 읽힌다 */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-11" aria-hidden="true">
+          {[0, 0.5, 1].map((f) => (
+            <span
+              key={f}
+              className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-muted"
+              style={{ top: pctY(max * f) }}
+            >
+              {format(max * f)}
+            </span>
+          ))}
         </div>
-      )}
+        <div className="relative">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="block h-auto w-full"
+            role="img"
+            aria-labelledby={id}
+            onMouseLeave={() => setHover(null)}
+          >
+            <title id={id}>
+              {label1}
+              {label2 ? ` / ${label2}` : ""} 추이
+            </title>
+            {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+              <line
+                key={f}
+                x1={padL}
+                x2={W - padR}
+                y1={y(max * f)}
+                y2={y(max * f)}
+                stroke={f === 0 ? "#CDD5DC" : "#E6EBEF"}
+                strokeDasharray={f === 0 ? undefined : "3 4"}
+              />
+            ))}
+            <defs>
+              <linearGradient id={`${id.replace(/[^\w-]/g, "")}-area`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={color} stopOpacity={0.16} />
+                <stop offset="1" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            {/* 면 채움 — opacity가 아닌 그라데이션 투명도로 (등장 애니메이션이 opacity를 1로 덮어써 선을 가리던 문제) */}
+            <path
+              d={`${path("value")} L${x(n - 1)},${H - padB} L${x(0)},${H - padB} Z`}
+              fill={`url(#${id.replace(/[^\w-]/g, "")}-area)`}
+              className="fade-in"
+            />
+            <path
+              d={path("value")}
+              fill="none"
+              stroke={color}
+              strokeWidth={2.5}
+              strokeLinejoin="round"
+              className="draw-line"
+              style={{ ["--len" as string]: 1400 }}
+            />
+            {label2 && (
+              <path
+                d={path("value2")}
+                fill="none"
+                stroke={color2}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+                className="draw-line"
+                style={{ ["--len" as string]: 1400, animationDelay: "150ms", opacity: 0.85 }}
+              />
+            )}
+            {data.map((d, i) => (
+              <g key={i}>
+                <rect
+                  x={x(i) - W / n / 2}
+                  y={padT}
+                  width={W / n}
+                  height={H - padT - padB}
+                  fill="transparent"
+                  onMouseEnter={() => setHover(i)}
+                  onTouchStart={() => setHover(i)}
+                />
+                {hover === i && (
+                  <>
+                    <line x1={x(i)} x2={x(i)} y1={padT} y2={H - padB} stroke="#B8C2CC" />
+                    {label2 && (
+                      <circle
+                        cx={x(i)}
+                        cy={y(d.value2 ?? 0)}
+                        r={4}
+                        fill="#fff"
+                        stroke={color2}
+                        strokeWidth={2.5}
+                      />
+                    )}
+                    <circle cx={x(i)} cy={y(d.value)} r={4.5} fill="#fff" stroke={color} strokeWidth={2.5} />
+                  </>
+                )}
+              </g>
+            ))}
+          </svg>
+          {h && hover !== null && (
+            <div
+              className="pointer-events-none absolute z-10 whitespace-nowrap rounded-xl bg-[#1B2733] px-3 py-2 text-[12px] leading-relaxed text-white shadow-raised"
+              style={{
+                left: pctX(hover),
+                top: pctY(Math.max(h.value, h.value2 ?? 0)),
+                transform: `translate(${tipShift}%, calc(-100% - 12px))`,
+              }}
+            >
+              <div className="font-bold">{h.label}</div>
+              <div className="flex items-center gap-1.5">
+                <i className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
+                {label1} <b className="tabular-nums">{format(h.value)}</b>
+              </div>
+              {label2 && (
+                <div className="flex items-center gap-1.5">
+                  <i className="inline-block h-2 w-2 rounded-full" style={{ background: color2 }} />
+                  {label2} <b className="tabular-nums">{format(h.value2 ?? 0)}</b>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {/* x축 라벨 */}
+        <div className="relative mt-1 h-4" aria-hidden="true">
+          {data.map((d, i) =>
+            i % showEvery === 0 ? (
+              <span
+                key={i}
+                className="absolute top-0 whitespace-nowrap text-[11px] text-muted"
+                style={{
+                  left: pctX(i),
+                  transform: `translateX(${i === 0 ? 0 : i === n - 1 ? -100 : -50}%)`,
+                }}
+              >
+                {d.label}
+              </span>
+            ) : null,
+          )}
+        </div>
+      </div>
       {label2 && (
-        <div className="mt-1 flex justify-end gap-4 text-xs text-muted">
+        <div className="mt-1.5 flex justify-end gap-4 text-xs text-muted">
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block h-0.5 w-4 rounded" style={{ background: color }} />
             {label1}

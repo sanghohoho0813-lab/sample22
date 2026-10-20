@@ -140,3 +140,18 @@ export function autocomplete(data: DemoData, q: string): string[] {
     8,
   );
 }
+
+/**
+ * 함께 주문된 상품 — 기준 상품이 들어 있는 주문(장바구니 단위)에 같이 담긴 다른 상품과 그 주문 수.
+ * 한 주문에 같은 상품이 여러 줄이어도 1번으로 센다. 많이 함께 담긴 순.
+ */
+export function coPurchased(productId: string, baskets: string[][]) {
+  const count = new Map<string, number>();
+  for (const b of baskets) {
+    if (!b.includes(productId)) continue;
+    for (const id of new Set(b)) if (id !== productId) count.set(id, (count.get(id) ?? 0) + 1);
+  }
+  return Array.from(count, ([id, n]) => ({ productId: id, count: n })).sort(
+    (a, b) => b.count - a.count || (a.productId < b.productId ? -1 : 1),
+  );
+}

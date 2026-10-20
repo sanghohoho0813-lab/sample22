@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { SlidersHorizontal, X, SearchX, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import { useData } from "@/lib/hooks";
 import { searchProducts, type SearchFilters } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 import ProductCard from "./ProductCard";
+import ListHero, { type ListHeroKind } from "./ListHero";
 import Overlay from "@/components/shared/Overlay";
 import { EmptyState } from "@/components/shared/Bits";
 import { ProductSkeleton } from "@/components/shared/ClientGate";
@@ -33,6 +34,7 @@ export default function ProductListView({
   lockCategory = false,
   showCategoryChips = true,
   emptyHint,
+  hero,
 }: {
   title: string;
   subtitle?: string;
@@ -40,6 +42,8 @@ export default function ProductListView({
   lockCategory?: boolean;
   showCategoryChips?: boolean;
   emptyHint?: string;
+  /** 빠른배송·특가처럼 목록 자체가 약속인 화면 — 제목 자리에 요약 히어로 */
+  hero?: ListHeroKind;
 }) {
   const data = useData();
   const recordEvent = useStore((s) => s.recordEvent);
@@ -82,6 +86,56 @@ export default function ProductListView({
     f.delivery !== "all",
     f.stock !== "all",
   ].filter(Boolean).length;
+  // 적용된 필터를 모두 칩으로 보여주고 하나씩 해제할 수 있게 (숨은 필터가 없도록)
+  const chips: { key: string; label: string; clear: () => void }[] = [
+    ...(f.category && f.category !== "all" && !lockCategory
+      ? [
+          {
+            key: "cat",
+            label: data.categories.find((c) => c.slug === f.category)?.name ?? "카테고리",
+            clear: () => setF((s) => ({ ...s, category: "all" as const })),
+          },
+        ]
+      : []),
+    ...(priceBand !== null
+      ? [{ key: "price", label: PRICE_BANDS[priceBand].label, clear: () => setBand(null) }]
+      : []),
+    ...(f.delivery && f.delivery !== "all"
+      ? [
+          {
+            key: "delivery",
+            label: { fast: "빠른배송", standard: "일반배송", reserve: "예약배송" }[f.delivery],
+            clear: () => setF((s) => ({ ...s, delivery: "all" as const })),
+          },
+        ]
+      : []),
+    ...(f.stock && f.stock !== "all"
+      ? [
+          {
+            key: "stock",
+            label: f.stock === "in" ? "바로 구매 가능" : "입고예정만",
+            clear: () => setF((s) => ({ ...s, stock: "all" as const })),
+          },
+        ]
+      : []),
+    ...(f.brandIds ?? []).map((id) => ({
+      key: `b-${id}`,
+      label: data.brands.find((b) => b.id === id)?.name ?? id,
+      clear: () => toggleBrand(id),
+    })),
+    ...(f.minRating
+      ? [
+          {
+            key: "rating",
+            label: "평점 4.5 이상",
+            clear: () => setF((s) => ({ ...s, minRating: undefined })),
+          },
+        ]
+      : []),
+    ...(f.discountOnly
+      ? [{ key: "disc", label: "할인상품만", clear: () => setF((s) => ({ ...s, discountOnly: false })) }]
+      : []),
+  ];
   const reset = () => {
     setF({
       sort: "popular",
@@ -229,17 +283,21 @@ export default function ProductListView({
         <ChevronRight size={12} />
         <span>{title}</span>
       </nav>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-          {subtitle && <p className="mt-1 text-muted">{subtitle}</p>}
+      {hero ? (
+        <ListHero kind={hero} title={title} subtitle={subtitle} />
+      ) : (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+            {subtitle && <p className="mt-1 text-muted">{subtitle}</p>}
+          </div>
+          <div className="text-sm text-muted">
+            검색결과 <b className="text-ink">{results.length}</b>개
+          </div>
         </div>
-        <div className="text-sm text-muted">
-          검색결과 <b className="text-ink">{results.length}</b>개
-        </div>
-      </div>
+      )}
 
-      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
+      <div className={`${hero ? "mt-6" : "mt-4"} grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]`}>
         <aside className="hidden lg:block">
           <div className="card sticky top-32 p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -285,6 +343,11 @@ export default function ProductListView({
                 ))}
               </div>
             )}
+            {hero && (
+              <span className="hidden shrink-0 text-sm text-muted lg:inline">
+                상품 <b className="text-ink">{results.length}</b>개
+              </span>
+            )}
             <div className="ml-auto flex shrink-0 gap-1">
               {SORTS.map((s) => (
                 <button
@@ -297,28 +360,21 @@ export default function ProductListView({
               ))}
             </div>
           </div>
-          {activeCount > 0 && (
+          {chips.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted">적용된 필터</span>
-              {f.delivery !== "all" && (
-                <span className="chip chip-on !min-h-[34px] text-sm">
-                  {{ fast: "빠른배송", standard: "일반배송", reserve: "예약배송" }[f.delivery!]}
-                  <X size={12} onClick={() => setF((s) => ({ ...s, delivery: "all" }))} />
-                </span>
-              )}
-              {priceBand !== null && (
-                <span className="chip chip-on !min-h-[34px] text-sm">
-                  {PRICE_BANDS[priceBand].label}
-                  <X size={12} onClick={() => setBand(null)} />
-                </span>
-              )}
-              {f.brandIds?.map((id) => (
-                <span key={id} className="chip chip-on !min-h-[34px] text-sm">
-                  {data.brands.find((b) => b.id === id)?.name}
-                  <X size={12} onClick={() => toggleBrand(id)} />
-                </span>
+              {chips.map((c) => (
+                <button
+                  key={c.key}
+                  className="chip chip-on !min-h-[34px] text-sm"
+                  onClick={c.clear}
+                  aria-label={`${c.label} 필터 해제`}
+                >
+                  {c.label}
+                  <X size={12} aria-hidden="true" />
+                </button>
               ))}
-              <button onClick={reset} className="text-xs text-muted underline">
+              <button onClick={reset} className="min-h-[34px] text-xs text-muted underline">
                 전체 해제
               </button>
             </div>
@@ -336,7 +392,7 @@ export default function ProductListView({
           ) : results.length === 0 ? (
             <div className="card mt-4">
               <EmptyState
-                icon={<SearchX size={22} />}
+                art="search"
                 title={base.q ? `'${base.q}'에 맞는 상품이 없습니다` : "조건에 맞는 상품이 없습니다"}
                 body={emptyHint ?? "철자를 확인하거나 필터를 줄여보세요. 아래 인기 상품도 확인해 보세요."}
                 action={

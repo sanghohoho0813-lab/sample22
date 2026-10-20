@@ -111,6 +111,12 @@ export default function ActionsView() {
     setOwner(role === "owner" ? "all" : role);
     setQ("");
   };
+  // 상세를 연 채로 현재 정렬·필터 순서대로 이전/다음 실행을 넘겨 본다
+  const navIdx = action ? sort.sorted.findIndex((x) => x.id === action.id) : -1;
+  const step = (d: number) => {
+    const next = sort.sorted[navIdx + d];
+    if (next) setAction(next);
+  };
   const canAct = (a: AXAction) => role === "owner" || role === a.owner;
   const selectable = (a: AXAction) => a.stage === "recommended" && canAct(a);
   const bulkConfirm = () => {
@@ -494,6 +500,11 @@ export default function ActionsView() {
       <ActionDrawer
         action={action}
         onClose={() => setAction(null)}
+        nav={
+          navIdx >= 0
+            ? { index: navIdx, total: sort.sorted.length, onPrev: () => step(-1), onNext: () => step(1) }
+            : undefined
+        }
         onOpenSku={(id) => {
           setAction(null);
           setSkuId(id);

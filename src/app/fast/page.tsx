@@ -12,6 +12,7 @@ export default function FastPage() {
         <ProductListView
           title="빠른배송"
           subtitle="오늘 15:00 전 주문하면 내일 도착하는 상품"
+          hero="fast"
           base={{ delivery: "fast", sort: "popular" }}
         />
       </ClientGate>

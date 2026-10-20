@@ -12,6 +12,7 @@ export default function DealsPage() {
         <ProductListView
           title="이번 주 특가"
           subtitle="묶음 구성 할인과 기획전 상품"
+          hero="deals"
           base={{ discountOnly: true, sort: "discount" }}
         />
       </ClientGate>

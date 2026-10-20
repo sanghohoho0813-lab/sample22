@@ -27,6 +27,8 @@ export interface OverlayProps {
   size?: "sm" | "md" | "lg" | "xl";
   children: ReactNode;
   footer?: ReactNode;
+  /** 제목 줄 오른쪽(닫기 앞)에 붙는 보조 조작 — 예: 이전/다음 항목 */
+  headerActions?: ReactNode;
   /** on mobile drawer becomes bottom sheet automatically */
 }
 
@@ -42,6 +44,7 @@ export default function Overlay({
   size = "md",
   children,
   footer,
+  headerActions,
 }: OverlayProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const lastFocused = useRef<HTMLElement | null>(null);
@@ -115,14 +118,17 @@ export default function Overlay({
                 {title && <h2 className="text-lg font-bold leading-snug">{title}</h2>}
                 {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="닫기"
-                className="btn-ghost btn-sm -mr-2 !min-h-[40px] shrink-0 !px-2"
-              >
-                <X size={20} />
-              </button>
+              <div className="-mr-2 flex shrink-0 items-center gap-1">
+                {headerActions}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="닫기"
+                  className="btn-ghost btn-sm !min-h-[40px] shrink-0 !px-2"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
           )}
           {!title && !subtitle && (

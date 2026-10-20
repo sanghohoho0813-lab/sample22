@@ -16,7 +16,6 @@ import {
   Clock3,
   ChevronRight,
   ChevronLeft,
-  Bell,
   LayoutDashboard,
   Presentation,
   Truck,
@@ -30,6 +29,7 @@ import { useStore } from "@/lib/store";
 import { useBump, useData, useHydrated, useIsInIframe, useNow } from "@/lib/hooks";
 import { autocomplete, searchProducts, SUGGESTED_SEARCHES } from "@/lib/catalog";
 import ProductArt from "@/components/shared/ProductArt";
+import { CategoryMenu, NotificationBell } from "./HeaderPanels";
 import Overlay from "@/components/shared/Overlay";
 import SampleBridgeCTA from "@/components/shared/SampleBridgeCTA";
 import MobileDrawer from "@/components/shared/MobileDrawer";
@@ -97,6 +97,11 @@ export function SearchBox({
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const sugg = autocomplete(data, q);
+  // 입력 중에는 검색어 추천과 함께 바로 갈 수 있는 상품 3개 (이미지·가격)
+  const hits = useMemo(
+    () => (q.trim().length >= 1 ? searchProducts(data, { q: q.trim(), sort: "popular" }).slice(0, 3) : []),
+    [data, q],
+  );
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -163,21 +168,58 @@ export function SearchBox({
       {open && (
         <div className="card-raised fade-up absolute z-40 mt-2 w-full p-3">
           {q ? (
-            sugg.length ? (
-              <ul>
-                {sugg.map((s) => (
-                  <li key={s}>
-                    <button
-                      type="button"
-                      onMouseDown={() => go(s)}
-                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-[17px] hover:bg-mist"
-                    >
-                      <Search size={15} className="text-muted" />
-                      {s}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            sugg.length || hits.length ? (
+              <div className="space-y-2">
+                {hits.length > 0 && (
+                  <div>
+                    <div className="px-1 pb-1 text-xs font-semibold text-muted">상품 바로가기</div>
+                    <ul>
+                      {hits.map((h) => (
+                        <li key={h.product.id}>
+                          <button
+                            type="button"
+                            onMouseDown={() => {
+                              pushRecent(q.trim());
+                              setOpen(false);
+                              setQ("");
+                              onDone?.();
+                              router.push(`/product/${h.product.id}`);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-mist"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-mist"
+                            >
+                              <ProductArt name={h.product.name} className="h-full w-full" />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-[15px]">{h.product.name}</span>
+                            <span className="shrink-0 text-[14px] font-semibold tabular-nums">
+                              {h.defaultSku.salePrice.toLocaleString()}원
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {sugg.length > 0 && (
+                  <ul className={hits.length ? "border-t border-line pt-1" : ""}>
+                    {sugg.map((s) => (
+                      <li key={s}>
+                        <button
+                          type="button"
+                          onMouseDown={() => go(s)}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-[17px] hover:bg-mist"
+                        >
+                          <Search size={15} className="text-muted" />
+                          {s}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ) : (
               <div className="px-2 py-3 text-sm text-muted">
                 일치하는 추천어가 없습니다. Enter로 전체 검색합니다.
@@ -491,8 +533,8 @@ export default function CustomerShell({
               >
                 N
               </span>
-              {/* 좁은 화면에선 글자를 숨기되 스크린리더 이름("NEXMART 홈")은 유지 */}
-              <span className="sr-only text-xl font-black tracking-tight text-navy xs:not-sr-only">
+              {/* 좁은 화면(아이콘 3개 + DEMO가 들어가는 폭)에선 글자를 숨기되 스크린리더 이름("NEXMART 홈")은 유지 */}
+              <span className="sr-only text-xl font-black tracking-tight text-navy min-[480px]:not-sr-only">
                 NEXMART
               </span>
               <span className="sr-only"> 홈</span>
@@ -520,12 +562,7 @@ export default function CustomerShell({
               >
                 <Search size={22} />
               </button>
-              <Link href="/my" className="btn-ghost relative hidden !px-2.5 sm:inline-flex" aria-label="알림">
-                <Bell size={22} />
-                {hydrated && unread > 0 && (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-orange" />
-                )}
-              </Link>
+              <NotificationBell />
               <Link
                 href="/cart"
                 className="btn-ghost relative !px-2.5"
@@ -547,16 +584,20 @@ export default function CustomerShell({
           </div>
           {!plain && (
             <nav className="-mx-1 hidden h-11 items-center gap-1 md:flex" aria-label="주요 메뉴">
-              {NAV.map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[17px] font-semibold transition-colors ${isActive(n.href) ? "bg-soft text-primary" : "text-ink hover:bg-mist"}`}
-                >
-                  <n.icon size={16} />
-                  {n.label}
-                </Link>
-              ))}
+              {NAV.map((n) =>
+                n.href === "/category" ? (
+                  <CategoryMenu key={n.href} active={isActive(n.href)} />
+                ) : (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[17px] font-semibold transition-colors ${isActive(n.href) ? "bg-soft text-primary" : "text-ink hover:bg-mist"}`}
+                  >
+                    <n.icon size={16} />
+                    {n.label}
+                  </Link>
+                ),
+              )}
               {!inIframe && (
                 <Link
                   href="/ax"

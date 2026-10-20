@@ -150,6 +150,28 @@ describe("AX 실행 카드", () => {
   });
 });
 
+describe("고객 알림", () => {
+  it("읽음 처리는 그 고객의 안 읽은 알림만 바꾸고 다른 고객 알림은 그대로 둔다", () => {
+    const cid = st().data.notifications.find((n) => !n.read)?.customerId;
+    expect(cid).toBeDefined();
+    const others = st().data.notifications.filter((n) => n.customerId !== cid);
+    st().markNotificationsRead(cid!);
+    expect(
+      st()
+        .data.notifications.filter((n) => n.customerId === cid)
+        .every((n) => n.read),
+    ).toBe(true);
+    expect(st().data.notifications.filter((n) => n.customerId !== cid)).toEqual(others);
+  });
+  it("안 읽은 알림이 없으면 데이터를 새로 만들지 않는다 (불필요한 재렌더 방지)", () => {
+    const cid = st().data.notifications[0]?.customerId ?? "c-001";
+    st().markNotificationsRead(cid);
+    const before = st().data;
+    st().markNotificationsRead(cid);
+    expect(st().data).toBe(before);
+  });
+});
+
 describe("resetDemo", () => {
   it("시연 데이터는 초기화하되 테마·글자 크기·튜토리얼 완료는 유지", () => {
     st().setTheme("navy-gold");

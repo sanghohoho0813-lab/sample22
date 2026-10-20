@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { autocomplete, searchProducts, summarize } from "@/lib/catalog";
+import { autocomplete, coPurchased, searchProducts, summarize } from "@/lib/catalog";
+import { getLedger } from "@/lib/dataset";
 import { generateDemoData } from "@/lib/seed";
 import { NOW, demo } from "./fixtures";
 
@@ -99,5 +100,27 @@ describe("autocomplete", () => {
   });
   it("공백만 입력하면 제안 없음", () => {
     expect(autocomplete(data, "   ")).toEqual([]);
+  });
+});
+
+describe("함께 구매한 상품 (coPurchased)", () => {
+  it("기준 상품이 든 주문만 세고, 한 주문 안의 중복 줄은 1번으로 센다", () => {
+    const r = coPurchased("a", [
+      ["a", "b", "b"],
+      ["a", "c"],
+      ["a", "b"],
+      ["b", "c"],
+    ]);
+    expect(r).toEqual([
+      { productId: "b", count: 2 },
+      { productId: "c", count: 1 },
+    ]);
+  });
+  it("시연 원장에서도 실제로 함께 담긴 조합이 계산된다 (인기순 대체가 아님)", () => {
+    const ledger = getLedger(data);
+    const baskets = ledger.orders.map((o) => o.lines.map((l) => l.productId));
+    const top = coPurchased("p-001", baskets)[0];
+    expect(top.count).toBeGreaterThanOrEqual(3);
+    expect(baskets.filter((b) => b.includes("p-001") && b.includes(top.productId)).length).toBe(top.count);
   });
 });

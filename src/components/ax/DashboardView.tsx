@@ -9,6 +9,7 @@ import {
   PackageCheck,
   Radar,
   Repeat,
+  Rocket,
   RotateCcw,
   Search,
   ShoppingCart,
@@ -25,7 +26,8 @@ import {
   useRepeat,
   useReturnSignals,
 } from "@/lib/hooks";
-import { ROLE_LABEL, useStore } from "@/lib/store";
+import { ACTION_STAGE_LABEL, ROLE_LABEL, useStore } from "@/lib/store";
+import { useToast } from "@/components/shared/Toast";
 import { EXCEPTION_LABEL, type ExceptionKind, type OpsException } from "@/lib/control";
 import { isPreShip } from "@/lib/fulfillment";
 import { LIFECYCLE } from "@/lib/lifecycle";
@@ -59,6 +61,26 @@ export default function DashboardView() {
   const [action, setAction] = useState<AXAction | null>(null);
   const [skuId, setSkuId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const createAction = useStore((s) => s.createActionFromException);
+  const toast = useToast();
+  // 큐에서 바로 — 연결된 실행은 곧장 열고, 없으면 만들어서 연다 (예외 상세를 거치지 않는 빠른 길)
+  const openLinked = (e: OpsException) => {
+    const a = e.action && data.actions.find((x) => x.id === e.action!.id);
+    if (a) setAction(a);
+  };
+  const quickCreate = (e: OpsException) => {
+    const id = createAction(e);
+    if (!id) {
+      toast({ title: "실행을 만들 수 없습니다", body: "대상 데이터가 바뀌었는지 확인하세요.", tone: "info" });
+      return;
+    }
+    toast({
+      title: "실행을 만들었습니다",
+      body: "근거·영향 대상·기준값이 함께 저장됐습니다.",
+      tone: "success",
+    });
+    setAction(useStore.getState().data.actions.find((x) => x.id === id) ?? ({ id } as AXAction));
+  };
 
   // ---- 오늘 운영 상태 ----
   const due = forecast.orders.filter((p) => p.cutoffAt <= forecast.nextCutoff);
@@ -424,7 +446,31 @@ export default function DashboardView() {
                         </td>
                         <td className="whitespace-nowrap text-[13px]">
                           {e.action ? (
-                            <span className="font-semibold text-primary">연결됨</span>
+                            <button
+                              className="btn-outline btn-sm !min-h-[34px] !px-2.5"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                openLinked(e);
+                              }}
+                            >
+                              열기
+                              <span className="font-normal text-muted">
+                                · {ACTION_STAGE_LABEL[e.action.stage]}
+                              </span>
+                              <span className="sr-only"> — 연결된 실행: {e.title}</span>
+                            </button>
+                          ) : e.actionType && (role === "owner" || role === e.owner) ? (
+                            <button
+                              className="btn-primary btn-sm !min-h-[34px] !px-2.5"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                quickCreate(e);
+                              }}
+                            >
+                              <Rocket size={14} aria-hidden="true" />
+                              <span className="sr-only">실행 </span>만들기
+                              <span className="sr-only"> — {e.title}</span>
+                            </button>
                           ) : e.actionType ? (
                             <span className="text-orange">실행 없음</span>
                           ) : (

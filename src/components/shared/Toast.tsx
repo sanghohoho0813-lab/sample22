@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-import { CheckCircle2, Info, AlertTriangle, X, ChevronRight } from "lucide-react";
+import { Check, Info, AlertTriangle, X, ChevronRight } from "lucide-react";
 
 /** action: 알림 안에서 바로 다음 행동으로 이어지는 링크 (예: 담은 뒤 "장바구니 보기") */
 interface Toast {
@@ -30,50 +30,53 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed left-1/2 top-[68px] z-[1100] flex w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 flex-col gap-2 sm:bottom-6 sm:top-auto"
         aria-live="polite"
       >
-        {items.map((t) => (
-          <div
-            key={t.id}
-            role="status"
-            className="card-raised fade-up pointer-events-auto flex items-start gap-3 border-l-4 px-4 py-3"
-            style={{
-              borderLeftColor:
-                t.tone === "success"
-                  ? "var(--t-primary)"
-                  : t.tone === "warn"
-                    ? "#D93A3A"
-                    : "var(--t-secondary)",
-            }}
-          >
-            {t.tone === "success" ? (
-              <CheckCircle2 className="mt-0.5 shrink-0 text-primary" size={20} />
-            ) : t.tone === "warn" ? (
-              <AlertTriangle className="mt-0.5 shrink-0 text-danger" size={20} />
-            ) : (
-              <Info className="mt-0.5 shrink-0 text-secondary" size={20} />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-semibold leading-snug">{t.title}</div>
-              {t.body && <div className="mt-0.5 line-clamp-2 text-[14px] text-muted">{t.body}</div>}
+        {items.map((t) => {
+          const Icon = t.tone === "success" ? Check : t.tone === "warn" ? AlertTriangle : Info;
+          return (
+            <div
+              key={t.id}
+              role="status"
+              className="fade-up pointer-events-auto flex items-center gap-3 rounded-2xl bg-[#1B2733] py-3 pl-3.5 pr-2 text-white shadow-[0_12px_32px_-8px_rgba(15,23,32,0.45)]"
+            >
+              {/* 색은 아이콘 원 하나에만 — 어두운 바탕에서도 상태가 한눈에 보이게 */}
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-full"
+                style={{
+                  background:
+                    t.tone === "success"
+                      ? "var(--t-primary)"
+                      : t.tone === "warn"
+                        ? "#D93A3A"
+                        : "var(--t-secondary)",
+                }}
+                aria-hidden="true"
+              >
+                <Icon size={15} strokeWidth={2.75} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-semibold leading-snug">{t.title}</div>
+                {t.body && <div className="mt-0.5 line-clamp-2 text-[14px] text-[#C5CED6]">{t.body}</div>}
+              </div>
               {t.action && (
                 <Link
                   href={t.action.href}
                   onClick={() => dismiss(t.id)}
-                  className="mt-1.5 inline-flex min-h-[34px] items-center gap-0.5 whitespace-nowrap rounded-lg bg-soft px-2.5 text-[14px] font-bold text-primary hover:brightness-95"
+                  className="inline-flex min-h-[36px] shrink-0 items-center gap-0.5 whitespace-nowrap rounded-xl bg-white/[0.12] px-3 text-[14px] font-bold text-white hover:bg-white/20"
                 >
                   {t.action.label}
                   <ChevronRight size={15} />
                 </Link>
               )}
+              <button
+                onClick={() => dismiss(t.id)}
+                aria-label="닫기"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#AEB8C2] hover:bg-white/10 hover:text-white"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <button
-              onClick={() => dismiss(t.id)}
-              aria-label="닫기"
-              className="-mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center text-muted hover:text-ink"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Ctx.Provider>
   );

@@ -279,6 +279,8 @@ export interface StoreState {
   /** 재고가 모자라 출고할 수 없으면 false */
   advanceOrder: (orderId: string, stage: OrderStage, actor?: string) => boolean;
   notifyCustomer: (orderId: string, body: string) => void;
+  /** 고객 알림 모두 읽음 (알림 패널을 닫을 때) */
+  markNotificationsRead: (customerId: string) => void;
   receiveInbound: (poId: string) => void;
   addEvidence: (e: Omit<EvidenceLog, "id" | "createdAt" | "updatedAt" | "source">) => string;
   createActionFromSku: (skuId: string) => string | null;
@@ -979,6 +981,19 @@ export const useStore = create<StoreState>()(
         set({ data: { ...s.data, orders, inventory, evidence: [ev, ...s.data.evidence], notifications } });
         return true;
       },
+      markNotificationsRead: (customerId) =>
+        set((s) =>
+          s.data.notifications.some((n) => n.customerId === customerId && !n.read)
+            ? {
+                data: {
+                  ...s.data,
+                  notifications: s.data.notifications.map((n) =>
+                    n.customerId === customerId && !n.read ? { ...n, read: true } : n,
+                  ),
+                },
+              }
+            : {},
+        ),
       notifyCustomer: (orderId, body) =>
         set((s) => {
           const o = s.data.orders.find((x) => x.id === orderId);

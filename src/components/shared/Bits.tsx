@@ -2,6 +2,7 @@
 import { useState, type ReactNode } from "react";
 import { HelpCircle, Inbox, Sparkles } from "lucide-react";
 import Overlay from "./Overlay";
+import EmptyArt, { type EmptyArtKind } from "./EmptyArt";
 
 export function Tabs<T extends string>({
   tabs,
@@ -50,19 +51,26 @@ export function EmptyState({
   body,
   action,
   icon,
+  art,
 }: {
   title: string;
   body?: string;
   action?: ReactNode;
   icon?: ReactNode;
+  /** 고객 화면용 일러스트 — 주면 아이콘 대신 그림을 쓴다 */
+  art?: EmptyArtKind;
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-mist text-muted">
-        {icon ?? <Inbox size={22} />}
-      </div>
-      <div className="font-semibold">{title}</div>
-      {body && <p className="max-w-sm text-sm text-muted">{body}</p>}
+      {art ? (
+        <EmptyArt kind={art} className="mb-1 h-24 w-32" />
+      ) : (
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-mist text-muted">
+          {icon ?? <Inbox size={22} />}
+        </div>
+      )}
+      <div className={art ? "text-[17px] font-bold" : "font-semibold"}>{title}</div>
+      {body && <p className={`max-w-sm text-muted ${art ? "text-[15px]" : "text-sm"}`}>{body}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );

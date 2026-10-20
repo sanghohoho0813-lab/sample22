@@ -15,22 +15,40 @@ export default function ClientGate({ children, fallback }: { children: ReactNode
   if (pathname?.startsWith("/ax"))
     return (
       <div className="space-y-4" aria-busy="true" aria-label="불러오는 중">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton h-[104px] rounded-2xl" />
-          ))}
+        {/* 상단 상태줄(한 줄 5칸) + 표 패널 — 실제 업무 화면 구성과 같은 모양 */}
+        <div className="skeleton h-[92px] rounded-2xl" />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="space-y-2 rounded-2xl border border-line bg-white p-5">
+            <div className="skeleton h-6 w-1/3" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton h-12" />
+            ))}
+          </div>
+          <div className="skeleton hidden h-[360px] rounded-2xl xl:block" />
         </div>
-        <div className="skeleton h-[320px] rounded-2xl" />
       </div>
     );
   return (
-    <div className="mx-auto max-w-[1280px] space-y-4 px-4 py-6" aria-busy="true" aria-label="불러오는 중">
+    <div className="mx-auto max-w-[1280px] space-y-5 px-4 py-6" aria-busy="true" aria-label="불러오는 중">
       <div className="skeleton h-9 w-1/2 max-w-xs rounded-xl" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+      <div className="skeleton h-12 max-w-3xl rounded-full" />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4 sm:gap-x-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="skeleton aspect-[3/4] rounded-2xl" />
+          <ProductSkeleton key={i} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/** 상품 카드 자리표시 — 이미지 타일 + 브랜드·이름·가격 3줄 (실제 카드와 같은 비율) */
+export function ProductSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <div className="skeleton aspect-square rounded-2xl" />
+      <div className="skeleton mt-3 h-3 w-1/3" />
+      <div className="skeleton mt-2 h-4 w-5/6" />
+      <div className="skeleton mt-2 h-5 w-1/2" />
     </div>
   );
 }

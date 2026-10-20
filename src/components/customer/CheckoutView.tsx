@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
-import { CreditCard, MapPin, Info, Lock } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { CreditCard, MapPin, Info, Lock, Landmark, Smartphone, Truck, Pencil } from "lucide-react";
 import { useLookups, useShippingRule } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { deliveryPromise, won } from "@/lib/format";
@@ -28,6 +28,7 @@ export default function CheckoutView() {
   const [phone, setPhone] = useState(me?.phone ?? "");
   const [addr, setAddr] = useState(me ? `${me.address.line1} ${me.address.line2 ?? ""}`.trim() : "");
   const [tried, setTried] = useState(false);
+  const [editAddr, setEditAddr] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   // 입력 검증 — 제출을 한 번 시도한 뒤부터 칸 아래에 바로 안내
   const digits = phone.replace(/\D/g, "");
@@ -46,6 +47,7 @@ export default function CheckoutView() {
     agree: !agree ? "필수 약관에 동의해 주세요" : "",
   };
   const invalid = Object.values(errors).some(Boolean);
+  const invalidAddr = !!(errors.name || errors.phone || errors.addr);
   const fmtPhone = (v: string) => {
     const d = v.replace(/\D/g, "").slice(0, 11);
     return d.length < 4
@@ -110,51 +112,69 @@ export default function CheckoutView() {
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-5">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">주문·결제</h1>
-      <div className="mt-2 flex items-start gap-2 rounded-xl bg-orange/10 px-4 py-2.5 text-[15px]">
-        <Info size={16} className="mt-0.5 shrink-0 text-orange" />
-        <div>
-          <b>시연용 주문서</b> · 실제 결제 없이 주문만 생성됩니다.
-        </div>
-      </div>
+      <h1 className="text-[26px] font-bold tracking-tight sm:text-3xl">주문·결제</h1>
+      <p className="mt-1 inline-flex items-center gap-1.5 text-[14px] text-muted">
+        <Info size={14} className="shrink-0 text-orange" />
+        시연용 주문서 — 실제 결제 없이 주문만 생성됩니다
+      </p>
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4" ref={formRef}>
           <section className="card p-5">
-            <h2 className="flex items-center gap-2 text-lg font-bold">
-              <MapPin size={18} className="text-primary" />
-              주문자 · 배송지
-            </h2>
+            <StepTitle n={1} icon={<MapPin size={17} />}>
+              받는 분 · 배송지
+            </StepTitle>
+            {/* 저장된 배송지가 맞으면 요약만, 고치거나 입력 오류가 있으면 입력칸을 연다 */}
+            {!editAddr && !(tried && invalidAddr) ? (
+              <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-mist px-4 py-3">
+                <div className="min-w-0 text-[15px]">
+                  <div className="font-semibold">
+                    {name} <span className="font-normal tabular-nums text-muted">· {phone}</span>
+                  </div>
+                  <div className="mt-0.5 text-muted">{addr}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm shrink-0 !px-2 text-primary"
+                  onClick={() => setEditAddr(true)}
+                >
+                  <Pencil size={14} /> 변경
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    ["name", "주문자", name, setName, "text", "name", ""],
+                    ["phone", "연락처", phone, (v: string) => setPhone(fmtPhone(v)), "tel", "tel", ""],
+                    ["addr", "배송지", addr, setAddr, "text", "street-address", "sm:col-span-2"],
+                  ] as const
+                ).map(([k, label, value, set, type, auto, span]) => {
+                  const err = tried ? errors[k] : "";
+                  return (
+                    <label key={k} className={`text-[15px] ${span}`}>
+                      <span className="text-muted">{label}</span>
+                      <input
+                        className={`input mt-1 ${err ? "!border-danger focus:!ring-danger/30" : ""}`}
+                        value={value}
+                        onChange={(e) => (set as (v: string) => void)(e.target.value)}
+                        type={type}
+                        inputMode={type === "tel" ? "tel" : undefined}
+                        autoComplete={auto}
+                        aria-invalid={!!err}
+                        aria-describedby={err ? `err-${k}` : undefined}
+                      />
+                      {err && (
+                        <span id={`err-${k}`} className="mt-1 block text-[14px] text-danger">
+                          {err}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  ["name", "주문자", name, setName, "text", "name", ""],
-                  ["phone", "연락처", phone, (v: string) => setPhone(fmtPhone(v)), "tel", "tel", ""],
-                  ["addr", "배송지", addr, setAddr, "text", "street-address", "sm:col-span-2"],
-                ] as const
-              ).map(([k, label, value, set, type, auto, span]) => {
-                const err = tried ? errors[k] : "";
-                return (
-                  <label key={k} className={`text-[15px] ${span}`}>
-                    <span className="text-muted">{label}</span>
-                    <input
-                      className={`input mt-1 ${err ? "!border-danger focus:!ring-danger/30" : ""}`}
-                      value={value}
-                      onChange={(e) => (set as (v: string) => void)(e.target.value)}
-                      type={type}
-                      inputMode={type === "tel" ? "tel" : undefined}
-                      autoComplete={auto}
-                      aria-invalid={!!err}
-                      aria-describedby={err ? `err-${k}` : undefined}
-                    />
-                    {err && (
-                      <span id={`err-${k}`} className="mt-1 block text-[14px] text-danger">
-                        {err}
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
               <label className="text-[15px] sm:col-span-2">
                 <span className="text-muted">배송 요청사항</span>
                 <select className="input mt-1" value={note} onChange={(e) => setNote(e.target.value)}>
@@ -172,15 +192,18 @@ export default function CheckoutView() {
           </section>
 
           <section className="card p-5">
-            <h2 className="text-lg font-bold">주문 상품 {rows.length}건</h2>
-            <ul className="mt-3 divide-y divide-line">
+            <StepTitle n={2}>주문 상품 {rows.length}건</StepTitle>
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-soft px-2.5 py-1 text-[14px] font-semibold text-primary">
+              <Truck size={15} /> {eta}
+            </p>
+            <ul className="mt-2 divide-y divide-line">
               {rows.map(({ c, sku, product, promise }) => (
                 <li key={c.skuId} className="flex items-center gap-3 py-3">
                   <AssetImage
                     assetKey={`product/${product.id}`}
                     category={product.categorySlug}
                     label={product.name}
-                    className="h-14 w-14 shrink-0 rounded-lg"
+                    className="h-16 w-16 shrink-0 rounded-xl"
                     ratio=""
                   />
                   <div className="min-w-0 flex-1">
@@ -196,25 +219,25 @@ export default function CheckoutView() {
           </section>
 
           <section className="card p-5">
-            <h2 className="flex items-center gap-2 text-lg font-bold">
-              <CreditCard size={18} className="text-primary" />
+            <StepTitle n={3} icon={<CreditCard size={17} />}>
               결제수단 <span className="badge bg-mist text-muted">미리보기</span>
-            </h2>
+            </StepTitle>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {(
                 [
-                  ["card", "카드"],
-                  ["transfer", "계좌이체"],
-                  ["pay", "간편결제"],
+                  ["card", "카드", CreditCard],
+                  ["transfer", "계좌이체", Landmark],
+                  ["pay", "간편결제", Smartphone],
                 ] as const
-              ).map(([k, l]) => (
+              ).map(([k, l, Icon]) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setPay(k)}
                   aria-pressed={pay === k}
-                  className={`min-h-[52px] rounded-xl border px-2 py-3 text-[15px] font-semibold ${pay === k ? "border-primary bg-soft" : "border-line hover:bg-mist"}`}
+                  className={`flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-[15px] font-semibold transition-colors ${pay === k ? "border-primary bg-soft text-primary ring-1 ring-primary/30" : "border-line hover:bg-mist"}`}
                 >
+                  <Icon size={20} strokeWidth={1.8} />
                   {l}
                 </button>
               ))}
@@ -246,7 +269,7 @@ export default function CheckoutView() {
         </div>
 
         <aside className="card p-5 lg:sticky lg:top-32">
-          <div className="text-lg font-bold">결제 예정금액</div>
+          <div className="text-[18px] font-bold">결제 예정금액</div>
           <dl className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted">상품금액</dt>
@@ -258,7 +281,9 @@ export default function CheckoutView() {
             </div>
             <div className="flex justify-between border-t border-line pt-3">
               <dt className="font-semibold">최종 결제예정금액</dt>
-              <dd className="text-xl font-black tabular-nums">{won(subtotal + shipping)}</dd>
+              <dd className="text-[24px] font-bold tabular-nums tracking-tight">
+                {won(subtotal + shipping)}
+              </dd>
             </div>
           </dl>
           <div className="mt-2 text-xs text-muted">예상 도착: {eta}</div>
@@ -281,5 +306,18 @@ export default function CheckoutView() {
         </button>
       </div>
     </div>
+  );
+}
+
+/** 주문서 단계 제목 — 번호로 순서를 보여준다 */
+function StepTitle({ n, icon, children }: { n: number; icon?: ReactNode; children: ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-2.5 text-[18px] font-bold">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-strong text-[13px] font-bold text-white">
+        {n}
+      </span>
+      {children}
+      {icon && <span className="ml-auto text-muted">{icon}</span>}
+    </h2>
   );
 }

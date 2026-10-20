@@ -8,6 +8,7 @@ import { useStore } from "@/lib/store";
 import ProductCard from "./ProductCard";
 import Overlay from "@/components/shared/Overlay";
 import { EmptyState } from "@/components/shared/Bits";
+import { ProductSkeleton } from "@/components/shared/ClientGate";
 import type { CategorySlug } from "@/lib/types";
 
 const SORTS: { key: NonNullable<SearchFilters["sort"]>; label: string }[] = [
@@ -325,11 +326,11 @@ export default function ProductListView({
 
           {loading ? (
             <div
-              className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4"
+              className="mt-4 grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-4 md:grid-cols-3 xl:grid-cols-4"
               aria-busy="true"
             >
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="skeleton aspect-[3/4.4]" />
+                <ProductSkeleton key={i} />
               ))}
             </div>
           ) : results.length === 0 ? (

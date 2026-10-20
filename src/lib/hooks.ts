@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "./store";
 import { buildSkuInsights, type SkuInsight } from "./engines";
 import { getLedger } from "./dataset";
@@ -154,6 +154,22 @@ export function useOrderLookup() {
       return h ? ledgerOrderToOrder(h, products, skus) : undefined;
     };
   }, [data.orders, data.products, data.skus, ledger]);
+}
+
+/** 값이 커질 때만 잠깐 true — 장바구니 배지 "튀는" 반응용 (첫 렌더·감소에는 반응하지 않음) */
+export function useBump(value: number, ms = 380) {
+  const prev = useRef<number | null>(null);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (prev.current !== null && value > prev.current) {
+      setOn(true);
+      const t = setTimeout(() => setOn(false), ms);
+      prev.current = value;
+      return () => clearTimeout(t);
+    }
+    prev.current = value;
+  }, [value, ms]);
+  return on;
 }
 
 export function useNow(intervalMs = 1000) {

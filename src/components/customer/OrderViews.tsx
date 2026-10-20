@@ -47,6 +47,9 @@ export function deliveryNote(order: Order) {
     const at = order.history.find((h) => h.stage === "delivered")?.at ?? order.updatedAt;
     return `${fmtDate(at, "md")} 배송완료`;
   }
+  // 예정일이 지났는데 아직 배송 중이면 "예정"이라고 하지 않는다
+  if (new Date(order.promisedAt).getTime() < Date.now())
+    return `예정일(${fmtDate(order.promisedAt, "md")}) 지나 배송 중`;
   return `${fmtDate(order.promisedAt, "md")} 도착 예정`;
 }
 
@@ -105,18 +108,22 @@ export function OrderCompleteView({ orderId }: { orderId: string }) {
     );
   const promise = fmtDate(order.promisedAt, "md");
   return (
-    <div className="mx-auto max-w-[900px] px-4 py-8">
+    <div className="mx-auto max-w-[720px] px-4 py-8">
       <div className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <CheckCircle2 size={34} />
+        <div className="pop-in relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary-strong text-white shadow-[0_10px_30px_rgba(8,115,123,0.28)]">
+          <CheckCircle2 size={40} strokeWidth={2.2} />
+          <span aria-hidden="true" className="ring-pulse absolute inset-0 rounded-full" />
         </div>
-        <h1 className="mt-3 text-2xl font-bold sm:text-3xl">주문이 접수되었습니다</h1>
-        <p className="mt-1 text-muted">
-          주문번호 <b className="text-ink">{order.id}</b> · {promise} 도착 예정
+        <h1 className="mt-5 text-[26px] font-bold tracking-tight sm:text-3xl">주문이 접수되었습니다</h1>
+        <p className="mt-2 text-[17px]">
+          <b className="text-primary">{promise}</b> 도착 예정
         </p>
-        <div className="badge mt-2 bg-orange/15 text-orange">시연 주문 — 실제 결제 없음</div>
+        <p className="mt-1 text-[14px] text-muted">
+          주문번호 <span className="font-semibold tabular-nums text-ink">{order.id}</span> · 시연 주문(실제
+          결제 없음)
+        </p>
       </div>
-      <div className="card mt-6 p-5">
+      <div className="card mt-7 p-5">
         <OrderProgress order={order} />
         <ul className="mt-5 divide-y divide-line">
           {order.items.map((it) => {
@@ -176,6 +183,20 @@ export function OrderCompleteView({ orderId }: { orderId: string }) {
   );
 }
 
+/** 주문 상태 칩 — 진행 중은 브랜드색, 완료는 회색, 취소·반품은 경고색 */
+function StageChip({ stage }: { stage: OrderStage }) {
+  const done = stage === "delivered";
+  const bad = stage === "cancelled" || stage === "return";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[14px] font-bold ${bad ? "bg-danger/10 text-danger" : done ? "bg-mist text-muted" : "bg-soft text-primary"}`}
+    >
+      {!done && !bad && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+      {CUSTOMER_STAGE_LABEL[stage]}
+    </span>
+  );
+}
+
 export function MyPageView() {
   const data = useData();
   const customerId = useStore((s) => s.ui.customerId);
@@ -194,215 +215,277 @@ export function MyPageView() {
   const due = repeat.filter((r) => r.dueInDays <= 3).length;
   const active = orders.filter((o) => !["delivered", "cancelled", "return"].includes(o.stage)).length;
 
+  const tiles = [
+    { key: "orders" as const, label: "배송 진행", value: active, href: "/track" },
+    { key: "noti" as const, label: "새 알림", value: notes.filter((n) => !n.read).length },
+    { key: "repeat" as const, label: "다시 살 때", value: due, href: "/my/repeat", accent: true },
+    { key: "wish" as const, label: "찜", value: wishlist.length },
+  ];
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-5">
-      <div className="card flex flex-wrap items-center gap-4 p-5">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-soft text-primary">
-          <User size={26} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold">
-            <span className="sr-only">마이페이지 — </span>
-            {me.name}님
-          </h1>
-          <div className="inline-flex items-center gap-1 text-sm text-muted">
-            <MapPin size={13} />
-            {me.address.line1} {me.address.line2}
-          </div>
-        </div>
-        {/* 숫자 3개가 곧 바로가기 — 같은 기능의 버튼을 따로 두지 않는다 */}
-        <div className="grid w-full grid-cols-3 gap-2 text-center sm:w-auto">
-          <Link href="/track" className="min-w-[92px] rounded-xl bg-mist px-3 py-2.5 hover:brightness-95">
-            <div className="text-xl font-bold tabular-nums">{active}</div>
-            <div className="text-[13px] text-muted">배송 진행</div>
-          </Link>
-          <button
-            type="button"
-            onClick={() => setTab("noti")}
-            className="min-w-[92px] rounded-xl bg-mist px-3 py-2.5 hover:brightness-95"
-          >
-            <div className="text-xl font-bold tabular-nums">{notes.filter((n) => !n.read).length}</div>
-            <div className="text-[13px] text-muted">새 알림</div>
-          </button>
-          <Link href="/my/repeat" className="min-w-[92px] rounded-xl bg-soft px-3 py-2.5 hover:brightness-95">
-            <div className="text-xl font-bold tabular-nums text-primary">{due}</div>
-            <div className="text-[13px] text-muted">다시 살 때</div>
-          </Link>
-        </div>
-      </div>
-
-      <Tabs
-        className="mt-5"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { key: "orders", label: "주문내역", count: orders.length },
-          { key: "wish", label: "찜", count: wishlist.length },
-          { key: "recent", label: "최근 본 상품", count: recentViews.length },
-          { key: "noti", label: "알림", count: notes.length },
-          { key: "inquiry", label: "문의·반품" },
-        ]}
-      />
-
-      <div className="mt-4">
-        {tab === "orders" &&
-          (orders.length ? (
-            <ul className="space-y-3">
-              {orders.map((o) => (
-                <li key={o.id} className="card p-4">
-                  <Link
-                    href={`/my/orders/${o.id}`}
-                    className="-m-1 flex items-center justify-between gap-2 rounded-lg p-1 hover:bg-mist/60"
-                  >
-                    <span className="sr-only">주문 {o.id} —</span>
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span
-                        className={`text-[17px] font-bold ${["delivered", "cancelled"].includes(o.stage) ? "text-ink" : "text-primary"}`}
-                      >
-                        {CUSTOMER_STAGE_LABEL[o.stage]}
-                      </span>
-                      <span className="text-[15px] tabular-nums text-muted">
-                        {fmtDate(o.createdAt, "md")} 주문
-                      </span>
-                      {o.customerNotified && (
-                        <span className="badge bg-orange/15 text-orange">배송 안내</span>
-                      )}
-                    </div>
-                    <span className="inline-flex shrink-0 items-center gap-0.5 text-[15px] text-muted">
-                      상세
-                      <ChevronRight size={16} />
-                    </span>
-                  </Link>
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="flex -space-x-2">
-                      {o.items.slice(0, 3).map((it) => {
-                        const p = productById.get(it.productId)!;
-                        return (
-                          <AssetImage
-                            key={it.skuId}
-                            assetKey={`product/${p.id}`}
-                            category={p.categorySlug}
-                            label={p.name}
-                            className="h-14 w-14 rounded-lg ring-2 ring-white"
-                            ratio=""
-                          />
-                        );
-                      })}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="line-clamp-1 text-[16px] font-semibold">
-                        {o.items[0].name}
-                        {o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}
-                      </div>
-                      <div className="text-[14px] text-muted">
-                        <b className="font-semibold tabular-nums text-ink">{won(o.total)}</b> ·{" "}
-                        {deliveryNote(o)}
-                      </div>
-                      <div className="text-[13px] tabular-nums text-muted">주문번호 {o.id}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Link href={`/my/orders/${o.id}`} className="btn-outline btn-sm">
-                      배송조회
-                    </Link>
-                    <RebuyButton order={o} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="card">
-              <EmptyState
-                title="주문내역이 없습니다"
-                action={
-                  <Link href="/" className="btn-primary btn-sm">
-                    쇼핑하기
-                  </Link>
-                }
-              />
-            </div>
-          ))}
-
-        {tab === "wish" &&
-          (wishlist.length ? (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {wishlist.map((pid) => {
-                const p = productById.get(pid);
-                if (!p) return null;
-                const s = searchProducts(data, { q: p.name }).find((x) => x.product.id === pid);
-                return s ? <ProductCard key={pid} s={s} size="sm" /> : null;
-              })}
-            </div>
-          ) : (
-            <div className="card">
-              <EmptyState
-                icon={<Heart size={22} />}
-                title="찜한 상품이 없습니다"
-                body="상품 카드의 하트를 누르면 여기에 모입니다."
-              />
-            </div>
-          ))}
-
-        {tab === "recent" &&
-          (recentViews.length ? (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {recentViews.map((pid) => {
-                const p = productById.get(pid);
-                if (!p) return null;
-                const s = searchProducts(data, { q: p.name }).find((x) => x.product.id === pid);
-                return s ? <ProductCard key={pid} s={s} size="sm" /> : null;
-              })}
-            </div>
-          ) : (
-            <div className="card">
-              <EmptyState icon={<Clock3 size={22} />} title="최근 본 상품이 없습니다" />
-            </div>
-          ))}
-
-        {tab === "noti" &&
-          (notes.length ? (
-            <ul className="card divide-y divide-line">
-              {notes.map((n) => (
-                <li key={n.id} className="flex gap-3 p-4">
-                  <Bell size={18} className={`mt-0.5 shrink-0 ${n.read ? "text-muted" : "text-primary"}`} />
-                  <div>
-                    <div className="text-sm font-semibold">{n.title}</div>
-                    <div className="text-sm text-muted">{n.body}</div>
-                    <div className="mt-1 text-xs text-muted">{relTime(n.createdAt)}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="card">
-              <EmptyState
-                icon={<Bell size={22} />}
-                title="알림이 없습니다"
-                body="출고·배송 상태가 바뀌면 여기에 표시됩니다."
-              />
-            </div>
-          ))}
-
-        {tab === "inquiry" && (
-          <div className="space-y-3">
-            <div className="card p-4">
-              <div className="font-semibold">취소·반품·교환</div>
-              <p className="mt-1 text-sm text-muted">
-                주문상세에서 신청할 수 있습니다. 주문접수 상태는 즉시 취소, 배송완료 후 7일 이내 반품·교환이
-                가능합니다.
-              </p>
-            </div>
-            <div className="card p-4">
-              <div className="font-semibold">고객문의</div>
-              <p className="mt-1 text-sm text-muted">
-                1588-0000 (시연) · 평일 09:00~18:00. 시연 환경에서는 문의 접수가 저장되지 않습니다.
-              </p>
-              <div className="mt-2 text-xs text-muted">
-                내 반품 요청: {data.returns.filter((r) => orders.some((o) => o.id === r.orderId)).length}건
+    <div className="mx-auto max-w-[1180px] px-4 py-5 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:py-8">
+      {/* 왼쪽(데스크톱 고정): 프로필 + 바로가기 숫자 */}
+      <aside className="lg:sticky lg:top-32">
+        <div className="rounded-[22px] bg-shell p-5 text-white">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15">
+              <User size={24} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-[21px] font-bold">
+                <span className="sr-only">마이페이지 — </span>
+                {me.name}님
+              </h1>
+              <div className="inline-flex max-w-full items-center gap-1 text-[14px] text-white/85">
+                <MapPin size={13} className="shrink-0" />
+                <span className="truncate">
+                  {me.address.line1} {me.address.line2}
+                </span>
               </div>
             </div>
           </div>
-        )}
+          {/* 숫자 4개가 곧 바로가기 — 같은 기능의 버튼을 따로 두지 않는다 */}
+          <div className="mt-4 grid grid-cols-4 gap-1.5 text-center">
+            {tiles.map((t) => {
+              const body = (
+                <>
+                  <div
+                    className={`text-[20px] font-bold tabular-nums ${t.accent && t.value ? "text-highlight" : ""}`}
+                  >
+                    {t.value}
+                  </div>
+                  <div className="text-[12px] text-white/85">{t.label}</div>
+                </>
+              );
+              const cls = "rounded-xl bg-white/10 px-1 py-2.5 transition-colors hover:bg-white/15";
+              return t.href ? (
+                <Link key={t.key} href={t.href} className={cls}>
+                  {body}
+                </Link>
+              ) : (
+                <button key={t.key} type="button" onClick={() => setTab(t.key as typeof tab)} className={cls}>
+                  {body}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <nav
+          aria-label="마이페이지 메뉴"
+          className="mt-3 hidden overflow-hidden rounded-2xl border border-line bg-white lg:block"
+        >
+          {(
+            [
+              ["orders", "주문내역", orders.length],
+              ["wish", "찜한 상품", wishlist.length],
+              ["recent", "최근 본 상품", recentViews.length],
+              ["noti", "알림", notes.length],
+              ["inquiry", "문의·반품", null],
+            ] as const
+          ).map(([k, l, n]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              aria-current={tab === k ? "page" : undefined}
+              className={`flex w-full items-center justify-between border-b border-line px-4 py-3 text-left text-[15px] last:border-b-0 ${tab === k ? "bg-soft font-bold text-primary" : "hover:bg-mist"}`}
+            >
+              {l}
+              <span className="inline-flex items-center gap-1 text-[14px] text-muted">
+                {n !== null && <span className="tabular-nums">{n}</span>}
+                <ChevronRight size={15} />
+              </span>
+            </button>
+          ))}
+        </nav>
+        <Link
+          href="/my/repeat"
+          className="mt-3 hidden items-center gap-3 rounded-2xl border border-line bg-white p-4 hover:bg-mist lg:flex"
+        >
+          <RotateCcw size={20} className="shrink-0 text-primary" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">다시 구매</span>
+            <span className="block text-[13px] text-muted">구매주기에 맞춰 한 번에 담기</span>
+          </span>
+          <ChevronRight size={16} className="text-muted" />
+        </Link>
+      </aside>
+
+      <div className="min-w-0">
+        <Tabs
+          className="mt-5 lg:mt-0"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { key: "orders", label: "주문내역", count: orders.length },
+            { key: "wish", label: "찜", count: wishlist.length },
+            { key: "recent", label: "최근 본 상품", count: recentViews.length },
+            { key: "noti", label: "알림", count: notes.length },
+            { key: "inquiry", label: "문의·반품" },
+          ]}
+        />
+
+        <div className="mt-4">
+          {tab === "orders" &&
+            (orders.length ? (
+              <ul className="space-y-3">
+                {orders.map((o) => (
+                  <li key={o.id} className="card p-4 sm:p-5">
+                    <Link
+                      href={`/my/orders/${o.id}`}
+                      className="-m-1 flex items-center justify-between gap-2 rounded-lg p-1 hover:bg-mist/60"
+                    >
+                      <span className="sr-only">주문 {o.id} —</span>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <StageChip stage={o.stage} />
+                        <span className="text-[15px] tabular-nums text-muted">
+                          {fmtDate(o.createdAt, "md")} 주문
+                        </span>
+                        {o.customerNotified && (
+                          <span className="badge bg-orange/15 text-orange">배송 안내</span>
+                        )}
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-[15px] text-muted">
+                        상세
+                        <ChevronRight size={16} />
+                      </span>
+                    </Link>
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="flex -space-x-3">
+                        {o.items.slice(0, 3).map((it) => {
+                          const p = productById.get(it.productId)!;
+                          return (
+                            <AssetImage
+                              key={it.skuId}
+                              assetKey={`product/${p.id}`}
+                              category={p.categorySlug}
+                              label={p.name}
+                              className="h-16 w-16 rounded-xl ring-2 ring-white"
+                              ratio=""
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="line-clamp-1 text-[16px] font-semibold">
+                          {o.items[0].name}
+                          {o.items.length > 1 ? ` 외 ${o.items.length - 1}건` : ""}
+                        </div>
+                        <div className="text-[14px] text-muted">
+                          <b className="font-semibold tabular-nums text-ink">{won(o.total)}</b> ·{" "}
+                          {deliveryNote(o)}
+                        </div>
+                        <div className="text-[13px] tabular-nums text-muted">주문번호 {o.id}</div>
+                      </div>
+                      <div className="hidden shrink-0 gap-2 sm:flex">
+                        <Link href={`/my/orders/${o.id}`} className="btn-outline btn-sm">
+                          배송조회
+                        </Link>
+                        <RebuyButton order={o} />
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:hidden">
+                      <Link href={`/my/orders/${o.id}`} className="btn-outline btn-sm">
+                        배송조회
+                      </Link>
+                      <RebuyButton order={o} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="card">
+                <EmptyState
+                  title="주문내역이 없습니다"
+                  action={
+                    <Link href="/" className="btn-primary btn-sm">
+                      쇼핑하기
+                    </Link>
+                  }
+                />
+              </div>
+            ))}
+
+          {tab === "wish" &&
+            (wishlist.length ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {wishlist.map((pid) => {
+                  const p = productById.get(pid);
+                  if (!p) return null;
+                  const s = searchProducts(data, { q: p.name }).find((x) => x.product.id === pid);
+                  return s ? <ProductCard key={pid} s={s} size="sm" /> : null;
+                })}
+              </div>
+            ) : (
+              <div className="card">
+                <EmptyState
+                  icon={<Heart size={22} />}
+                  title="찜한 상품이 없습니다"
+                  body="상품 카드의 하트를 누르면 여기에 모입니다."
+                />
+              </div>
+            ))}
+
+          {tab === "recent" &&
+            (recentViews.length ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {recentViews.map((pid) => {
+                  const p = productById.get(pid);
+                  if (!p) return null;
+                  const s = searchProducts(data, { q: p.name }).find((x) => x.product.id === pid);
+                  return s ? <ProductCard key={pid} s={s} size="sm" /> : null;
+                })}
+              </div>
+            ) : (
+              <div className="card">
+                <EmptyState icon={<Clock3 size={22} />} title="최근 본 상품이 없습니다" />
+              </div>
+            ))}
+
+          {tab === "noti" &&
+            (notes.length ? (
+              <ul className="card divide-y divide-line">
+                {notes.map((n) => (
+                  <li key={n.id} className="flex gap-3 p-4">
+                    <Bell size={18} className={`mt-0.5 shrink-0 ${n.read ? "text-muted" : "text-primary"}`} />
+                    <div>
+                      <div className="text-sm font-semibold">{n.title}</div>
+                      <div className="text-sm text-muted">{n.body}</div>
+                      <div className="mt-1 text-xs text-muted">{relTime(n.createdAt)}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="card">
+                <EmptyState
+                  icon={<Bell size={22} />}
+                  title="알림이 없습니다"
+                  body="출고·배송 상태가 바뀌면 여기에 표시됩니다."
+                />
+              </div>
+            ))}
+
+          {tab === "inquiry" && (
+            <div className="space-y-3">
+              <div className="card p-4">
+                <div className="font-semibold">취소·반품·교환</div>
+                <p className="mt-1 text-sm text-muted">
+                  주문상세에서 신청할 수 있습니다. 주문접수 상태는 즉시 취소, 배송완료 후 7일 이내 반품·교환이
+                  가능합니다.
+                </p>
+              </div>
+              <div className="card p-4">
+                <div className="font-semibold">고객문의</div>
+                <p className="mt-1 text-sm text-muted">
+                  1588-0000 (시연) · 평일 09:00~18:00. 시연 환경에서는 문의 접수가 저장되지 않습니다.
+                </p>
+                <div className="mt-2 text-xs text-muted">
+                  내 반품 요청: {data.returns.filter((r) => orders.some((o) => o.id === r.orderId)).length}건
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -450,7 +533,7 @@ function ShipEta({ order, forecast }: { order: Order; forecast: ReturnType<typeo
 
 export function OrderDetailView({ orderId }: { orderId: string }) {
   const data = useData();
-  const { productById, warehouseById } = useLookups();
+  const { productById, customerById, brandById } = useLookups();
   const cancelOrder = useStore((s) => s.cancelOrder);
   const requestReturn = useStore((s) => s.requestReturn);
   const toast = useToast();
@@ -473,141 +556,205 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
     );
   const canCancel = ["new", "confirmed"].includes(order.stage);
   const canReturn = order.stage === "delivered";
-  const wh = warehouseById.get(order.warehouseId);
+  const me = customerById.get(order.customerId);
+  // 고객용 진행 기록: 내부 단계(피킹대기·피킹 등)가 같은 고객 단계로 묶이면 처음 들어간 시각 하나만 (안내 메모가 있는 기록은 유지)
+  const timeline = [...order.history]
+    .reverse()
+    .filter(
+      (h, i, arr) =>
+        i === arr.length - 1 ||
+        !!h.note ||
+        CUSTOMER_STAGE_LABEL[arr[i + 1].stage] !== CUSTOMER_STAGE_LABEL[h.stage],
+    );
+  const deliveredAt = order.history.find((h) => h.stage === "delivered")?.at;
   return (
-    <div className="mx-auto max-w-[900px] px-4 py-5">
-      <Link href="/my" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
+    <div className="mx-auto max-w-[1080px] px-4 py-5 lg:py-8">
+      <Link
+        href="/my"
+        className="inline-flex min-h-[36px] items-center gap-1 text-sm text-muted hover:text-ink"
+      >
         <ChevronLeft size={14} />
         주문내역
       </Link>
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
-        <h1 className="text-2xl font-bold">주문상세</h1>
-        <div className="text-sm text-muted">
-          {order.id} · {fmtDate(order.createdAt, "datetime")}
+      <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
+        <h1 className="text-[24px] font-bold tracking-tight">주문상세</h1>
+        <div className="text-[14px] tabular-nums text-muted">
+          {order.id} · {fmtDate(order.createdAt, "datetime")} 주문
         </div>
       </div>
 
-      <div className="card mt-4 p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-lg font-bold">{CUSTOMER_STAGE_LABEL[order.stage]}</div>
-          <div className="inline-flex items-center gap-1 text-sm text-muted">
-            <Truck size={14} />
-            {deliveryNote(order)}
-          </div>
-        </div>
-        <OrderProgress order={order} />
-        {isPreShip(order.stage) && <ShipEta order={order} forecast={forecast} />}
-        {order.customerNotified && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl bg-orange/10 px-3 py-2 text-sm text-orange">
-            <Bell size={15} className="mt-0.5 shrink-0" />
-            <span>
-              {[...order.history]
-                .reverse()
-                .find((h) => h.note?.startsWith("출고 지연 안내"))
-                ?.note?.replace("출고 지연 안내 · ", "") ?? "배송이 지연될 수 있어"}
-              {" — "}출고가 늦어져 미리 안내드립니다. 불편을 드려 죄송합니다.
-            </span>
-          </div>
-        )}
-        <ol className="mt-5 space-y-3 border-l-2 border-line pl-4">
-          {[...order.history].reverse().map((h, i) => (
-            <li key={i} className="relative text-sm">
-              <span
-                className={`absolute -left-[23px] top-1 h-3 w-3 rounded-full ${i === 0 ? "bg-primary" : "bg-line"}`}
-              />
-              <div className="font-semibold">{CUSTOMER_STAGE_LABEL[h.stage]}</div>
-              <div className="text-xs text-muted">
-                {fmtDate(h.at, "datetime")}
-                {h.note ? ` · ${h.note}` : ""}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      <div className="card mt-4 p-5">
-        <div className="font-bold">주문 상품</div>
-        <ul className="mt-2 divide-y divide-line">
-          {order.items.map((it) => {
-            const p = productById.get(it.productId)!;
-            return (
-              <li key={it.skuId} className="flex items-center gap-3 py-3">
-                <AssetImage
-                  assetKey={`product/${p.id}`}
-                  category={p.categorySlug}
-                  label={p.name}
-                  className="h-14 w-14 shrink-0 rounded-lg"
-                  ratio=""
-                />
-                <div className="min-w-0 flex-1">
-                  <Link href={`/product/${p.id}`} className="line-clamp-1 text-sm font-semibold">
-                    {it.name}
-                  </Link>
-                  <div className="text-xs text-muted">
-                    {it.skuName} × {it.qty}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold tabular-nums">{won(it.unitPrice * it.qty)}</div>
-                  {canReturn && (
-                    <button
-                      className="text-xs text-primary underline"
-                      onClick={() => setRet({ skuId: it.skuId })}
-                    >
-                      반품·교환
-                    </button>
+      <div className="mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
+        <div className="space-y-4">
+          {/* 상태 — 지금 어디쯤이고 언제 오는가 */}
+          <section className="card p-5">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <StageChip stage={order.stage} />
+                <p className="mt-2 text-[22px] font-bold tracking-tight">
+                  {order.stage === "delivered"
+                    ? `${fmtDate(deliveredAt ?? order.updatedAt, "md")} 배송완료`
+                    : order.stage === "cancelled"
+                      ? "취소된 주문입니다"
+                      : order.stage === "return"
+                        ? "반품·교환 진행 중"
+                        : new Date(order.promisedAt).getTime() < Date.now()
+                          ? "도착이 늦어지고 있어요"
+                          : `${fmtDate(order.promisedAt, "md")} 도착 예정`}
+                </p>
+                {!["delivered", "cancelled", "return"].includes(order.stage) &&
+                  new Date(order.promisedAt).getTime() < Date.now() && (
+                    <p className="mt-0.5 text-[14px] text-muted">
+                      원래 예정일 {fmtDate(order.promisedAt, "md")} · 곧 도착합니다. 불편을 드려 죄송합니다.
+                    </p>
                   )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        <dl className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted">상품금액</dt>
-            <dd className="tabular-nums">{won(order.subtotal)}</dd>
-          </div>
-          {order.discount > 0 && (
-            <div className="flex justify-between">
-              <dt className="text-muted">할인</dt>
-              <dd className="tabular-nums">-{won(order.discount)}</dd>
+              </div>
             </div>
-          )}
-          <div className="flex justify-between">
-            <dt className="text-muted">배송비</dt>
-            <dd className="tabular-nums">{order.shippingFee ? won(order.shippingFee) : "무료"}</dd>
-          </div>
-          <div className="flex justify-between text-base">
-            <dt className="font-semibold">결제금액</dt>
-            <dd className="font-black tabular-nums">{won(order.total)}</dd>
-          </div>
-        </dl>
-      </div>
+            <div className="mt-5">
+              <OrderProgress order={order} />
+            </div>
+            {isPreShip(order.stage) && <ShipEta order={order} forecast={forecast} />}
+            {order.customerNotified && (
+              <div className="mt-4 flex items-start gap-2 rounded-xl bg-orange/10 px-3 py-2.5 text-sm text-orange">
+                <Bell size={15} className="mt-0.5 shrink-0" />
+                <span>
+                  {[...order.history]
+                    .reverse()
+                    .find((h) => h.note?.startsWith("출고 지연 안내"))
+                    ?.note?.replace("출고 지연 안내 · ", "") ?? "배송이 지연될 수 있어"}
+                  {" — "}출고가 늦어져 미리 안내드립니다. 불편을 드려 죄송합니다.
+                </span>
+              </div>
+            )}
+            <details className="group mt-5 border-t border-line pt-4" open>
+              <summary className="flex cursor-pointer list-none items-center justify-between text-[15px] font-semibold">
+                진행 기록
+                <ChevronRight size={16} className="text-muted transition-transform group-open:rotate-90" />
+              </summary>
+              <ol className="mt-3 space-y-3 border-l-2 border-line pl-4">
+                {timeline.map((h, i) => (
+                  <li key={i} className="relative text-sm">
+                    <span
+                      className={`absolute -left-[23px] top-1 h-3 w-3 rounded-full ring-4 ring-white ${i === 0 ? "bg-primary" : "bg-line"}`}
+                    />
+                    <div className={i === 0 ? "font-bold" : "font-semibold text-ink/80"}>
+                      {CUSTOMER_STAGE_LABEL[h.stage]}
+                    </div>
+                    <div className="text-[13px] text-muted">
+                      {fmtDate(h.at, "datetime")}
+                      {h.note ? ` · ${h.note}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          </section>
 
-      <div className="card mt-4 p-5 text-sm">
-        <div className="font-bold">배송지</div>
-        <div className="mt-1 text-muted">
-          {order.history[0]?.note ?? "문 앞에 놓아주세요"} · 출고 물류: {wh?.name}
+          <section className="card p-5">
+            <h2 className="text-[17px] font-bold">주문 상품 {order.items.length}개</h2>
+            <ul className="mt-2 divide-y divide-line">
+              {order.items.map((it) => {
+                const p = productById.get(it.productId)!;
+                return (
+                  <li key={it.skuId} className="flex items-center gap-3 py-3">
+                    <Link href={`/product/${p.id}`} className="shrink-0" tabIndex={-1} aria-hidden="true">
+                      <AssetImage
+                        assetKey={`product/${p.id}`}
+                        category={p.categorySlug}
+                        label={p.name}
+                        brand={brandById.get(p.brandId)?.name}
+                        className="h-16 w-16 rounded-xl"
+                        ratio=""
+                      />
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/product/${p.id}`} className="line-clamp-1 text-[15px] font-semibold">
+                        {it.name}
+                      </Link>
+                      <div className="text-[13px] text-muted">
+                        {it.skuName} × {it.qty}
+                      </div>
+                      <div className="text-[15px] font-bold tabular-nums">{won(it.unitPrice * it.qty)}</div>
+                    </div>
+                    {canReturn && (
+                      <button
+                        className="btn-outline btn-sm shrink-0"
+                        onClick={() => setRet({ skuId: it.skuId })}
+                      >
+                        반품·교환
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          <section className="card p-5 text-[15px]">
+            <h2 className="text-[17px] font-bold">받는 분</h2>
+            <dl className="mt-2 space-y-1.5">
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-muted">이름</dt>
+                <dd>{me?.name ?? "-"}</dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-muted">주소</dt>
+                <dd className="min-w-0">{me ? `${me.address.line1} ${me.address.line2 ?? ""}` : "-"}</dd>
+              </div>
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-muted">요청사항</dt>
+                <dd>{order.history[0]?.note ?? "문 앞에 놓아주세요"}</dd>
+              </div>
+            </dl>
+          </section>
         </div>
-      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {canCancel ? (
-          <button
-            className="btn-outline"
-            onClick={() => {
-              cancelOrder(order.id);
-              toast({ title: "주문을 취소했습니다", body: "예약 재고가 해제되었습니다.", tone: "info" });
-            }}
-          >
-            주문 취소
-          </button>
-        ) : (
-          <button className="btn-outline" disabled>
-            주문 취소 (상품준비 이후 불가)
-          </button>
-        )}
-        <RebuyButton order={order} />
+        {/* 결제 요약 + 행동 — 데스크톱은 오른쪽에 고정 */}
+        <aside className="mt-4 space-y-3 lg:sticky lg:top-32 lg:mt-0">
+          <section className="card p-5">
+            <h2 className="text-[17px] font-bold">결제 정보</h2>
+            <dl className="mt-3 space-y-1.5 text-[15px]">
+              <div className="flex justify-between">
+                <dt className="text-muted">상품금액</dt>
+                <dd className="tabular-nums">{won(order.subtotal)}</dd>
+              </div>
+              {order.discount > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-muted">할인</dt>
+                  <dd className="tabular-nums text-accent">−{won(order.discount)}</dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-muted">배송비</dt>
+                <dd className="tabular-nums">{order.shippingFee ? won(order.shippingFee) : "무료"}</dd>
+              </div>
+              <div className="flex items-baseline justify-between border-t border-line pt-3">
+                <dt className="font-semibold">결제금액</dt>
+                <dd className="text-[22px] font-bold tabular-nums">{won(order.total)}</dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-[13px] text-muted">시연 주문 — 실제 결제는 이루어지지 않았습니다.</p>
+          </section>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+            <RebuyButton order={order} />
+            {canCancel ? (
+              <button
+                className="btn-outline btn-sm"
+                onClick={() => {
+                  cancelOrder(order.id);
+                  toast({ title: "주문을 취소했습니다", body: "예약 재고가 해제되었습니다.", tone: "info" });
+                }}
+              >
+                주문 취소
+              </button>
+            ) : (
+              <p className="flex items-center text-[13px] leading-snug text-muted">
+                {order.stage === "delivered"
+                  ? "받은 날부터 7일 이내 반품·교환 가능"
+                  : "상품 준비가 시작되어 취소할 수 없어요"}
+              </p>
+            )}
+          </div>
+        </aside>
       </div>
 
       <Overlay
@@ -725,8 +872,10 @@ export function RepeatBasketView() {
 
       {done ? (
         <div className="card mt-5 p-6 text-center">
-          <CheckCircle2 size={36} className="mx-auto text-primary" />
-          <div className="mt-2 text-xl font-bold">재구매 주문 완료 · {done.id}</div>
+          <div className="pop-in mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-strong text-white">
+            <CheckCircle2 size={32} />
+          </div>
+          <div className="mt-3 text-xl font-bold">재구매 주문 완료 · {done.id}</div>
           <p className="mt-1 text-muted">
             다음 구매주기가 오늘 기준으로 갱신되었습니다. 내부 AX에는 재구매 성과 기록이 기록됩니다.
           </p>
@@ -763,7 +912,25 @@ export function RepeatBasketView() {
                     : "지금 필요"
                   : `${r.dueInDays}일 후 필요`;
               return (
-                <div key={r.product.id} className={`flex gap-3 p-4 ${ex ? "opacity-50" : ""}`}>
+                <div
+                  key={r.product.id}
+                  className={`flex gap-3 p-4 transition-opacity ${ex ? "opacity-55" : ""}`}
+                >
+                  {/* 포함/제외는 장바구니와 같은 체크박스 문법 */}
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[var(--t-primary)]"
+                    checked={!ex}
+                    onChange={() =>
+                      setExcluded((st) => {
+                        const n = new Set(st);
+                        if (n.has(r.product.id)) n.delete(r.product.id);
+                        else n.add(r.product.id);
+                        return n;
+                      })
+                    }
+                    aria-label={`${r.product.name} 다시 주문에 포함`}
+                  />
                   <Link href={`/product/${r.product.id}`} className="shrink-0">
                     <AssetImage
                       assetKey={`product/${r.product.id}`}
@@ -792,26 +959,14 @@ export function RepeatBasketView() {
                           )}
                         </div>
                       </div>
-                      <button
-                        className="min-h-[32px] whitespace-nowrap px-1 text-[14px] text-muted hover:text-ink"
-                        onClick={() =>
-                          setExcluded((s) => {
-                            const n = new Set(s);
-                            if (n.has(r.product.id)) n.delete(r.product.id);
-                            else n.add(r.product.id);
-                            return n;
-                          })
-                        }
-                      >
-                        {ex ? "다시 포함" : "제외"}
-                      </button>
                     </div>
                     {/* 판단에 필요한 것만 한 줄로: 언제 필요한가 · 언제 오는가 (구매일·주기는 보조 정보) */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
-                      <span className={`font-semibold ${r.dueInDays <= 0 ? "text-[#C2501A]" : "text-ink"}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[13px] font-bold ${r.dueInDays <= 0 ? "bg-accent/10 text-accent" : "bg-mist text-ink"}`}
+                      >
                         {dueText}
                       </span>
-                      <span className="text-line">|</span>
                       <DeliveryBadge promise={deliveryPromise(r.product.deliveryType, r.available)} compact />
                     </div>
                     <div className="mt-0.5 text-[13px] text-muted">

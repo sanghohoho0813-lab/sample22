@@ -13,7 +13,7 @@ import { useToast } from "@/components/shared/Toast";
 import { OrderDrawer, SkuDrawer } from "./Drawers";
 import { ActionDrawer } from "./ActionDrawer";
 import { Panel } from "./Widgets";
-import { Impact, Pager, SeverityTag, SortTh, usePage, useSort, VerdictTag } from "./OpsUi";
+import { Impact, money, Pager, SeverityTag, SortTh, usePage, useSort, VerdictTag } from "./OpsUi";
 
 type StageFilter = ActionStage | "all" | "running";
 const URG_RANK: Record<Urgency, number> = { critical: 4, high: 3, mid: 2, low: 1 };
@@ -292,7 +292,45 @@ export default function ActionsView() {
           />
         ) : view === "table" ? (
           <>
-            <div className="table-wrap">
+            {/* 휴대폰: 요약 목록 (긴급도·유형 → 제목 → 단계·담당·기한) */}
+            <ul className="space-y-2 sm:hidden">
+              {pg.rows.map((a) => (
+                <li key={a.id}>
+                  <button
+                    className="w-full rounded-xl border border-line bg-white p-3 text-left active:bg-mist"
+                    onClick={() => setAction(a)}
+                  >
+                    <span className="flex items-center gap-2 text-[12px] font-semibold text-muted">
+                      <SeverityTag s={a.urgency} />
+                      {actionTypeLabel(a.type)}
+                      <span className={`ml-auto ${overdue(a) ? "text-danger" : ""}`}>
+                        {overdue(a) ? "기한 지남" : `기한 ${fmtDate(a.dueAt, "md")}`}
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block font-semibold leading-snug">{a.title}</span>
+                    <span className="mt-1.5 flex items-center justify-between gap-2 text-[13px]">
+                      <span>
+                        <b className="font-semibold">{ACTION_STAGE_LABEL[a.stage]}</b>
+                        {!["held", "dismissed"].includes(a.stage) && (
+                          <span className="ml-1 tabular-nums text-muted">
+                            {lifecycleIndex(a.stage) + 1}/6
+                          </span>
+                        )}
+                        <span className="text-muted"> · {a.assignee}</span>
+                      </span>
+                      {a.impact && (
+                        <span className="font-semibold tabular-nums">
+                          {a.impact.unit === "원"
+                            ? money(a.impact.value)
+                            : `${Math.round(a.impact.value)}${a.impact.unit}`}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="table-wrap hidden sm:block">
               <table className="table">
                 <thead>
                   <tr>
@@ -314,7 +352,7 @@ export default function ActionsView() {
                       영향
                     </SortTh>
                     <th>기준값 → 측정</th>
-                    <SortTh k="updated" sort={sort}>
+                    <SortTh k="updated" sort={sort} className="hidden 2xl:table-cell">
                       갱신
                     </SortTh>
                   </tr>
@@ -356,6 +394,9 @@ export default function ActionsView() {
                             {lifecycleIndex(a.stage) + 1}/6
                           </span>
                         )}
+                        <span className="block text-[12px] text-muted 2xl:hidden">
+                          {relTime(a.updatedAt)} 갱신
+                        </span>
                       </td>
                       <td className="whitespace-nowrap text-[13px]">
                         {a.assignee}
@@ -376,10 +417,10 @@ export default function ActionsView() {
                           <span className="text-muted">-</span>
                         )}
                       </td>
-                      <td className="text-[13px]">
+                      <td className="max-w-[220px] text-[13px] leading-snug">
                         {a.measurement ? (
                           <span className="inline-flex flex-wrap items-center gap-1">
-                            <span className="tabular-nums">
+                            <span className="whitespace-normal">
                               {a.measurement.before} → {a.measurement.after}
                             </span>
                             <VerdictTag v={a.measurement.verdict} />
@@ -388,7 +429,9 @@ export default function ActionsView() {
                           <span className="text-muted">{a.baseline?.display ?? "-"}</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap text-[13px] text-muted">{relTime(a.updatedAt)}</td>
+                      <td className="hidden whitespace-nowrap text-[13px] text-muted 2xl:table-cell">
+                        {relTime(a.updatedAt)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

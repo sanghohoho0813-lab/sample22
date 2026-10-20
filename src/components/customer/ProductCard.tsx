@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Heart, Plus, Zap, Star } from "lucide-react";
 import type { ProductSummary } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
@@ -82,6 +82,7 @@ export default function ProductCard({
   const addToCart = useStore((st) => st.addToCart);
   const toast = useToast();
   const liked = wishlist.includes(s.product.id);
+  const [pop, setPop] = useState(0);
   const p = s.product;
   const brand = brandById.get(p.brandId)?.name;
   const badge = p.tags.includes("베스트")
@@ -136,12 +137,19 @@ export default function ProductCard({
         </div>
         <button
           type="button"
-          onClick={() => toggleWishlist(p.id)}
+          onClick={() => {
+            toggleWishlist(p.id);
+            if (!liked) setPop((n) => n + 1);
+          }}
           aria-label={liked ? "찜 해제" : "찜하기"}
           aria-pressed={liked}
           className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full text-ink/45 transition-colors hover:text-danger"
         >
-          <Heart size={19} className={liked ? "fill-danger text-danger" : "fill-white/70"} />
+          <Heart
+            key={pop}
+            size={19}
+            className={`${liked ? "fill-danger text-danger" : "fill-white/70"} ${pop ? "heart-pop" : ""}`}
+          />
         </button>
         {!s.soldOut && (
           <button

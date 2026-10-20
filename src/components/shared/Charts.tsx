@@ -14,6 +14,7 @@ export function Sparkline({
   stroke?: string;
   fill?: boolean;
 }) {
+  const gid = `sp${useId().replace(/[^\w-]/g, "")}`;
   if (!values.length) return null;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
@@ -34,12 +35,16 @@ export function Sparkline({
       className="overflow-visible"
     >
       {fill && (
-        <path
-          d={`${d} L${width},${height} L0,${height} Z`}
-          fill={stroke}
-          opacity={0.12}
-          className="fade-in"
-        />
+        <>
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={stroke} stopOpacity={0.18} />
+              <stop offset="1" stopColor={stroke} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {/* 면은 그라데이션 투명도로 — 등장 애니메이션이 opacity를 1로 덮어써 진하게 칠해지던 문제 */}
+          <path d={`${d} L${width},${height} L0,${height} Z`} fill={`url(#${gid})`} className="fade-in" />
+        </>
       )}
       <path
         d={d}

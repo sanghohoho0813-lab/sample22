@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Search,
   ShoppingCart,
@@ -27,8 +27,9 @@ import {
   Phone,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useData, useHydrated, useIsInIframe, useNow } from "@/lib/hooks";
-import { autocomplete, SUGGESTED_SEARCHES } from "@/lib/catalog";
+import { useBump, useData, useHydrated, useIsInIframe, useNow } from "@/lib/hooks";
+import { autocomplete, searchProducts, SUGGESTED_SEARCHES } from "@/lib/catalog";
+import ProductArt from "@/components/shared/ProductArt";
 import Overlay from "@/components/shared/Overlay";
 import SampleBridgeCTA from "@/components/shared/SampleBridgeCTA";
 import MobileDrawer from "@/components/shared/MobileDrawer";
@@ -224,6 +225,79 @@ export function SearchBox({
   );
 }
 
+/** 휴대폰 전체 화면 검색 — 검색창 + 카테고리 바로가기 + 지금 많이 찾는 상품 */
+function MobileSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const data = useData();
+  const popular = useMemo(
+    () => (open ? searchProducts(data, { sort: "popular" }).slice(0, 6) : []),
+    [data, open],
+  );
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="상품 검색"
+      className="fade-up fixed inset-0 z-[60] flex flex-col bg-white md:hidden"
+    >
+      <div className="flex h-16 shrink-0 items-center gap-1 border-b border-line pl-1 pr-3">
+        <button className="btn-ghost !px-2" onClick={onClose} aria-label="검색 닫기">
+          <ChevronLeft size={24} />
+        </button>
+        <div className="flex-1">
+          <SearchBox autoFocus onDone={onClose} label="휴대폰 상품 검색" />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5">
+        <h2 className="text-[15px] font-bold">카테고리</h2>
+        <ul className="mt-3 grid grid-cols-4 gap-2">
+          {data.categories.map((c) => (
+            <li key={c.slug}>
+              <Link href={`/category/${c.slug}`} onClick={onClose} className="chip w-full justify-center">
+                <span className="text-[15px] font-medium">{c.name}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <h2 className="mt-6 text-[15px] font-bold">지금 많이 찾는 상품</h2>
+        <ol className="mt-2 divide-y divide-line">
+          {popular.map((s, i) => (
+            <li key={s.product.id}>
+              <Link
+                href={`/product/${s.product.id}`}
+                onClick={onClose}
+                className="flex items-center gap-3 py-2.5 active:bg-mist"
+              >
+                <span className="w-5 shrink-0 text-center text-[15px] font-bold tabular-nums text-primary">
+                  {i + 1}
+                </span>
+                <span aria-hidden="true" className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-mist">
+                  <ProductArt name={s.product.name} className="h-full w-full" />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[15px]">{s.product.name}</span>
+                <span className="shrink-0 text-[14px] font-semibold tabular-nums">
+                  {s.defaultSku.salePrice.toLocaleString()}원
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 /** 실시간 오늘 날짜·시각 + 빠른배송 출고마감 카운트다운 */
 export function DeliveryStrip({ compact = false }: { compact?: boolean }) {
   const now = useNow(30000);
@@ -359,6 +433,7 @@ export default function CustomerShell({
   const router = useRouter();
   const hydrated = useHydrated();
   const cartCount = useStore((s) => s.ui.cart.reduce((a, c) => a + c.qty, 0));
+  const cartBump = useBump(cartCount);
   const data = useData();
   const customerId = useStore((s) => s.ui.customerId);
   const unread = data.notifications.filter((n) => n.customerId === customerId && !n.read).length;
@@ -458,7 +533,9 @@ export default function CustomerShell({
               >
                 <ShoppingCart size={22} />
                 {hydrated && cartCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-orange-strong px-1 text-[13px] font-bold tabular-nums text-white">
+                  <span
+                    className={`absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-orange-strong px-1 text-[13px] font-bold tabular-nums text-white ${cartBump ? "bump" : ""}`}
+                  >
                     {cartCount > 99 ? "99+" : cartCount}
                   </span>
                 )}
@@ -493,21 +570,9 @@ export default function CustomerShell({
             </nav>
           )}
         </div>
-        {/* mobile search overlay */}
-        {searchOpen && (
-          <div className="fade-up fixed inset-0 z-[60] bg-white md:hidden">
-            <div className="flex h-16 items-center gap-2 border-b border-line px-3">
-              <div className="flex-1">
-                <SearchBox autoFocus onDone={() => setSearchOpen(false)} />
-              </div>
-              <button className="btn-ghost !px-2" onClick={() => setSearchOpen(false)} aria-label="닫기">
-                <X size={22} />
-              </button>
-            </div>
-            <div className="p-4 text-sm text-muted">검색어를 입력하고 Enter 또는 검색을 누르세요.</div>
-          </div>
-        )}
       </header>
+      {/* 휴대폰 검색 — 헤더 밖에 둔다 (헤더의 backdrop-blur가 fixed 요소의 기준을 헤더로 묶어 화면을 다 덮지 못하던 문제) */}
+      <MobileSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <main
         id="main"
@@ -650,7 +715,9 @@ export default function CustomerShell({
                     <n.icon size={23} strokeWidth={on ? 2.3 : 1.8} />
                     {n.label}
                     {hydrated && n.count ? (
-                      <span className="absolute right-1/2 top-1.5 flex h-[18px] min-w-[18px] translate-x-4 items-center justify-center rounded-full bg-orange-strong px-1 text-[12px] font-bold tabular-nums text-white">
+                      <span
+                        className={`absolute right-1/2 top-1.5 flex h-[18px] min-w-[18px] translate-x-4 items-center justify-center rounded-full bg-orange-strong px-1 text-[12px] font-bold tabular-nums text-white ${cartBump ? "bump" : ""}`}
+                      >
                         {n.count > 99 ? "99+" : n.count}
                       </span>
                     ) : null}
